@@ -3,11 +3,16 @@ from Bio.Seq import Seq
 from helpers import reverse_complement
 
 def mut_to_oligo(mut, ref_genome, oligo_len=90):
-    genome_slice_len = oligo_len - len(mut.after)
     
-    out = "AAA"
+    post_seq_len = (oligo_len - len(mut.after) +0)/2
+    pre_seq_len = oligo_len - post_seq_len - len(mut.after)
     
-    out = target_lagging_strand(out, mut.position, ori=3886229, ter=1493223)
+    offset = 1
+    #if not len(mut.before): offset = 0
+    pre_seq = ref_genome[ mut.position-pre_seq_len-1 : mut.position-offset ]
+    post_seq = ref_genome[ mut.position+len(mut.before)-offset : mut.position+len(mut.before)+post_seq_len-1 ]
+    
+    out = pre_seq + mut.after.lower() + post_seq
     
     return out
 

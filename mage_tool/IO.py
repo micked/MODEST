@@ -50,10 +50,7 @@ class Mutation:
         elif mut_type.lower() == "deletion" or mut_type.lower() == "large_deletion":
             if not ref_genome:
                 raise Exception("No reference genome supplied")
-            if hasattr(ref_genome, "seq"):
-                self.before = ref_genome.seq[pos-1:pos+int(mut)-1]
-            else:
-                self.before = ref_genome[pos-1:pos+int(mut)-1]
+            self.before = ref_genome[pos-1:pos+int(mut)-1]
             self.after = ""
         else:
             raise Exception("Unknown mut_type: " + mut_type)
