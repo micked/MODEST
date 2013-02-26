@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 
+"""
+General interface to <>
+"""
+
 from translation import replace_start_codon
 
 def interface(adjustments, genes, genome):
@@ -16,15 +20,16 @@ def interface(adjustments, genes, genome):
         op = operations[a["operation"]]
         gene = genes[a["gene"]]
         muts = op(gene, *a["options"])
-        for mut in muts:
-            if mut:
-                mutations.append(mut)
+        mutations.extend(muts)
 
     for m in mutations:
         print m
 
 def start_codon_optimal(gene):
-    return [replace_start_codon(gene.cds, gene.pos, "ATG")]
+    mut = replace_start_codon(gene.cds, gene.pos, "ATG")
+    if not mut:
+        return []
+    return [mut]
 
 operations = {
     "start_codon_optimal": start_codon_optimal

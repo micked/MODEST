@@ -46,7 +46,3 @@ def find_mutation_box(parent, mutation):
 
     mut = "{}={}".format(parent[offset:length], mutation[offset:length])
     return offset, mut
-
-
-if __name__ == '__main__':
-    print find_mutation_box("ATG", "AGC")

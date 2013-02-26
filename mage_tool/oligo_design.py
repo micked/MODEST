@@ -1,6 +1,13 @@
+#!/usr/bin/env python
+
+"""
+Module for designing DNA oligos from mutation objects
+"""
+
 from Bio.Seq import Seq
 
 from helpers import reverse_complement
+
 
 def mut_to_oligo(mut, ref_genome, oligo_len=90):
     

@@ -1,4 +1,8 @@
 
+"""
+Classes dealing with input/output and format changes
+"""
+
 class Mutation:
     def __init__(self, mut_format, mut, pos=0, mut_type="", ref_genome=False):
         """Mutation

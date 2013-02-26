@@ -13,7 +13,7 @@ if __name__ == "__main__":
     mutation_list = [l.strip().split() for l in list(open("data/some_mutations.txt", "U"))]
     
     project = "HeatAdaptation"
-    
+
     #"""
     with open("master.fasta", "w") as f:
         for mut in mutation_list:
