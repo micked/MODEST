@@ -1,5 +1,11 @@
 #!/usr/bin/env python
 
+"""
+Commandline interface to <>
+
+Yadda yadda yadda
+"""
+
 import argparse
 
 from Bio import SeqIO

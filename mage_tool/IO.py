@@ -3,6 +3,10 @@
 Classes dealing with input/output and format changes
 """
 
+from copy import deepcopy
+
+from helpers import reverse_complement
+
 class Mutation:
     def __init__(self, mut_format, mut, pos=0, mut_type="", ref_genome=False):
         """Mutation
@@ -36,7 +40,7 @@ class Mutation:
         return "Mutation: [{}={}] at pos {}".format(
             self.before,
             self.after,
-            self.position)
+            self.pos)
     
     #
     # Parsers
@@ -44,7 +48,7 @@ class Mutation:
     
     def _parse_arrow(self, mut, pos, mut_type, ref_genome=False):
         """Parse arrow format"""
-        self.position = pos
+        self.pos = pos
         if mut_type.lower() == "point_mutation":  
             self.before = mut.split("->")[0]
             self.after = mut.split("->")[1]
@@ -60,9 +64,13 @@ class Mutation:
             raise Exception("Unknown mut_type: " + mut_type)
             
     def _parse_eq(self, mut, pos):
-        self.position = pos
+        self.pos = pos
         mut = mut.strip("[]")
         self.before, self.after = mut.split("=")
+
+    def copy(self):
+        """Return a copy"""
+        return deepcopy(self)
 
 
 def seqIO_to_genelist(genome, include_genes=None):
@@ -77,10 +85,17 @@ def seqIO_to_genelist(genome, include_genes=None):
             if include_genes and name not in include_genes:
                 continue
 
-            pos = g.location.start
+            #Little bit of warning:
+            #Bio converts positions to 0-index internally
+            #This is mostly a good thing
             strand = g.location.strand
             cds = g.extract(genome).seq
-            leader = genome.seq[pos-35:pos]
+            if strand == 1:
+                pos = g.location.start
+                leader = genome.seq[pos-35:pos]
+            else:
+                pos = g.location.end
+                leader = reverse_complement(genome.seq[pos:pos+35])
             #TODO
             promoter = None
             promoter_pos = None
@@ -111,3 +126,16 @@ class Gene:
 
     def __repr__(self):
         return self.__str__()
+
+    def do_mutation(self, mut):
+        """Return Mutaion in genome context (positive strand)"""
+        mut = mut.copy()
+        if self.strand == 1:
+            mut.pos = mut.pos+self.pos
+            return mut
+        else:
+            mut.pos = self.pos - mut.pos - len(mut.before)
+            mut.before = reverse_complement(mut.before)
+            mut.after = reverse_complement(mut.after)
+
+        return mut

@@ -26,7 +26,7 @@ def interface(adjustments, genes, genome):
         print m
 
 def start_codon_optimal(gene):
-    mut = replace_start_codon(gene.cds, gene.pos, "ATG")
+    mut = replace_start_codon(gene, "ATG")
     if not mut:
         return []
     return [mut]

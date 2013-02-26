@@ -65,7 +65,6 @@ thiQ	start_codon_optimal
 thiP	start_codon_optimal
 thiB	start_codon_optimal
 sgrR	start_codon_optimal
-sgrS	start_codon_optimal
 sgrT	start_codon_optimal
 setA	start_codon_optimal
 leuD	start_codon_optimal
@@ -162,7 +161,6 @@ yaeI	start_codon_optimal
 dapD	start_codon_optimal
 glnD	start_codon_optimal
 map	start_codon_optimal
-tff	start_codon_optimal
 rpsB	start_codon_optimal
 tsf	start_codon_optimal
 pyrH	start_codon_optimal
