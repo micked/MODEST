@@ -20,10 +20,11 @@ def interface(adjustments, genes, genome):
         op = operations[a["operation"]]
         gene = genes[a["gene"]]
         muts = op(gene, *a["options"])
-        mutations.extend(muts)
+        for mut in muts:
+            mutations.append({"mutation": mut, "gene": gene})
 
     for m in mutations:
-        print m
+        print m["mutation"], m["gene"].cds[0:10]
 
 def start_codon_optimal(gene):
     mut = replace_start_codon(gene, "ATG")

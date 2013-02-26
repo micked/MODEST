@@ -194,12 +194,6 @@ metQ	start_codon_optimal
 metI	start_codon_optimal
 metN	start_codon_optimal
 gmhB	start_codon_optimal
-rrsH	start_codon_optimal
-ileV	start_codon_optimal
-alaV	start_codon_optimal
-rrlH	start_codon_optimal
-rrfH	start_codon_optimal
-aspU	start_codon_optimal
 dkgB	start_codon_optimal
 yafC	start_codon_optimal
 yafD	start_codon_optimal
@@ -209,7 +203,6 @@ gloB	start_codon_optimal
 yafS	start_codon_optimal
 rnhA	start_codon_optimal
 dnaQ	start_codon_optimal
-aspV	start_codon_optimal
 yafT	start_codon_optimal
 ykfM	start_codon_optimal
 yafU	start_codon_optimal
@@ -239,7 +232,6 @@ crl	start_codon_optimal
 phoE	start_codon_optimal
 proB	start_codon_optimal
 proA	start_codon_optimal
-thrW	start_codon_optimal
 ykfN	start_codon_optimal
 ykfI	start_codon_optimal
 yafW	start_codon_optimal
@@ -256,7 +248,6 @@ ykfA	start_codon_optimal
 perR	start_codon_optimal
 insN	start_codon_optimal
 insI	start_codon_optimal
-eyeA	start_codon_optimal
 ykfC	start_codon_optimal
 insH	start_codon_optimal
 mmuP	start_codon_optimal
@@ -283,7 +274,6 @@ yagL	start_codon_optimal
 yagM	start_codon_optimal
 yagN	start_codon_optimal
 intF	start_codon_optimal
-ptwF	start_codon_optimal
 yagP	start_codon_optimal
 ykgT	start_codon_optimal
 paoD	start_codon_optimal
@@ -454,7 +444,6 @@ amtB	start_codon_optimal
 tesB	start_codon_optimal
 ybaY	start_codon_optimal
 ybaZ	start_codon_optimal
-ffs	start_codon_optimal
 ybaA	start_codon_optimal
 ylaB	start_codon_optimal
 ylaC	start_codon_optimal
@@ -481,7 +470,6 @@ ybaL	start_codon_optimal
 fsr	start_codon_optimal
 ushA	start_codon_optimal
 ybaK	start_codon_optimal
-chiX	start_codon_optimal
 ybaP	start_codon_optimal
 ybaQ	start_codon_optimal
 copA	start_codon_optimal
@@ -535,7 +523,6 @@ sfmD	start_codon_optimal
 sfmH	start_codon_optimal
 sfmF	start_codon_optimal
 fimZ	start_codon_optimal
-argU	start_codon_optimal
 intD	start_codon_optimal
 xisD	start_codon_optimal
 exoD	start_codon_optimal
@@ -571,7 +558,6 @@ ybcY	start_codon_optimal
 tfaX	start_codon_optimal
 appY	start_codon_optimal
 ompT	start_codon_optimal
-pauD	start_codon_optimal
 envY	start_codon_optimal
 ybcH	start_codon_optimal
 nfrA	start_codon_optimal
@@ -588,7 +574,6 @@ nfsB	start_codon_optimal
 ybdF	start_codon_optimal
 ybdJ	start_codon_optimal
 ybdK	start_codon_optimal
-sokE	start_codon_optimal
 hokE	start_codon_optimal
 insL	start_codon_optimal
 entD	start_codon_optimal
@@ -671,13 +656,6 @@ ybeY	start_codon_optimal
 ybeZ	start_codon_optimal
 miaB	start_codon_optimal
 ubiF	start_codon_optimal
-glnX	start_codon_optimal
-glnV	start_codon_optimal
-metU	start_codon_optimal
-glnW	start_codon_optimal
-glnU	start_codon_optimal
-leuW	start_codon_optimal
-metT	start_codon_optimal
 asnB	start_codon_optimal
 nagD	start_codon_optimal
 nagC	start_codon_optimal
@@ -750,13 +728,6 @@ tolA	start_codon_optimal
 tolB	start_codon_optimal
 pal	start_codon_optimal
 ybgF	start_codon_optimal
-lysT	start_codon_optimal
-valT	start_codon_optimal
-lysW	start_codon_optimal
-valZ	start_codon_optimal
-lysY	start_codon_optimal
-lysZ	start_codon_optimal
-lysQ	start_codon_optimal
 nadA	start_codon_optimal
 pnuC	start_codon_optimal
 zitB	start_codon_optimal
@@ -824,7 +795,6 @@ rhtA	start_codon_optimal
 ompX	start_codon_optimal
 ybiP	start_codon_optimal
 yliL	start_codon_optimal
-rybA	start_codon_optimal
 mntR	start_codon_optimal
 ybiR	start_codon_optimal
 ybiS	start_codon_optimal
@@ -855,7 +825,6 @@ ybjH	start_codon_optimal
 ybjI	start_codon_optimal
 ybjJ	start_codon_optimal
 ybjK	start_codon_optimal
-rybB	start_codon_optimal
 ybjL	start_codon_optimal
 ybjM	start_codon_optimal
 grxA	start_codon_optimal
@@ -892,7 +861,6 @@ macB	start_codon_optimal
 cspD	start_codon_optimal
 clpS	start_codon_optimal
 clpA	start_codon_optimal
-serW	start_codon_optimal
 infA	start_codon_optimal
 aat	start_codon_optimal
 cydC	start_codon_optimal
@@ -980,7 +948,6 @@ rlmI	start_codon_optimal
 yccX	start_codon_optimal
 tusE	start_codon_optimal
 yccA	start_codon_optimal
-serT	start_codon_optimal
 hyaA	start_codon_optimal
 hyaB	start_codon_optimal
 hyaC	start_codon_optimal
@@ -1041,7 +1008,6 @@ insF	start_codon_optimal
 insE	start_codon_optimal
 ymdE	start_codon_optimal
 ycdU	start_codon_optimal
-serX	start_codon_optimal
 ghrA	start_codon_optimal
 ycdX	start_codon_optimal
 ycdY	start_codon_optimal
@@ -1096,7 +1062,6 @@ rne	start_codon_optimal
 yceQ	start_codon_optimal
 rluC	start_codon_optimal
 yceF	start_codon_optimal
-psrD	start_codon_optimal
 yceD	start_codon_optimal
 rpmF	start_codon_optimal
 plsX	start_codon_optimal
@@ -1229,11 +1194,8 @@ ychQ	start_codon_optimal
 ychA	start_codon_optimal
 kdsA	start_codon_optimal
 ldrA	start_codon_optimal
-rdlA	start_codon_optimal
 ldrB	start_codon_optimal
-rdlB	start_codon_optimal
 ldrC	start_codon_optimal
-rdlC	start_codon_optimal
 chaA	start_codon_optimal
 chaB	start_codon_optimal
 chaC	start_codon_optimal
@@ -1246,10 +1208,7 @@ narG	start_codon_optimal
 narH	start_codon_optimal
 narJ	start_codon_optimal
 narI	start_codon_optimal
-rttR	start_codon_optimal
 tpr	start_codon_optimal
-tyrV	start_codon_optimal
-tyrT	start_codon_optimal
 purU	start_codon_optimal
 ychJ	start_codon_optimal
 rssA	start_codon_optimal
@@ -1364,11 +1323,9 @@ abgT	start_codon_optimal
 abgB	start_codon_optimal
 abgA	start_codon_optimal
 abgR	start_codon_optimal
-isrA	start_codon_optimal
 smrA	start_codon_optimal
 ydaM	start_codon_optimal
 ydaN	start_codon_optimal
-fnrS	start_codon_optimal
 dbpA	start_codon_optimal
 ttcA	start_codon_optimal
 intR	start_codon_optimal
@@ -1404,7 +1361,6 @@ ynaE	start_codon_optimal
 ttcC	start_codon_optimal
 uspF	start_codon_optimal
 ompN	start_codon_optimal
-micC	start_codon_optimal
 ydbK	start_codon_optimal
 ydbJ	start_codon_optimal
 hslJ	start_codon_optimal
@@ -1446,11 +1402,9 @@ ydcF	start_codon_optimal
 aldA	start_codon_optimal
 gapC	start_codon_optimal
 cybB	start_codon_optimal
-rydC	start_codon_optimal
 ydcA	start_codon_optimal
 hokB	start_codon_optimal
 mokB	start_codon_optimal
-sokB	start_codon_optimal
 trg	start_codon_optimal
 ydcI	start_codon_optimal
 ydcJ	start_codon_optimal
@@ -1565,7 +1519,6 @@ marB	start_codon_optimal
 eamA	start_codon_optimal
 ydeE	start_codon_optimal
 yneM	start_codon_optimal
-mgrR	start_codon_optimal
 ydeH	start_codon_optimal
 ydeI	start_codon_optimal
 ydeJ	start_codon_optimal
@@ -1607,7 +1560,6 @@ dicA	start_codon_optimal
 ydfA	start_codon_optimal
 ydfB	start_codon_optimal
 ydfC	start_codon_optimal
-dicF	start_codon_optimal
 dicB	start_codon_optimal
 ydfD	start_codon_optimal
 ydfE	start_codon_optimal
@@ -1701,8 +1653,6 @@ cfa	start_codon_optimal
 ribC	start_codon_optimal
 mdtK	start_codon_optimal
 ydhQ	start_codon_optimal
-valV	start_codon_optimal
-valW	start_codon_optimal
 ydhR	start_codon_optimal
 ydhS	start_codon_optimal
 ydhT	start_codon_optimal
@@ -1721,12 +1671,10 @@ sufD	start_codon_optimal
 sufC	start_codon_optimal
 sufB	start_codon_optimal
 sufA	start_codon_optimal
-rydB	start_codon_optimal
 ydiH	start_codon_optimal
 ydiI	start_codon_optimal
 ydiJ	start_codon_optimal
 ydiK	start_codon_optimal
-rprA	start_codon_optimal
 ydiL	start_codon_optimal
 ydiM	start_codon_optimal
 ydiN	start_codon_optimal
@@ -1880,8 +1828,6 @@ rsmF	start_codon_optimal
 yebV	start_codon_optimal
 yebW	start_codon_optimal
 pphA	start_codon_optimal
-ryeA	start_codon_optimal
-ryeB	start_codon_optimal
 yebY	start_codon_optimal
 yebZ	start_codon_optimal
 yobA	start_codon_optimal
@@ -1953,9 +1899,6 @@ ftnA	start_codon_optimal
 yecH	start_codon_optimal
 tyrP	start_codon_optimal
 yecA	start_codon_optimal
-leuZ	start_codon_optimal
-cysT	start_codon_optimal
-glyW	start_codon_optimal
 pgsA	start_codon_optimal
 uvrC	start_codon_optimal
 uvrY	start_codon_optimal
@@ -1996,7 +1939,6 @@ fliR	start_codon_optimal
 rcsA	start_codon_optimal
 dsrB	start_codon_optimal
 yodD	start_codon_optimal
-dsrA	start_codon_optimal
 yedP	start_codon_optimal
 yedQ	start_codon_optimal
 yodC	start_codon_optimal
@@ -2006,7 +1948,6 @@ vsr	start_codon_optimal
 dcm	start_codon_optimal
 yedJ	start_codon_optimal
 yedR	start_codon_optimal
-rseX	start_codon_optimal
 yedS	start_codon_optimal
 hchA	start_codon_optimal
 yedV	start_codon_optimal
@@ -2016,20 +1957,15 @@ yedY	start_codon_optimal
 yedZ	start_codon_optimal
 zinT	start_codon_optimal
 yodB	start_codon_optimal
-serU	start_codon_optimal
 mtfA	start_codon_optimal
-asnT	start_codon_optimal
 yeeJ	start_codon_optimal
 yeeL	start_codon_optimal
 shiA	start_codon_optimal
 amn	start_codon_optimal
 yeeN	start_codon_optimal
-asnW	start_codon_optimal
 yeeO	start_codon_optimal
-asnU	start_codon_optimal
 cbl	start_codon_optimal
 nac	start_codon_optimal
-asnV	start_codon_optimal
 erfK	start_codon_optimal
 cobT	start_codon_optimal
 cobS	start_codon_optimal
@@ -2042,7 +1978,6 @@ yoeA	start_codon_optimal
 insD	start_codon_optimal
 insC	start_codon_optimal
 yeeP	start_codon_optimal
-isrC	start_codon_optimal
 flu	start_codon_optimal
 yeeR	start_codon_optimal
 yeeS	start_codon_optimal
@@ -2121,9 +2056,7 @@ yegI	start_codon_optimal
 yegJ	start_codon_optimal
 yegK	start_codon_optimal
 yegL	start_codon_optimal
-sibA	start_codon_optimal
 ibsA	start_codon_optimal
-sibB	start_codon_optimal
 ibsB	start_codon_optimal
 mdtA	start_codon_optimal
 mdtB	start_codon_optimal
@@ -2133,7 +2066,6 @@ baeS	start_codon_optimal
 baeR	start_codon_optimal
 yegP	start_codon_optimal
 yegQ	start_codon_optimal
-cyaR	start_codon_optimal
 ogrK	start_codon_optimal
 yegZ	start_codon_optimal
 yegR	start_codon_optimal
@@ -2240,7 +2172,6 @@ rplY	start_codon_optimal
 yejK	start_codon_optimal
 yejL	start_codon_optimal
 yejM	start_codon_optimal
-proL	start_codon_optimal
 yejO	start_codon_optimal
 insH	start_codon_optimal
 narP	start_codon_optimal
@@ -2267,7 +2198,6 @@ alkB	start_codon_optimal
 ada	start_codon_optimal
 apbE	start_codon_optimal
 ompC	start_codon_optimal
-micF	start_codon_optimal
 rcsD	start_codon_optimal
 rcsB	start_codon_optimal
 rcsC	start_codon_optimal
@@ -2400,7 +2330,6 @@ fadL	start_codon_optimal
 yfdF	start_codon_optimal
 mlaA	start_codon_optimal
 yfdC	start_codon_optimal
-argW	start_codon_optimal
 intS	start_codon_optimal
 gtrA	start_codon_optimal
 gtrB	start_codon_optimal
@@ -2418,7 +2347,6 @@ yfdS	start_codon_optimal
 yfdT	start_codon_optimal
 ypdJ	start_codon_optimal
 torI	start_codon_optimal
-pawZ	start_codon_optimal
 dsdC	start_codon_optimal
 dsdX	start_codon_optimal
 dsdA	start_codon_optimal
@@ -2451,15 +2379,9 @@ mntH	start_codon_optimal
 nupC	start_codon_optimal
 insL	start_codon_optimal
 yfeA	start_codon_optimal
-alaX	start_codon_optimal
-alaW	start_codon_optimal
 yfeC	start_codon_optimal
 yfeD	start_codon_optimal
 gltX	start_codon_optimal
-valU	start_codon_optimal
-valX	start_codon_optimal
-valY	start_codon_optimal
-lysV	start_codon_optimal
 xapR	start_codon_optimal
 xapB	start_codon_optimal
 xapA	start_codon_optimal
@@ -2580,7 +2502,6 @@ ndk	start_codon_optimal
 pbpC	start_codon_optimal
 yfhM	start_codon_optimal
 sseA	start_codon_optimal
-ryfA	start_codon_optimal
 sseB	start_codon_optimal
 pepB	start_codon_optimal
 iscX	start_codon_optimal
@@ -2616,7 +2537,6 @@ glnB	start_codon_optimal
 glrR	start_codon_optimal
 yfhG	start_codon_optimal
 glrK	start_codon_optimal
-glmY	start_codon_optimal
 purL	start_codon_optimal
 mltF	start_codon_optimal
 tadA	start_codon_optimal
@@ -2624,7 +2544,6 @@ pgpC	start_codon_optimal
 yfhH	start_codon_optimal
 yfhL	start_codon_optimal
 shoB	start_codon_optimal
-ohsC	start_codon_optimal
 acpS	start_codon_optimal
 pdxJ	start_codon_optimal
 recO	start_codon_optimal
@@ -2650,12 +2569,7 @@ yfiQ	start_codon_optimal
 pssA	start_codon_optimal
 yfiM	start_codon_optimal
 kgtP	start_codon_optimal
-rrfG	start_codon_optimal
-rrlG	start_codon_optimal
-gltW	start_codon_optimal
-rrsG	start_codon_optimal
 clpB	start_codon_optimal
-ryfD	start_codon_optimal
 yfiH	start_codon_optimal
 rluD	start_codon_optimal
 bamD	start_codon_optimal
@@ -2682,7 +2596,6 @@ bamE	start_codon_optimal
 ratB	start_codon_optimal
 ratA	start_codon_optimal
 smpB	start_codon_optimal
-ssrA	start_codon_optimal
 intA	start_codon_optimal
 yfjH	start_codon_optimal
 alpA	start_codon_optimal
@@ -2708,11 +2621,9 @@ yfjY	start_codon_optimal
 ypjJ	start_codon_optimal
 yfjZ	start_codon_optimal
 ypjF	start_codon_optimal
-psaA	start_codon_optimal
 ypjA	start_codon_optimal
 pinH	start_codon_optimal
 ypjC	start_codon_optimal
-ileY	start_codon_optimal
 ygaQ	start_codon_optimal
 csiD	start_codon_optimal
 lhgO	start_codon_optimal
@@ -2742,15 +2653,9 @@ mprA	start_codon_optimal
 emrA	start_codon_optimal
 emrB	start_codon_optimal
 luxS	start_codon_optimal
-micA	start_codon_optimal
 gshA	start_codon_optimal
 yqaA	start_codon_optimal
 yqaB	start_codon_optimal
-argQ	start_codon_optimal
-argZ	start_codon_optimal
-argY	start_codon_optimal
-argV	start_codon_optimal
-serV	start_codon_optimal
 csrA	start_codon_optimal
 alaS	start_codon_optimal
 recX	start_codon_optimal
@@ -2817,7 +2722,6 @@ casC	start_codon_optimal
 casB	start_codon_optimal
 casA	start_codon_optimal
 ygcB	start_codon_optimal
-sokX	start_codon_optimal
 cysH	start_codon_optimal
 cysI	start_codon_optimal
 cysJ	start_codon_optimal
@@ -2849,7 +2753,6 @@ gudP	start_codon_optimal
 yqcA	start_codon_optimal
 truC	start_codon_optimal
 yqcC	start_codon_optimal
-csrB	start_codon_optimal
 syd	start_codon_optimal
 queF	start_codon_optimal
 ygdH	start_codon_optimal
@@ -2866,15 +2769,11 @@ fucR	start_codon_optimal
 rlmM	start_codon_optimal
 ygdD	start_codon_optimal
 gcvA	start_codon_optimal
-gcvB	start_codon_optimal
 ygdI	start_codon_optimal
 csdA	start_codon_optimal
 csdE	start_codon_optimal
 csdL	start_codon_optimal
 mltA	start_codon_optimal
-metZ	start_codon_optimal
-metW	start_codon_optimal
-metV	start_codon_optimal
 amiC	start_codon_optimal
 argA	start_codon_optimal
 recD	start_codon_optimal
@@ -2895,8 +2794,6 @@ ygdR	start_codon_optimal
 tas	start_codon_optimal
 lplT	start_codon_optimal
 aas	start_codon_optimal
-omrA	start_codon_optimal
-omrB	start_codon_optimal
 galR	start_codon_optimal
 lysA	start_codon_optimal
 lysR	start_codon_optimal
@@ -2922,7 +2819,6 @@ ygeO	start_codon_optimal
 insD	start_codon_optimal
 insC	start_codon_optimal
 ygeQ	start_codon_optimal
-glyU	start_codon_optimal
 ygeR	start_codon_optimal
 xdhA	start_codon_optimal
 xdhB	start_codon_optimal
@@ -2969,9 +2865,7 @@ ubiH	start_codon_optimal
 pepP	start_codon_optimal
 ygfB	start_codon_optimal
 zapA	start_codon_optimal
-ssrS	start_codon_optimal
 fau	start_codon_optimal
-sibC	start_codon_optimal
 ibsC	start_codon_optimal
 serA	start_codon_optimal
 rpiA	start_codon_optimal
@@ -3025,7 +2919,6 @@ mltC	start_codon_optimal
 nupG	start_codon_optimal
 speC	start_codon_optimal
 yqgA	start_codon_optimal
-pheV	start_codon_optimal
 yghD	start_codon_optimal
 yghE	start_codon_optimal
 yghF	start_codon_optimal
@@ -3105,9 +2998,7 @@ yqiI	start_codon_optimal
 glgS	start_codon_optimal
 yqiJ	start_codon_optimal
 yqiK	start_codon_optimal
-sibD	start_codon_optimal
 ibsD	start_codon_optimal
-sibE	start_codon_optimal
 ibsE	start_codon_optimal
 rfaE	start_codon_optimal
 glnE	start_codon_optimal
@@ -3126,7 +3017,6 @@ rpsU	start_codon_optimal
 dnaG	start_codon_optimal
 rpoD	start_codon_optimal
 mug	start_codon_optimal
-ileX	start_codon_optimal
 yqjH	start_codon_optimal
 yqjI	start_codon_optimal
 aer	start_codon_optimal
@@ -3177,7 +3067,6 @@ tdcA	start_codon_optimal
 tdcR	start_codon_optimal
 yhaB	start_codon_optimal
 yhaC	start_codon_optimal
-rnpB	start_codon_optimal
 garK	start_codon_optimal
 garR	start_codon_optimal
 garL	start_codon_optimal
@@ -3220,17 +3109,14 @@ deaD	start_codon_optimal
 yrbN	start_codon_optimal
 nlpI	start_codon_optimal
 pnp	start_codon_optimal
-psrO	start_codon_optimal
 rpsO	start_codon_optimal
 truB	start_codon_optimal
 rbfA	start_codon_optimal
 infB	start_codon_optimal
 nusA	start_codon_optimal
 rimP	start_codon_optimal
-metY	start_codon_optimal
 argG	start_codon_optimal
 yhbX	start_codon_optimal
-leuU	start_codon_optimal
 secG	start_codon_optimal
 glmM	start_codon_optimal
 folP	start_codon_optimal
@@ -3266,7 +3152,6 @@ npr	start_codon_optimal
 yrbL	start_codon_optimal
 mtgA	start_codon_optimal
 elbB	start_codon_optimal
-arcZ	start_codon_optimal
 arcB	start_codon_optimal
 yhcC	start_codon_optimal
 gltB	start_codon_optimal
@@ -3329,13 +3214,6 @@ yhdW	start_codon_optimal
 yhdX	start_codon_optimal
 yhdY	start_codon_optimal
 yhdZ	start_codon_optimal
-rrfF	start_codon_optimal
-thrV	start_codon_optimal
-rrfD	start_codon_optimal
-rrlD	start_codon_optimal
-alaU	start_codon_optimal
-ileU	start_codon_optimal
-rrsD	start_codon_optimal
 yrdA	start_codon_optimal
 yrdB	start_codon_optimal
 aroE	start_codon_optimal
@@ -3496,7 +3374,6 @@ gntK	start_codon_optimal
 gntR	start_codon_optimal
 yhhW	start_codon_optimal
 yhhX	start_codon_optimal
-ryhB	start_codon_optimal
 yhhY	start_codon_optimal
 yhhZ	start_codon_optimal
 yrhA	start_codon_optimal
@@ -3570,12 +3447,10 @@ yhiD	start_codon_optimal
 hdeB	start_codon_optimal
 hdeA	start_codon_optimal
 hdeD	start_codon_optimal
-arrS	start_codon_optimal
 gadE	start_codon_optimal
 mdtE	start_codon_optimal
 mdtF	start_codon_optimal
 gadW	start_codon_optimal
-gadY	start_codon_optimal
 gadX	start_codon_optimal
 gadA	start_codon_optimal
 yhjA	start_codon_optimal
@@ -3600,14 +3475,12 @@ bcsE	start_codon_optimal
 bcsF	start_codon_optimal
 bcsG	start_codon_optimal
 ldrD	start_codon_optimal
-rdlD	start_codon_optimal
 yhjV	start_codon_optimal
 dppF	start_codon_optimal
 dppD	start_codon_optimal
 dppC	start_codon_optimal
 dppB	start_codon_optimal
 dppA	start_codon_optimal
-proK	start_codon_optimal
 eptB	start_codon_optimal
 yhjX	start_codon_optimal
 yhjY	start_codon_optimal
@@ -3623,7 +3496,6 @@ mokA	start_codon_optimal
 hokA	start_codon_optimal
 insJ	start_codon_optimal
 insK	start_codon_optimal
-sokA	start_codon_optimal
 glyS	start_codon_optimal
 glyQ	start_codon_optimal
 ysaB	start_codon_optimal
@@ -3731,7 +3603,6 @@ xanP	start_codon_optimal
 yicH	start_codon_optimal
 yicI	start_codon_optimal
 yicJ	start_codon_optimal
-selC	start_codon_optimal
 yicT	start_codon_optimal
 setC	start_codon_optimal
 yicL	start_codon_optimal
@@ -3748,7 +3619,6 @@ uhpA	start_codon_optimal
 ilvN	start_codon_optimal
 ilvB	start_codon_optimal
 ivbL	start_codon_optimal
-istR	start_codon_optimal
 tisB	start_codon_optimal
 emrD	start_codon_optimal
 yidF	start_codon_optimal
@@ -3833,12 +3703,6 @@ rbsK	start_codon_optimal
 rbsR	start_codon_optimal
 hsrA	start_codon_optimal
 yieP	start_codon_optimal
-rrsC	start_codon_optimal
-gltU	start_codon_optimal
-rrlC	start_codon_optimal
-rrfC	start_codon_optimal
-aspT	start_codon_optimal
-trpT	start_codon_optimal
 hdfR	start_codon_optimal
 yifE	start_codon_optimal
 yifB	start_codon_optimal
@@ -3871,13 +3735,8 @@ rffT	start_codon_optimal
 wzyE	start_codon_optimal
 rffM	start_codon_optimal
 yifK	start_codon_optimal
-argX	start_codon_optimal
-hisR	start_codon_optimal
-leuT	start_codon_optimal
-proM	start_codon_optimal
 aslB	start_codon_optimal
 aslA	start_codon_optimal
-glmZ	start_codon_optimal
 hemY	start_codon_optimal
 hemX	start_codon_optimal
 hemD	start_codon_optimal
@@ -3924,11 +3783,6 @@ pepQ	start_codon_optimal
 yigZ	start_codon_optimal
 trkH	start_codon_optimal
 hemG	start_codon_optimal
-rrsA	start_codon_optimal
-ileT	start_codon_optimal
-alaT	start_codon_optimal
-rrlA	start_codon_optimal
-rrfA	start_codon_optimal
 mobB	start_codon_optimal
 mobA	start_codon_optimal
 yihD	start_codon_optimal
@@ -3937,9 +3791,7 @@ dsbA	start_codon_optimal
 yihF	start_codon_optimal
 yihG	start_codon_optimal
 polA	start_codon_optimal
-spf	start_codon_optimal
 yihA	start_codon_optimal
-csrC	start_codon_optimal
 yihI	start_codon_optimal
 hemN	start_codon_optimal
 yshB	start_codon_optimal
@@ -4034,7 +3886,6 @@ argE	start_codon_optimal
 argC	start_codon_optimal
 argB	start_codon_optimal
 argH	start_codon_optimal
-oxyS	start_codon_optimal
 oxyR	start_codon_optimal
 sthA	start_codon_optimal
 fabR	start_codon_optimal
@@ -4042,17 +3893,9 @@ yijD	start_codon_optimal
 trmA	start_codon_optimal
 btuB	start_codon_optimal
 murI	start_codon_optimal
-rrsB	start_codon_optimal
-gltT	start_codon_optimal
-rrlB	start_codon_optimal
-rrfB	start_codon_optimal
 murB	start_codon_optimal
 birA	start_codon_optimal
 coaA	start_codon_optimal
-thrU	start_codon_optimal
-tyrU	start_codon_optimal
-glyT	start_codon_optimal
-thrT	start_codon_optimal
 tufB	start_codon_optimal
 secE	start_codon_optimal
 nusG	start_codon_optimal
@@ -4063,7 +3906,6 @@ rplL	start_codon_optimal
 rpoB	start_codon_optimal
 rpoC	start_codon_optimal
 yjaZ	start_codon_optimal
-sroH	start_codon_optimal
 thiH	start_codon_optimal
 thiG	start_codon_optimal
 thiS	start_codon_optimal
@@ -4082,10 +3924,6 @@ zraS	start_codon_optimal
 zraR	start_codon_optimal
 purD	start_codon_optimal
 purH	start_codon_optimal
-rrsE	start_codon_optimal
-gltV	start_codon_optimal
-rrlE	start_codon_optimal
-rrfE	start_codon_optimal
 yjaA	start_codon_optimal
 yjaB	start_codon_optimal
 metA	start_codon_optimal
@@ -4141,7 +3979,6 @@ yjcB	start_codon_optimal
 yjcC	start_codon_optimal
 soxS	start_codon_optimal
 soxR	start_codon_optimal
-ryjA	start_codon_optimal
 yjcD	start_codon_optimal
 yjcE	start_codon_optimal
 yjcF	start_codon_optimal
@@ -4215,7 +4052,6 @@ cadA	start_codon_optimal
 cadB	start_codon_optimal
 cadC	start_codon_optimal
 yjdQ	start_codon_optimal
-pheU	start_codon_optimal
 yjdC	start_codon_optimal
 dsbD	start_codon_optimal
 cutA	start_codon_optimal
@@ -4246,9 +4082,6 @@ yjeP	start_codon_optimal
 psd	start_codon_optimal
 rsgA	start_codon_optimal
 orn	start_codon_optimal
-glyV	start_codon_optimal
-glyX	start_codon_optimal
-glyY	start_codon_optimal
 yjeV	start_codon_optimal
 queG	start_codon_optimal
 yjeF	start_codon_optimal
@@ -4351,7 +4184,6 @@ idnO	start_codon_optimal
 idnD	start_codon_optimal
 idnK	start_codon_optimal
 yjgB	start_codon_optimal
-leuX	start_codon_optimal
 intB	start_codon_optimal
 insC	start_codon_optimal
 insD	start_codon_optimal
@@ -4384,7 +4216,6 @@ yjhI	start_codon_optimal
 sgcR	start_codon_optimal
 sgcE	start_codon_optimal
 sgcA	start_codon_optimal
-ryjB	start_codon_optimal
 sgcQ	start_codon_optimal
 sgcC	start_codon_optimal
 sgcB	start_codon_optimal
@@ -4432,7 +4263,6 @@ yjiV	start_codon_optimal
 mcrC	start_codon_optimal
 mcrB	start_codon_optimal
 symE	start_codon_optimal
-symR	start_codon_optimal
 hsdS	start_codon_optimal
 hsdM	start_codon_optimal
 hsdR	start_codon_optimal
@@ -4454,9 +4284,6 @@ yjjQ	start_codon_optimal
 bglJ	start_codon_optimal
 fhuF	start_codon_optimal
 yjjZ	start_codon_optimal
-leuV	start_codon_optimal
-leuP	start_codon_optimal
-leuQ	start_codon_optimal
 rsmC	start_codon_optimal
 holD	start_codon_optimal
 rimI	start_codon_optimal
