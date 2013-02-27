@@ -10,17 +10,19 @@ from helpers import reverse_complement
 
 
 def mut_to_oligo(mut, ref_genome, oligo_len=90):
-    
+    """Make oligo from mutation"""
+
+    if str(ref_genome[mut.pos:mut.pos+len(mut.before)]) != str(mut.before):
+        found = ref_genome[mut.pos:mut.pos+len(mut.before)]
+        raise Exception("Trying to mutate {}, but found {} in genome.".format(mut.before, found))
+
     post_seq_len = (oligo_len - len(mut.after) +0)/2
     pre_seq_len = oligo_len - post_seq_len - len(mut.after)
     
-    offset = 1
-    #if not len(mut.before): offset = 0
-    pre_seq = ref_genome[ mut.position-pre_seq_len-1 : mut.position-offset ]
-    post_seq = ref_genome[ mut.position+len(mut.before)-offset : mut.position+len(mut.before)+post_seq_len-1 ]
+    pre_seq = ref_genome[ mut.pos-pre_seq_len : mut.pos ]
+    post_seq = ref_genome[ mut.pos+len(mut.before) : mut.pos+len(mut.before)+post_seq_len ]
     
     out = pre_seq + mut.after.lower() + post_seq
-    
     return out
 
 

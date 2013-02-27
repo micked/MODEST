@@ -6,6 +6,7 @@ Commandline interface to <>
 Yadda yadda yadda
 """
 
+import logging
 import argparse
 
 from Bio import SeqIO
@@ -18,7 +19,26 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("adjustments", help="Adjustment list")
     parser.add_argument("genome", help="Annotated genome")
+    parser.add_argument("--log", help="Logfile, default MODEST.log. Use STDOUT to log all messages to screen, use - to disable", default="MODEST.log")
     args = parser.parse_args()
+
+    #Set up logging
+    format = "%(asctime)s %(name)-12s: %(levelname)-8s %(message)s"
+    if args.log == "-":
+        logging.basicConfig(level=logging.ERROR)
+        console = logging.StreamHandler()
+        console.setLevel(logging.ERROR)
+        formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
+        logging.getLogger('').addHandler(console)
+    elif args.log.lower() == "stdout":
+        logging.basicConfig(level=logging.DEBUG, format=format, datefmt='%Y-%m-%d %H:%M')
+    else:
+        logging.basicConfig(level=logging.DEBUG, format=format, datefmt='%Y-%m-%d %H:%M', filename='MODEST.log', filemode='w')
+        console = logging.StreamHandler()
+        console.setLevel(logging.WARNING)
+        formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
+        console.setFormatter(formatter)
+        logging.getLogger('').addHandler(console)
 
     include_genes = set()
     print("Parsing adjustments..")

@@ -3,9 +3,14 @@
 Classes dealing with input/output and format changes
 """
 
+import logging
 from copy import deepcopy
 
 from helpers import reverse_complement
+
+
+log = logging.getLogger("MODEST.IO")
+log.addHandler(logging.NullHandler())
 
 class Mutation:
     def __init__(self, mut_format, mut, pos=0, mut_type="", ref_genome=False):
@@ -101,7 +106,7 @@ def seqIO_to_genelist(genome, include_genes=None):
             promoter_pos = None
 
             if name in genes:
-                print("WARNING: Gene {} found more than once.".format(name))
+                log.warn("Gene {} found more than once.".format(name))
                 #raise Exception("Gene {} found twice!".format(name))
 
             genes[name] = Gene(name, pos, strand, cds, leader, promoter, promoter_pos)

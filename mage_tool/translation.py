@@ -4,6 +4,7 @@
 Mutation generation routines related to translation initiation
 """
 
+
 from IO import Mutation
 from helpers import find_mutation_box
 
