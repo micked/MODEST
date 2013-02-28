@@ -37,6 +37,11 @@ def interface(adjustments, genes, genome, config, project=None):
 
     return oligos
 
+
+"""
+Translation modifications
+"""
+
 def start_codon_optimal(gene):
     mut = replace_start_codon(gene, "ATG")
     if not mut:

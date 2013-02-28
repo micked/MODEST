@@ -55,11 +55,12 @@ class Oligo:
         """Calculate replichore and target the lagging strand
 
         Returns False if pos is inside oriC or Ter, True otherwise
+        ori and ter are ranges: [start, end]
         """
         #Check whether pos is not inside oriC or Ter
         if ori[0] <= self.pos <= ori[1]:
             self.replichore = 0
-            log.warning("Oligo: {} inside oriC")
+            log.warning("Oligo: {} inside oriC".format(self.id()))
             return False
         elif ter[0] <= self.pos <= ter[1]:
             self.replichore = 0
@@ -129,7 +130,7 @@ class Mutation:
             deletion        3, pos, mut_change="Deletion"
         eq: position required
             point mutation: A=T, pos
-            insertion:      =T or A=AT, pos
+            insertion:      =AT, pos
             deletion:       A=, pos
         genome: search genome for mutation (eq format)
             AATGATA[ATG=GT]ATGATA
