@@ -5,7 +5,7 @@ Mutation generation routines related to translation initiation
 """
 
 
-from IO import Mutation
+from oligo_design import Mutation
 from helpers import find_mutation_box
 
 def replace_start_codon(gene, start_codon="ATG"):
