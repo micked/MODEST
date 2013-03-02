@@ -30,15 +30,14 @@ if __name__ == '__main__':
     #Set up logging
     format = "%(asctime)s %(name)-12s: %(levelname)-8s %(message)s"
     if args.log == "-":
-        logging.basicConfig(level=logging.ERROR)
-        console = logging.StreamHandler()
-        console.setLevel(logging.ERROR)
-        formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
-        logging.getLogger('').addHandler(console)
+        #Only errors are logged
+        logging.basicConfig(level=logging.ERROR, format='%(name)-12s: %(levelname)-8s %(message)s')
     elif args.log.lower() == "stdout":
+        #Everything to stdout
         logging.basicConfig(level=logging.DEBUG, format=format, datefmt='%Y-%m-%d %H:%M')
     else:
-        logging.basicConfig(level=logging.DEBUG, format=format, datefmt='%Y-%m-%d %H:%M', filename='MODEST.log', filemode='w')
+        #Log to file and warnings to screen
+        logging.basicConfig(level=logging.DEBUG, format=format, datefmt='%Y-%m-%d %H:%M', filename=args.log, filemode='w')
         console = logging.StreamHandler()
         console.setLevel(logging.WARNING)
         formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
@@ -49,18 +48,26 @@ if __name__ == '__main__':
     print("Parsing adjustments..")
     adjustments = list()
     with open(args.adjustments) as f:
-        for line in f:
+        for i,line in enumerate(f,1):
             line = line.split()
-            adjustments.append({"gene": line[0], "operation": line[1], "options": ()})
+            if len(line) < 2:
+                pass #TODO
+            if len(line) == 2:
+                options = ""
+            else:
+                options = line[2]
+
+            adjustments.append({"gene": line[0], "operation": line[1], "options": options, "line": i})
             include_genes.add(line[0])
 
-    print("Loading config file")
+    print("Loading config file..")
     with open(args.config) as cfg:
         config = yaml.safe_load(cfg)
         #TODO: Validate config
 
     print("Parsing genome..")
     genome = SeqIO.read(args.genome, "genbank")
+
     print("Collecting gene list..")
     genes = seqIO_to_genelist(genome, include_genes)
 

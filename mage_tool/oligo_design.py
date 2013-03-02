@@ -7,7 +7,7 @@ Module for designing DNA oligos from mutation objects
 import logging
 from copy import deepcopy
 
-from helpers import reverse_complement
+from DNA_tools import reverse_complement
 
 #Define a log
 log = logging.getLogger("MODEST.oligo")
@@ -29,13 +29,16 @@ class Oligo:
         self.barcodes_forward = []
         self.barcodes_reverse = []
         self.barcode_ids = []
+        self.code = ""
+        self.operation = ""
 
     def make_oligo(self, genome):
         """Make oligo from mutation"""
         #Make sure what is being mutated is actually being mutated
         if str(genome[self.mut.pos:self.mut.pos+len(self.mut.before)]) != str(self.mut.before):
             found = genome[self.mut.pos:self.mut.pos+len(self.mut.before)]
-            raise Exception("Trying to mutate {}, but found {} in genome.".format(self.mut.before, found))
+            extended = genome[self.mut.pos-5:self.mut.pos+len(self.mut.before)+5]
+            raise Exception("Trying to mutate {}, but found {} in genome. [{}]".format(self.mut.before, found, extended))
 
         #Calculate flanking sequence lengths
         post_seq_len = (self.oligo_len - len(self.mut.after))/2
@@ -104,12 +107,13 @@ class Oligo:
 
     def id(self):
         """Calculate an ID based the various self-contained variables"""
-        return "{prj}{i:0>4}{barcodes}_{mut}_{gene}_RP{rp}{opt}".format(
+        return "{prj}{i:0>4}{barcodes}_{mut}_{gene}_{code}_RP{rp}{opt}".format(
             prj = self.project if self.project else "",
             i = self.number,
             barcodes = "_BC:" + ",".join(self.barcode_ids) if self.barcode_ids else "",
             mut = str(self.mut),
             gene = str(self.gene),
+            code = self.code,
             rp = self.replichore,
             opt = "OPT:" + str(self.optimised) if self.optimised else ""
             )

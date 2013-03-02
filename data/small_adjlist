@@ -11,9 +11,9 @@ yaaH	start_codon_optimal
 yaaW	start_codon_optimal
 yaaI	start_codon_optimal
 dnaK	start_codon_optimal
-dnaJ	start_codon_optimal
-insL	start_codon_optimal
-mokC	start_codon_optimal
-hokC	start_codon_optimal
-nhaA	start_codon_optimal
-nhaR	start_codon_optimal
+dnaJ	translational_KO KO_frame=10
+insL	translational_KO KO_frame=20
+mokC	translational_KO
+hokC	translational_KO KO_frame=1000
+nhaA	translational_KO
+nhaR	translational_KO
