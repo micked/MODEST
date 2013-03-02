@@ -14,6 +14,7 @@ from translation import translational_KO
 log = logging.getLogger("MODEST")
 log.addHandler(logging.NullHandler())
 
+
 def interface(adjustments, genes, genome, config, project=None):
     """General interface to <>
 
@@ -26,29 +27,32 @@ def interface(adjustments, genes, genome, config, project=None):
 
     i = 0
     for a in adjustments:
+        #Collect gene
+        gene = genes[a["gene"]]
+        op = a["operation"]
+        op_str = "[{}/{}] line {}".format(op, gene, a["line"])
         #Try to find operation
         try:
-            op = operations[a["operation"]]
+            op = operations[op]
         except KeyError:
-            log.error("Operation [{}] not found. Doing nothing.".format(a["operation"]))
-
-        #Collect gene and do operation
-        gene = genes[a["gene"]]
-        muts = op(gene, config, a["options"], a["line"])
-        
-        #Functions may return several oligos
-        for mut, code, operation in muts:
-            oligo = Oligo(mut, gene, project, i, oligo_len=90)
-            oligo.make_oligo(genome)
-            oligo.target_lagging_strand(config["replication"]["ori"], config["replication"]["ter"])
-            #Back tracing
-            oligo.code = code
-            oligo.operation = operation
-            #Add to log
-            log.info(" ".join([operation, str(mut), ">>", oligo.id()]))
-            #Add
-            oligos.append(oligo)
-            i += 1
+            log.error("{} not found. Doing nothing.".format(op_str))
+        else:
+            #Do operation
+            muts = op(gene, config, a["options"], op_str)
+            
+            #Functions may return several oligos
+            for mut, code, operation in muts:
+                oligo = Oligo(mut, gene, project, i, oligo_len=90)
+                oligo.make_oligo(genome)
+                oligo.target_lagging_strand(config["replication"]["ori"], config["replication"]["ter"])
+                #Back tracing
+                oligo.code = code
+                oligo.operation = operation
+                #Add to log
+                log.info(" ".join([operation, str(mut), ">>", oligo.id()]))
+                #Add
+                oligos.append(oligo)
+                i += 1
 
     return oligos
 
@@ -57,10 +61,8 @@ def interface(adjustments, genes, genome, config, project=None):
 Translation modifications
 """
 
-def MAGE_start_codon_optimal(gene, config, options, line):
-    op = "[start_codon_optimal/{}] line {}".format(gene, line)
-
-    mut = replace_start_codon(gene, "ATG")
+def MAGE_start_codon_optimal(gene, config, options, op):
+    mut = replace_start_codon(gene, config["start codons"][0])
     if not mut:
         log.debug(op + " Not mutating, optimal start codon found.")
         return []
@@ -68,10 +70,7 @@ def MAGE_start_codon_optimal(gene, config, options, line):
     code = "OptStart{}".format(len(mut.before))
     return [(mut, code, op)]
 
-
-def MAGE_translational_KO(gene, config, options, line):
-    op = "[translational_KO/{}] line {}".format(gene, line)
-
+def MAGE_translational_KO(gene, config, options, op):
     options, opt_str = parse_options(options, {"ko_frame": (int, 10)}, op)
     op += " " + opt_str
     if not options:
@@ -81,10 +80,12 @@ def MAGE_translational_KO(gene, config, options, line):
     stop_codons = config["stop codons"]
     try:
         mut = translational_KO(gene, stop_codons, KO_frame)
-        code = "TransKO{}".format(len(mut.before))
+        code = "TransKO{}".format(mut._codon_offset)
         return [(mut, code, op)]
     except Exception as e:
         log.error(op + " Caught exception: " + str(e))
+        return []
+
 
 """
 General options parser

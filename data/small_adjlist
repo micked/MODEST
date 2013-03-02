@@ -14,6 +14,6 @@ dnaK	start_codon_optimal
 dnaJ	translational_KO KO_frame=10
 insL	translational_KO KO_frame=20
 mokC	translational_KO
-hokC	translational_KO KO_frame=1000
+hokC	translational_KO KO_frame=1000,something=4
 nhaA	translational_KO
 nhaR	translational_KO

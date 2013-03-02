@@ -1,26 +1,9 @@
-from string import maketrans
+"""
+General Mutation tools
+"""
 
-"""
-DNA string tools
-"""
-    
-def complement(x):
-    """Complement a DNA string"""
-    try:
-        return x.complement()
-    except AttributeError:
-        return x.translate(maketrans("ATGCatgc", "TACGtacg"))
-    
-def reverse_complement(x):
-    """Reverse complement"""
-    try:
-        return x.reverse_complement()
-    except AttributeError:
-        return x.translate(maketrans("ATGCatgc", "TACGtacg"))[::-1]
+from oligo_design import Mutation
 
-"""
-Mutation tools
-"""
 
 def find_mutation_box(parent, child):
     """Find a mutation box based on parent and mutation
@@ -46,7 +29,8 @@ def find_mutation_box(parent, child):
         length -= 1
 
     mut = "{}={}".format(parent[offset:length], child[offset:length])
-    return offset, mut
+    mut = Mutation("eq", mut, offset)
+    return mut
 
 def compare_seqs(parent, child):
     """Compare two sequences and return number of mutations

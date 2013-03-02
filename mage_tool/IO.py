@@ -5,7 +5,7 @@ Classes dealing with input/output and format changes
 
 import logging
 
-from DNA_tools import reverse_complement
+from helpers import reverse_complement
 from oligo_design import Gene
 
 log = logging.getLogger("MODEST.IO")

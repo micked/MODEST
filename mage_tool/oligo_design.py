@@ -7,7 +7,7 @@ Module for designing DNA oligos from mutation objects
 import logging
 from copy import deepcopy
 
-from DNA_tools import reverse_complement
+from helpers import reverse_complement
 
 #Define a log
 log = logging.getLogger("MODEST.oligo")
