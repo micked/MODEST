@@ -9,6 +9,7 @@ import logging
 from oligo_design import Oligo
 from translation import replace_start_codon
 from translation import translational_KO
+from translation import RBS_single_mutation
 
 #Define a log
 log = logging.getLogger("MODEST")
@@ -39,7 +40,7 @@ def interface(adjustments, genes, genome, config, project=None):
         else:
             #Do operation
             muts = op(gene, config, a["options"], op_str)
-            
+
             #Functions may return several oligos
             for mut, code, operation in muts:
                 oligo = Oligo(mut, gene, project, i, oligo_len=90)
@@ -87,6 +88,30 @@ def MAGE_translational_KO(gene, config, options, op):
         return []
 
 
+def MAGE_RBSopt_single(gene, config, options, op):
+    kwds = {"insert": (truefalse, False),
+            "delete": (truefalse, False),
+            "top": (int, 3),
+            "maximise": (truefalse, True)
+    }
+    options, opt_str = parse_options(options, kwds, op)
+    if not options:
+        return []
+    muts = RBS_single_mutation(gene, **options)
+    if not muts:
+        return []
+
+    op += " " + opt_str
+
+    muts_out = list()
+    for m in muts:
+        code = "RBSoptSingle{:.2f}".format(m._adjustment)
+        l_op = op + " {:.4f} times wt level".format(m._adjustment)
+        muts_out.append((m, code, l_op))
+
+    return muts_out
+
+
 """
 General options parser
 """
@@ -101,6 +126,7 @@ def parse_options(options, kwds, func):
         int: 3
         float: 3.14
         string: something
+        truefalse: True|yes|1 or False|no|0
         int_list: 1;2;3
         float_list: 3.14;5.13;5.0
         string_list: some;thing
@@ -121,7 +147,7 @@ def parse_options(options, kwds, func):
     for option in options:
         tmp = option.split("=")
         if len(tmp) < 2:
-            log.error("{}invalid option without value <{}>".format(func, option))
+            log.error("{} invalid option without value <{}>".format(func, option))
             return None, ""
         supp_opt[tmp[0].lower()] = "".join(tmp[1:])
 
@@ -134,7 +160,7 @@ def parse_options(options, kwds, func):
             try:
                 opts_out[o] = kwds[o][0](supp_opt[o])
             except ValueError:
-                log.error("{}invalid value {} for {}".format(func, supp_opt[o], kwds[o][0]))
+                log.error("{} invalid value \"{}\" for {}".format(func, supp_opt[o], kwds[o][0]))
                 return None, ""
         #Use default value
         else:
@@ -152,6 +178,15 @@ Custom types
 def int_list(lst):
     raise Exception("TODO")
 
+def truefalse(t):
+    """Parsed bool"""
+    if t.lower() in ["true", "1", "yes"]:
+        return True
+    elif t.lower() in ["false", "0", "no"]:
+        return False
+    else:
+        raise ValueError("Could not parse: {} as true/false value".format(t))
+
 
 """
 Dict to map all allowed operations
@@ -160,4 +195,5 @@ Dict to map all allowed operations
 operations = {
     "start_codon_optimal":  MAGE_start_codon_optimal,
     "translational_KO":     MAGE_translational_KO,
+    "RBSopt_single":        MAGE_RBSopt_single
     }

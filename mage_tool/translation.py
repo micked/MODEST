@@ -7,6 +7,9 @@ Mutation generation routines related to translation initiation
 
 from mutation_tools import find_mutation_box
 from mutation_tools import compare_seqs
+from RBS.RBS_Calculator import RBS_Calculator
+from oligo_design import Mutation
+
 
 def replace_start_codon(gene, start_codon="ATG"):
     """Replace start codon"""
@@ -51,3 +54,53 @@ def translational_KO(gene, stop_codons=["TAG", "TAA", "TGA"], KO_frame=10):
                     new_mut = gene.do_mutation(mutation)
                     new_mut._codon_offset = (i+start_offset)/3
                     return new_mut
+
+
+def RBS_single_mutation(gene, maximise=True, insert=False, delete=False, top=3):
+    """Maxi/minimise RBS binding with single mutations (Bruteforce approach)"""
+    mutation_list = list()
+    
+    seq = gene.leader + gene.cds
+    RBS_calc = RBS_Calculator(str(seq), [35, 35], "")
+    RBS_calc.calc_dG()
+    old_value = RBS_calc.calc_expression_level(RBS_calc.dG_total_list[0])
+    mutation_list.append((old_value, 0, ""))
+
+    mutations = {"A": ["T", "G", "C"],
+                 "T": ["A", "G", "C"],
+                 "G": ["A", "T", "C"],
+                 "C": ["A", "T", "G"]
+    }
+
+    if delete:
+        for N in mutations:
+            mutations[N].append("")
+
+    if insert:
+        for N in mutations:
+            for M in ["A", "T", "G", "C"]:
+                mutations[N].append(N+M)
+
+    leader = str(gene.leader)
+
+    for i,n in enumerate(leader.upper()):
+        for m in mutations[n]:
+            new_leader = leader[:i] + m + leader[i+1:]
+            new_seq = new_leader + str(gene.cds)
+            RBS_calc = RBS_Calculator(new_seq, [34+len(m), 34+len(m)], "")
+            RBS_calc.calc_dG()
+            tmp_mut = "{}={}".format(n, m)
+            if not len(RBS_calc.dG_total_list):
+                continue
+            new_value = RBS_calc.calc_expression_level(RBS_calc.dG_total_list[0])
+            mutation_list.append((new_value, i, tmp_mut))
+
+    muts = list()
+    for m in sorted(mutation_list, key=lambda x: x[0], reverse=maximise)[0:top]:
+        if not m[2]:
+            break
+        mut = Mutation("eq", m[2], -35+m[1])
+        mut._adjustment = m[0] / old_value
+        muts.append(gene.do_mutation(mut))
+
+    return muts

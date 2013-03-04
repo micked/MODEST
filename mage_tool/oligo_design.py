@@ -197,7 +197,7 @@ class Mutation:
 
 class Gene:
     """Defines a single gene and all relevant information"""
-    def __init__(self, name, pos, strand, cds, leader, promoter = None, promoter_pos = None):
+    def __init__(self, name, pos, strand, cds, leader, promoter=None, promoter_pos=None):
         self.name = name
         self.pos = pos
         self.strand = strand

@@ -11,7 +11,7 @@ def find_mutation_box(parent, child):
     parent and mutation must be same length
     """
     if len(parent) != len(child):
-        raise ValueError("parent {} and child {} must be same length".format(len(parent), len(child)))
+        parent, child = cheap_alignment(parent, child)
 
     parent = parent.upper()
     child = child.upper()
@@ -28,7 +28,9 @@ def find_mutation_box(parent, child):
             break
         length -= 1
 
-    mut = "{}={}".format(parent[offset:length], child[offset:length])
+    parent_mut = str(parent[offset:length]).replace("-", "")
+    child_mut = str(child[offset:length]).replace("-", "")
+    mut = "{}={}".format(parent_mut, child_mut)
     mut = Mutation("eq", mut, offset)
     return mut
 
@@ -58,3 +60,30 @@ def compare_seqs(parent, child):
             on_mut = True
 
     return muts, groups
+
+def cheap_alignment(parent, child):
+    """Very cheap alignment, only cares about matches at the ends"""
+    p_len = len(parent)
+    c_len = len(child)
+
+    sw = False
+    if c_len > p_len:
+        sw = True
+        parent, child = child, parent
+        p_len = len(parent)
+        c_len = len(child)
+
+    diff = p_len - c_len
+
+    newchild = ""
+    i = 0
+    while i < c_len and parent[i] == child[i]:
+        newchild += child[i]
+        i += 1
+
+    newchild += "-"*diff + child[i:]
+
+    if sw:
+        newchild, parent = parent, newchild
+
+    return parent, newchild

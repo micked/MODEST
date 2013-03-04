@@ -16,4 +16,12 @@ insL	translational_KO KO_frame=20
 mokC	translational_KO
 hokC	translational_KO KO_frame=1000,something=4
 nhaA	translational_KO
-nhaR	translational_KO
+nhaR	RBSopt_single insert=true,delete=yes,maximise=false
+ileS    RBSopt_single insert=0,delete=yes
+folA    RBSopt_single top=1
+apaH    RBSopt_single top=1
+apaG    RBSopt_single top=1
+rsmA    RBSopt_single top=1
+pdxA    RBSopt_single top=1
+surA    RBSopt_single top=1
+lptD    RBSopt_single top=1
