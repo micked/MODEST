@@ -44,7 +44,7 @@ def interface(adjustments, genes, genome, config, project=None):
             #Functions may return several oligos
             for mut, code, operation in muts:
                 oligo = Oligo(mut, gene, project, i, oligo_len=90)
-                oligo.make_oligo(genome)
+                oligo.set_oligo(genome, optimise=True, threshold=-20.0)
                 oligo.target_lagging_strand(config["replication"]["ori"], config["replication"]["ter"])
                 #Back tracing
                 oligo.code = code
@@ -106,7 +106,7 @@ def MAGE_RBSopt_single(gene, config, options, op):
     muts_out = list()
     for m in muts:
         code = "RBSoptSingle{:.2f}".format(m._adjustment)
-        l_op = op + " {:.4f} times wt level".format(m._adjustment)
+        l_op = op + " {:.4f}X wt".format(m._adjustment)
         muts_out.append((m, code, l_op))
 
     return muts_out

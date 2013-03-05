@@ -8,6 +8,7 @@ import logging
 from copy import deepcopy
 
 from helpers import reverse_complement
+import ViennaRNA
 
 #Define a log
 log = logging.getLogger("MODEST.oligo")
@@ -23,6 +24,7 @@ class Oligo:
         self.pos = mut.pos
         self.oligo = None
         self.optimised = 0
+        self.dG_fold = 0
         self.replichore = None
         self.project = project
         self.number = number
@@ -32,7 +34,13 @@ class Oligo:
         self.code = ""
         self.operation = ""
 
-    def make_oligo(self, genome):
+    def set_oligo(self, genome, optimise=True, threshold=-20):
+        if optimise:
+            self.oligo, self.dG_fold, self.optimised = self.optimise_folding(genome, threshold)
+        else:
+            self.oligo = self.make_oligo(genome, offset=0)
+
+    def make_oligo(self, genome, offset=0):
         """Make oligo from mutation"""
         #Make sure what is being mutated is actually being mutated
         if str(genome[self.mut.pos:self.mut.pos+len(self.mut.before)]) != str(self.mut.before):
@@ -42,17 +50,52 @@ class Oligo:
 
         #Calculate flanking sequence lengths
         post_seq_len = (self.oligo_len - len(self.mut.after))/2
-        pre_seq_len = self.oligo_len - post_seq_len - len(self.mut.after)
-        
+        pre_seq_len = self.oligo_len - post_seq_len - len(self.mut.after) + offset
+        post_seq_len -= offset
+
         #Fetch pre sequence
         pre_seq = genome[self.mut.pos-pre_seq_len : self.mut.pos]
 
         #Fetch post sequence
         post_seq_start = self.mut.pos+len(self.mut.before)
-        post_seq = genome[post_seq_start:post_seq_start+post_seq_len]
+        post_seq = genome[post_seq_start : post_seq_start+post_seq_len]
         
-        #Set parameters
-        self.oligo = pre_seq + self.mut.after.lower() + post_seq
+        return pre_seq + self.mut.after.lower() + post_seq
+
+    def optimise_folding(self, genome, threshold=-20.0):
+        """Optimise oligo folding if dG below threshold"""
+        if not self.oligo:
+            oligo = self.make_oligo(genome, offset=0)
+        else:
+            oligo = self.oligo
+
+        #Calculate default dG
+        optimised_oligo = (oligo, ViennaRNA.mfe(str(oligo)), 0)
+        candidates = [optimised_oligo]
+
+        if ViennaRNA.mfe(str(oligo)) < threshold:
+            #Offset towards 3'-end
+            three_end_cap = 15
+            end = self.oligo_len/2 - three_end_cap - len(self.mut.after)
+            for i in range(1, end):
+                candidate = self.make_oligo(genome, offset=i)
+                candidates.append((candidate, ViennaRNA.mfe(str(candidate)), i))
+
+            #Pick the best
+            optimised_oligo = max(candidates, key=lambda x: x[1])
+
+            #We are still below threshold. Panic, then offset towards 5'-end
+            if optimised_oligo[1] < threshold:
+                five_end_cap = 15
+                start = -self.oligo_len/2 + five_end_cap
+                for i in range(start, 0):
+                    candidate = self.make_oligo(genome, offset=i)
+                    candidates.append((candidate, ViennaRNA.mfe(str(candidate)), i))
+
+                #Pick the new best (old candidates can still apply)
+                optimised_oligo = max(candidates, key=lambda x: x[1])
+
+        return optimised_oligo
 
     def target_lagging_strand(self, ori, ter):
         """Calculate replichore and target the lagging strand
@@ -115,7 +158,7 @@ class Oligo:
             gene = str(self.gene),
             code = self.code,
             rp = self.replichore,
-            opt = "OPT:" + str(self.optimised) if self.optimised else ""
+            opt = "_OPT:{}({:.1f})".format(str(self.optimised), self.dG_fold) if self.optimised else ""
             )
 
     def copy(self):

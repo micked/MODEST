@@ -1,4 +1,5 @@
 from string import maketrans
+import re
 
 """
 DNA string tools
@@ -17,3 +18,15 @@ def reverse_complement(x):
         return x.reverse_complement()
     except AttributeError:
         return x.translate(maketrans("ATGCatgc", "TACGtacg"))[::-1]
+
+def valid_na(seq):
+    """Check for valid DNA/RNA"""
+    return bool(re.match(r"^[ATGCU]+$", seq, re.IGNORECASE))
+
+def valid_rna(seq):
+    """Check for valid RNA"""
+    return bool(re.match(r"^[AGCU]+$", seq, re.IGNORECASE))
+
+def valid_dna(seq):
+    """Check for valid DNA"""
+    return bool(re.match(r"^[ATGC]+$", seq, re.IGNORECASE))

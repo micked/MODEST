@@ -1,11 +1,78 @@
 # -*- coding: utf-8 -*-
 
 """
+Python wrapper for the Vienna RNA Package by Andreas R. Gruber, Ronny Lorenz, Stephan H. Bernhart, Richard Neuböck,
+and Ivo L. Hofacker (NAR, 2008).
+"""
+
+import re
+from subprocess import Popen, PIPE
+
+RNACOFOLD = "RNAcofold"
+
+def rnacofold(seq, options=["--noPS"], calc_basepairing=True):
+    """Run RNAcofold"""
+    cmd = [RNACOFOLD] + options
+    output = run_command(cmd, seq)
+    brackets, dG = output_to_brackets_and_dG(output.split("\n")[1])
+    
+    out = {"dG": dG, "brackets": brackets}
+
+    if calc_basepairing:
+        out["strands"], out["bp_x"], out["bp_y"] = brackets_to_basepairing(brackets)
+
+    return out
+
+
+def mfe(seq):
+    """Wrapper around RNAcofold, return only dG"""
+    return rnacofold(seq, calc_basepairing=False)["dG"]
+
+
+def output_to_brackets_and_dG(outputline):
+    """Single output line to brackets and dG"""
+    outputline = outputline.split()
+    brackets = outputline[0]
+    dG = float("".join(outputline[1:]).strip("()"))
+    return brackets, dG
+
+
+def brackets_to_basepairing(brackets):
+    bp_x = list()
+    last = list()
+    bp_y = [0] * brackets.count(")")
+    strands = [len(s) for s in brackets.split("&")]
+
+    for i,letter in enumerate(brackets.replace("&",""), 1):
+        if letter == "(":
+            bp_x.append(i)
+            last.append(i)
+        elif letter == ")":
+            try:
+                matching_bracket = last.pop()
+                y_loc = bp_x.index(matching_bracket)
+                bp_y[y_loc] = i
+            except IndexError:
+                a = "x"
+                if brackets.count("(") > brackets.count(")"): a ="y"
+                raise Exception("Missing \"{}\" bracket in {}".format(a, brackets))
+
+    return strands, bp_x, bp_y
+
+
+def run_command(cmd, input_string):
+    """Run the specified command and return output"""
+    p = Popen(cmd, stdout=PIPE, stdin=PIPE, stderr=PIPE, universal_newlines=True)
+    out, stderr = p.communicate(input=input_string)
+    if p.returncode:
+        raise Exception("Cmd {} failed: {}".format(cmd[0], stderr))
+    return out
+
+
+"""
 Modfied from Ribosome-Binding-Site-Calculator:
 <https://github.com/hsalis/ribosome-binding-site-calculator>
 <https://salis.psu.edu/software/>
-
-Original Copyright:
 
 Python wrapper for the Vienna RNA Package by Andreas R. Gruber, Ronny Lorenz, Stephan H. Bernhart, Richard Neuböck,
 and Ivo L. Hofacker (NAR, 2008).
@@ -29,8 +96,6 @@ This Python wrapper is written by Howard Salis. Copyright 2008-2009 is owned by 
 All rights reserved. :) Use at your own risk.
 """
 
-import re
-from subprocess import Popen, PIPE
 
 debug = 0
 
