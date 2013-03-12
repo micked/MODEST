@@ -20,7 +20,8 @@ from mage_tool.IO import oligolist_to_tabfile
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("adjustments", help="Adjustment list")
-    parser.add_argument("genome", help="Annotated genome")    
+    parser.add_argument("genome", help="Annotated genome")   
+    parser.add_argument("barcodes", help="Barcode library")    
     parser.add_argument("config", help="Genome configuration")
     parser.add_argument("--log", help="Logfile, default MODEST.log. Use STDOUT to log all messages to screen, use - to disable", default="MODEST.log")
     parser.add_argument("-p", "--project", help="Project name", default="Untitled")
@@ -50,16 +51,25 @@ if __name__ == '__main__':
     with open(args.adjustments) as f:
         for i,line in enumerate(f,1):
             line = line.split()
-            if len(line) < 2:
+            if len(line) < 4:
                 pass #TODO
-            if len(line) == 2:
+            if len(line) == 4:
                 options = ""
             else:
-                options = line[2]
+                options = line[4]
 
-            adjustments.append({"gene": line[0], "operation": line[1], "options": options, "line": i})
+            adjustments.append({"gene": line[0], "operation": line[1], "forward_barcodes":line[2], "reverse_barcodes":line[3], "options": options, "line": i})
             include_genes.add(line[0])
 
+
+    print("Loading barcode file..")
+    barcoding_lib = dict()
+    with open(args.barcodes) as bcs:
+        for line in bcs:
+            line = line.split()
+            barcoding_lib[line[0]] = line[1]
+            
+    
     print("Loading config file..")
     with open(args.config) as cfg:
         config = yaml.safe_load(cfg)
@@ -72,7 +82,7 @@ if __name__ == '__main__':
     genes = seqIO_to_genelist(genome, include_genes)
 
     print("Making oligos..")
-    oligos = interface(adjustments, genes, genome.seq, config, args.project)
+    oligos = interface(adjustments, genes, genome.seq, config, barcoding_lib, args.project)
 
     if args.output:
         output = args.output

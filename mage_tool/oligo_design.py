@@ -134,13 +134,18 @@ class Oligo:
                 self.replichore = 2
                 return True
 
-    def add_barcode(self, barcode, barcoding_lib):
+    def add_barcode(self, barcode, barcoding_lib, position):
         """TODO"""
         #Add a barcode ID to self.barcode_ids
         #and add barcode sequences to self.barcodes_*
         #forward should be prepended, and backward should be appended
         #Maybe add some primer checking too (maybe second function)
-        pass
+        if position == "forward":
+            self.barcodes_forward.insert(0, barcoding_lib[barcode])
+        elif position == "reverse":
+            self.barcodes_reverse.append(barcoding_lib[barcode])
+        self.barcode_ids.append(barcode)
+
 
     def output(self):
         """Return the oligo with barcodes"""

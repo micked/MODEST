@@ -16,7 +16,7 @@ log = logging.getLogger("MODEST")
 log.addHandler(logging.NullHandler())
 
 
-def interface(adjustments, genes, genome, config, project=None):
+def interface(adjustments, genes, genome, config, barcoding_lib, project=None):
     """General interface to <>
 
     adjustments is a parsed list
@@ -30,6 +30,10 @@ def interface(adjustments, genes, genome, config, project=None):
     for a in adjustments:
         #Collect gene
         gene = genes[a["gene"]]
+        #Forward barcodes
+        fwd_barcodes = a["forward_barcodes"]
+        #Reverse barcodes
+        rev_barcodes = a["reverse_barcodes"]
         op = a["operation"]
         op_str = "[{}/{}] line {}".format(op, gene, a["line"])
         #Try to find operation
@@ -46,6 +50,9 @@ def interface(adjustments, genes, genome, config, project=None):
                 oligo = Oligo(mut, gene, project, i, oligo_len=90)
                 oligo.set_oligo(genome, optimise=True, threshold=-20.0)
                 oligo.target_lagging_strand(config["replication"]["ori"], config["replication"]["ter"])
+                #Add barcodes
+                oligo.add_barcode(fwd_barcodes, barcoding_lib, "forward")
+                oligo.add_barcode(rev_barcodes, barcoding_lib, "reverse")
                 #Back tracing
                 oligo.code = code
                 oligo.operation = operation
