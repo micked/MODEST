@@ -4,10 +4,13 @@
 Mutation generation routines related to translation initiation
 """
 
+import random
+import math
 
 from mutation_tools import find_mutation_box
 from mutation_tools import compare_seqs
 from RBS.RBS_Calculator import RBS_Calculator
+from RBS.RBS_Calculator import NoRBSError
 from oligo_design import Mutation
 
 
@@ -108,34 +111,140 @@ def RBS_single_mutation(gene, maximise=True, insert=False, delete=False, top=3):
 RBS Monte Carlo functions
 """
 
-def RBS_Monte_Carlo(gene, target, its=10):
-    """TODO"""
+class RBS_Monte_Carlo:
 
-    leader = list(gene.leader)
-    cds = gene.cds
+    start_temp = 3.0 #0.6
+    end_temp = 0.01
+    mutation_bump = 3000
 
-    pred = RBSPredict("".join(leader), cds)
-    org_lvl = pred()
-    print org_lvl
+    moves = {"A": ["T", "G", "C"],
+             "T": ["A", "G", "C"],
+             "G": ["A", "T", "C"],
+             "C": ["A", "T", "G"]}
 
-    mutations = 0
-    for i in range(its):
-        pass
+    start_codons = ["ATG", "GTG", "TTG"]
+
+    def __init__(self, gene, target):
+        """TODO"""
+        self.original_leader = str(gene.leader).upper()
+        self.leader_len = len(gene.leader)
+        self.leader = list(self.original_leader)
+        self.cds = str(gene.cds).upper()
+        self.gene = gene
+
+        self.original_dG = RBSPredict(self.original_leader, self.cds)["dG"]
+        self.dG = self.original_dG
+
+        #To keep track of mutations
+        self.mutations = set()
+
+    def __call__(self, max_mutations=7, iterations=1, max_rounds=10000):
+        """Do Monte Carlo simulations"""
+
+        self.eliminate_start_codons()
+
+        start_mutations = len(self.mutations) + 1
+        if start_mutations >= max_mutations:
+            raise Exception("start_mutations ({}) is larger than max_mutations ({}) due to start codons.".format(start_mutations, max_mutations))
+
+        total_its = 0
+
+        for n_muts in range(start_mutations, max_mutations+1):
+            mut_iterations = self.mutation_bump
+            temp_step = (self.start_temp - self.end_temp) / mut_iterations
+
+            current_temp = self.start_temp
+            for i in range(mut_iterations):
+                do_move = True
+                while do_move:
+                    mutations = self.mutations.copy()
+                    candidate = self.leader[:]
+
+                    mp = random.randint(0, self.leader_len-1)
+                    candidate[mp] = random.choice(self.moves[self.leader[mp]])
+                    #Reset "back mutations"
+                    if mp in mutations:
+                        if candidate[mp] == self.original_leader[mp]:
+                            mutations.remove(mp)
+                    else:
+                        mutations.add(mp)
+
+                    #Revert a position
+                    if len(mutations) > n_muts:
+                        rev = random.choice(list(mutations))
+                        candidate[rev] = self.original_leader[rev]
+                        mutations.remove(rev)
+
+                    #Check for illegal moves
+                    do_move = not self.check_leader(candidate)
+
+                new_dG = RBSPredict("".join(candidate), self.cds)["dG"]
+
+                if new_dG < self.dG:
+                    #Accept
+                    self.leader = candidate
+                    self.dG = new_dG
+                    self.mutations = mutations
+                elif self.dG == new_dG:
+                    if random.random() > 0.8:
+                        #Randomly accept
+                        self.leader = candidate
+                        self.dG = new_dG
+                        self.mutations = mutations
+                else:
+                    P = math.exp((self.dG - new_dG)/self.end_temp)
+                    if P > random.random():
+                        #Conditionally accept
+                        self.leader = candidate
+                        self.dG = new_dG
+                        self.mutations = mutations
+
+                #Decrease temp
+                current_temp -= temp_step
+                total_its += 1
+
+                expr_level = RBS_Calculator.K * math.exp(-self.dG / RBS_Calculator.RT_eff)
+                print total_its, expr_level, n_muts
+
+    def check_leader(self, new_seq):
+        """Checks the leader sequence for illegal moves.
+
+        Returns False on invalid sequence
+
+        """
+        leader_str = "".join(new_seq)
+        for stc in self.start_codons:
+            if leader_str.find(stc) != -1:
+                return False
+
+        return True
+
+    def eliminate_start_codons(self):
+        """Start by mutating away other start codons"""
+        leader_str = "".join(self.leader)
+        for stc in self.start_codons:
+            fnd = leader_str.find(stc)
+            if fnd != -1:
+                self.leader[fnd+2] = random.choice(["A", "T", "C"])
+                self.mutations.add(fnd+2)
+
 
 """
-RBS calulator
+RBS Calculator
 """
 
-class RBSPredict:
-    """TODO"""
-    def __init__(self, leader, cds):
-        start_range = [len(leader), len(leader)]
+def RBSPredict(leader, cds):
+    """TODO: Create a more solid RBS calculator"""
+    start_range = [len(leader), len(leader)]
+    mRNA = leader.upper() + cds.upper()
+    tmp_calc = RBS_Calculator(mRNA, start_range, "")
+    try:
+        tmp_calc.calc_dG()
+    except NoRBSError:
+        tmp_calc.dG_total_list.append(1e20)
 
-        mRNA = leader.upper() + cds.upper()
+    if not tmp_calc.dG_total_list:
+        tmp_calc.dG_total_list.append(1e20)
 
-        self.tmp_calc = RBS_Calculator(mRNA, start_range, "")
-
-    def __call__(self):
-        self.tmp_calc.calc_dG()
-        self.expression_level = self.tmp_calc.calc_expression_level(self.tmp_calc.dG_total_list[0])
-        return self.expression_level
+    expr_lvl = tmp_calc.calc_expression_level(tmp_calc.dG_total_list[0])
+    return {"expr_lvl": expr_lvl, "dG": tmp_calc.dG_total_list[0]}

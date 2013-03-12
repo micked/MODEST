@@ -14,7 +14,7 @@ def rnacofold(seq, options=["--noPS"], calc_basepairing=True):
     """Run RNAcofold"""
     cmd = [RNACOFOLD] + options
     output = run_command(cmd, seq)
-    brackets, dG = output_to_brackets_and_dG(output.split("\n")[1])
+    brackets, dG = output_to_brackets_and_dG(output.splitlines()[1])
     
     out = {"dG": dG, "brackets": brackets}
 
