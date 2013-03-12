@@ -1,22 +1,22 @@
-thrL	start_codon_optimal F1  R1
-thrA	start_codon_optimal F2  R2
-thrB	start_codon_optimal F3  R3
-thrC	start_codon_optimal F4  R4
-yaaX	start_codon_optimal F1  R1
-yaaA	start_codon_optimal F2  R2
-yaaJ	start_codon_optimal F3  R3
-talB	start_codon_optimal F4  R4
-mog	start_codon_optimal F1  R1
-yaaH	start_codon_optimal F2  R2
-yaaW	start_codon_optimal F3  R3
-yaaI	start_codon_optimal F4  R4
-dnaK	start_codon_optimal F5  R5
-dnaJ	translational_KO    F6  R6    KO_frame=10
-insL	translational_KO    F7  R7    KO_frame=20
-mokC	translational_KO    F8  R8
-hokC	translational_KO    F9  R9    KO_frame=1000,something=4
-nhaA	translational_KO    F1  R1
-nhaR	RBSopt_single   F2  R2   insert=true,delete=yes,maximise=false
-ileS    RBSopt_single   F3  R3   insert=0,delete=yes
-folA    RBSopt_single   F4  R4   top=1
-apaH    RBSopt_single   F5  R5   top=1
+thrL	start_codon_optimal ID1
+thrA	start_codon_optimal ID2
+thrB	start_codon_optimal ID3
+thrC	start_codon_optimal ID4
+yaaX	start_codon_optimal ID1
+yaaA	start_codon_optimal ID2
+yaaJ	start_codon_optimal ID3
+talB	start_codon_optimal ID4
+mog	start_codon_optimal ID1
+yaaH	start_codon_optimal ID2
+yaaW	start_codon_optimal ID3
+yaaI	start_codon_optimal ID4
+dnaK	start_codon_optimal ID2
+dnaJ	translational_KO    ID1  KO_frame=10
+insL	translational_KO    ID2  KO_frame=20
+mokC	translational_KO    ID3
+hokC	translational_KO    ID4  KO_frame=1000,something=4
+nhaA	translational_KO    ID1
+nhaR	RBSopt_single   ID2  insert=true,delete=yes,maximise=false
+ileS    RBSopt_single   ID3  insert=0,delete=yes
+folA    RBSopt_single   ID4  top=1
+apaH    RBSopt_single   ID3  top=1

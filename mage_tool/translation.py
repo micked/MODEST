@@ -69,8 +69,7 @@ def RBS_single_mutation(gene, maximise=True, insert=False, delete=False, top=3):
     mutations = {"A": ["T", "G", "C"],
                  "T": ["A", "G", "C"],
                  "G": ["A", "T", "C"],
-                 "C": ["A", "T", "G"]
-    }
+                 "C": ["A", "T", "G"]}
 
     if delete:
         for N in mutations:
@@ -104,3 +103,39 @@ def RBS_single_mutation(gene, maximise=True, insert=False, delete=False, top=3):
         muts.append(gene.do_mutation(mut))
 
     return muts
+
+"""
+RBS Monte Carlo functions
+"""
+
+def RBS_Monte_Carlo(gene, target, its=10):
+    """TODO"""
+
+    leader = list(gene.leader)
+    cds = gene.cds
+
+    pred = RBSPredict("".join(leader), cds)
+    org_lvl = pred()
+    print org_lvl
+
+    mutations = 0
+    for i in range(its):
+        pass
+
+"""
+RBS calulator
+"""
+
+class RBSPredict:
+    """TODO"""
+    def __init__(self, leader, cds):
+        start_range = [len(leader), len(leader)]
+
+        mRNA = leader.upper() + cds.upper()
+
+        self.tmp_calc = RBS_Calculator(mRNA, start_range, "")
+
+    def __call__(self):
+        self.tmp_calc.calc_dG()
+        self.expression_level = self.tmp_calc.calc_expression_level(self.tmp_calc.dG_total_list[0])
+        return self.expression_level

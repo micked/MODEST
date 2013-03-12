@@ -30,10 +30,8 @@ def interface(adjustments, genes, genome, config, barcoding_lib, project=None):
     for a in adjustments:
         #Collect gene
         gene = genes[a["gene"]]
-        #Forward barcodes
-        fwd_barcodes = a["forward_barcodes"]
-        #Reverse barcodes
-        rev_barcodes = a["reverse_barcodes"]
+        #Barcode id
+        barcode_id = a["barcode_id"]
         op = a["operation"]
         op_str = "[{}/{}] line {}".format(op, gene, a["line"])
         #Try to find operation
@@ -51,8 +49,7 @@ def interface(adjustments, genes, genome, config, barcoding_lib, project=None):
                 oligo.set_oligo(genome, optimise=True, threshold=-20.0)
                 oligo.target_lagging_strand(config["replication"]["ori"], config["replication"]["ter"])
                 #Add barcodes
-                oligo.add_barcode(fwd_barcodes, barcoding_lib, "forward")
-                oligo.add_barcode(rev_barcodes, barcoding_lib, "reverse")
+                oligo.add_barcode(barcode_id, barcoding_lib)
                 #Back tracing
                 oligo.code = code
                 oligo.operation = operation

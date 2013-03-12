@@ -39,7 +39,7 @@ if __name__ == "__main__":
     iterations = max_iter
     while iterations == max_iter:
         try:
-            TIR_out, RBS_out, estimator, iterations = Monte_Carlo_Design(pre_seq, post_seq, RBS_init=None, TIR_target=TIR, dG_target=None, MaxIter=max_iter, verbose=False)
+            TIR_out, RBS_out, estimator, iterations = Monte_Carlo_Design(pre_seq, post_seq, RBS_init=pre_seq, TIR_target=TIR, dG_target=None, MaxIter=max_iter, verbose=False)
             total_iterations += iterations
         except NoRBSError:
             print "caught noRBS"

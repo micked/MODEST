@@ -47,10 +47,12 @@ def seqIO_to_genelist(genome, include_genes=None):
 
     return genes
 
+
 def oligolist_to_tabfile(oligolist, output):
-    """Writeout oligolist to a tab separeted file
+    """Writeout oligolist to a tab separeted file.
 
     Supply string filename or open file
+    
     """
     cls = False
     if not hasattr("write", output):
@@ -62,3 +64,41 @@ def oligolist_to_tabfile(oligolist, output):
 
     if cls:
         output.close()
+
+
+def parse_barcode_library(barcode_filehandle):
+    """Parse an open barcoding library file.
+
+    Barcoding library file has the following syntax:
+    ..
+
+    """
+
+    primers = dict()
+    barcodes = dict()
+
+    primer_flag = False
+    barcodes_flag = False
+
+    for line in barcode_filehandle:
+        if line[0] == "#" or not line.strip():
+            continue
+        elif line.strip() == ">PRIMERS":
+            primer_flag = True
+            continue
+        elif line.strip() == ">LIBRARY":
+            barcodes_flag = True
+            continue
+        
+        if barcodes_flag:
+            line = line.split()
+            forward = reverse_complement(primers[line[1]])
+            reverse = primers[line[2]]
+            barcodes[line[0]] = {"forward": forward, "reverse": reverse}
+        elif primer_flag:
+            line = line.split()
+            primers[line[0]] = line[1]
+        else:
+            raise Exception("Primer header not found")
+
+    return barcodes

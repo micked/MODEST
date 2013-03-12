@@ -15,6 +15,7 @@ from Bio import SeqIO
 from mage_tool.interface import interface
 from mage_tool.IO import seqIO_to_genelist
 from mage_tool.IO import oligolist_to_tabfile
+from mage_tool.IO import parse_barcode_library
 
 
 if __name__ == '__main__':
@@ -51,24 +52,20 @@ if __name__ == '__main__':
     with open(args.adjustments) as f:
         for i,line in enumerate(f,1):
             line = line.split()
-            if len(line) < 4:
+            if len(line) < 3:
                 pass #TODO
-            if len(line) == 4:
+            if len(line) == 3:
                 options = ""
             else:
-                options = line[4]
+                options = line[3]
 
-            adjustments.append({"gene": line[0], "operation": line[1], "forward_barcodes":line[2], "reverse_barcodes":line[3], "options": options, "line": i})
+            adjustments.append({"gene": line[0], "operation": line[1], "barcode_id": line[2], "options": options, "line": i})
             include_genes.add(line[0])
 
 
     print("Loading barcode file..")
-    barcoding_lib = dict()
     with open(args.barcodes) as bcs:
-        for line in bcs:
-            line = line.split()
-            barcoding_lib[line[0]] = line[1]
-            
+        barcoding_lib = parse_barcode_library(bcs)
     
     print("Loading config file..")
     with open(args.config) as cfg:
