@@ -4,6 +4,8 @@
 Mutation generation routines related to translation initiation
 """
 
+from __future__ import print_function
+
 import random
 import math
 
@@ -111,12 +113,30 @@ def RBS_single_mutation(gene, maximise=True, insert=False, delete=False, top=3):
 RBS Monte Carlo functions
 """
 
-class RBS_Monte_Carlo:
+#Constants
+RT_EFF = 2.222
+LOG_K =  7.824
+K = 2500.0
 
-    start_temp = 3.0 #0.6
+class RBSMonteCarlo:
+    """Monte Carlo simulations
+
+    This class works by ..
+
+    Two periods ..
+
+    """
+    #start_temp gets colder when more mutations are introduced
+    start_temp = lambda self, n_muts: (0.6 / n_muts) * 3
     end_temp = 0.01
-    mutation_bump = 3000
+    min_mutation_period = 1000
+    max_mutation_period = 4000
+    #Rejects before bumping to an extra mutation
+    stationary = 500
+    #Tolerance to target (dG)
+    tol = 0.25
 
+    #Default possible moves
     moves = {"A": ["T", "G", "C"],
              "T": ["A", "G", "C"],
              "G": ["A", "T", "C"],
@@ -124,45 +144,85 @@ class RBS_Monte_Carlo:
 
     start_codons = ["ATG", "GTG", "TTG"]
 
+    #Maximise/minimise translation rates
+    high = -17. # ~5M
+    low = 17. # ~1
+
+    #Verbose mode
+    verbose = False
+    live_plot = False
+
+    #Live plot sillyness
+    plot_dG = list()
+    plot_n_mut = list()
+    plot_temp = list()
+
     def __init__(self, gene, target):
-        """TODO"""
+        """Set up Monte Carlo simulations
+
+        Supply target in dG, or "high" to maximise, "low" to minimise
+
+        """
         self.original_leader = str(gene.leader).upper()
         self.leader_len = len(gene.leader)
         self.leader = list(self.original_leader)
         self.cds = str(gene.cds).upper()
         self.gene = gene
 
-        self.original_dG = RBSPredict(self.original_leader, self.cds)["dG"]
-        self.dG = self.original_dG
-
         #To keep track of mutations
         self.mutations = set()
 
-    def __call__(self, max_mutations=7, iterations=1, max_rounds=10000):
-        """Do Monte Carlo simulations"""
+        if target == "high":
+            self.target = self.high
+        elif target == "low":
+            self.target = self.low
+        else:
+            try:
+                self.target = float(target)
+            except ValueError:
+                raise ValueError("Could not parse: {} as target dG (use only lower-case for high/low)".format(target))
 
+        self.original_dG = RBSPredict(self.original_leader, self.cds)["dG"]
+        self.dG = self.original_dG
+        self.energy = abs(self.original_dG - self.target)
+
+        #Status
+        self.target_reached = False
+        self.last_P = 0.0
+
+    def run(self, max_mutations=7, iterations=1, max_rounds=10000):
+        """Run simulations"""
+        self.max_mutations = max_mutations
+
+        #Start by mutating away start codons
         self.eliminate_start_codons()
 
         start_mutations = len(self.mutations) + 1
         if start_mutations >= max_mutations:
             raise Exception("start_mutations ({}) is larger than max_mutations ({}) due to start codons.".format(start_mutations, max_mutations))
 
-        total_its = 0
+        #Total iterations
+        self.total_its = 0
+        rejects = 0
 
+        #Main loop
         for n_muts in range(start_mutations, max_mutations+1):
-            mut_iterations = self.mutation_bump
-            temp_step = (self.start_temp - self.end_temp) / mut_iterations
+            #Temperature control
+            start_temp = self.start_temp(n_muts)
+            temp_step = (start_temp - self.end_temp) / self.min_mutation_period
+            current_temp = start_temp
 
-            current_temp = self.start_temp
-            for i in range(mut_iterations):
+            for i in range(self.max_mutation_period):
                 do_move = True
                 while do_move:
                     mutations = self.mutations.copy()
                     candidate = self.leader[:]
 
+                    #Pick a random position to move
                     mp = random.randint(0, self.leader_len-1)
                     candidate[mp] = random.choice(self.moves[self.leader[mp]])
-                    #Reset "back mutations"
+
+                    #Reset mutation list if mutations mutate to original sequence
                     if mp in mutations:
                         if candidate[mp] == self.original_leader[mp]:
                             mutations.remove(mp)
@@ -178,33 +238,76 @@ class RBS_Monte_Carlo:
                     #Check for illegal moves
                     do_move = not self.check_leader(candidate)
 
+                #Calculate new total free energy
                 new_dG = RBSPredict("".join(candidate), self.cds)["dG"]
 
-                if new_dG < self.dG:
-                    #Accept
-                    self.leader = candidate
-                    self.dG = new_dG
-                    self.mutations = mutations
-                elif self.dG == new_dG:
+                #Calculate simulation energy
+                new_energy = abs(new_dG - self.target)
+
+                accept_move = False
+                if new_energy < self.energy:
+                    accept_move = True
+                    rejects = 0
+                    if self.verbose:
+                        self.status("Accepted", new_dG, n_muts)
+                elif self.energy == new_energy:
+                    rejects += 1
                     if random.random() > 0.8:
                         #Randomly accept
-                        self.leader = candidate
-                        self.dG = new_dG
-                        self.mutations = mutations
+                        accept_move = True
+                        if self.verbose:
+                            self.status("Randomly_accepted:", new_dG, n_muts)
+                    elif self.verbose:
+                        self.status("Randomly_rejected:", new_dG, n_muts)
                 else:
-                    P = math.exp((self.dG - new_dG)/self.end_temp)
+                    P = math.exp((self.dG - new_dG)/current_temp)
                     if P > random.random():
                         #Conditionally accept
-                        self.leader = candidate
-                        self.dG = new_dG
-                        self.mutations = mutations
+                        accept_move = True
+                        rejects = 0
+                        if self.verbose:
+                            self.status("Cond_accepted:", new_dG, n_muts, P)
+                    else:
+                        rejects += 1
+                        if self.verbose:
+                            self.status("Cond_rejected:", new_dG, n_muts, P)
 
-                #Decrease temp
-                current_temp -= temp_step
-                total_its += 1
+                #Move is accepted
+                if accept_move:
+                    self.leader = candidate
+                    self.dG = new_dG
+                    self.energy = new_energy
+                    self.mutations = mutations
 
-                expr_level = RBS_Calculator.K * math.exp(-self.dG / RBS_Calculator.RT_eff)
-                print total_its, expr_level, n_muts
+                #Target reached, STOP
+                if new_energy < self.tol:
+                    self.target_reached = True
+                    return "".join(self.leader)
+
+                #Decrease temp while in "hot period"
+                if i < self.min_mutation_period:
+                    current_temp -= temp_step
+                #Look for stationary phases in "cold period"
+                elif rejects >= self.stationary:
+                    #Bump number of mutations if we are stationary
+                    break
+
+                if self.live_plot: 
+                    self.plot_dG.append(self.dG)
+                    self.plot_n_mut.append(n_muts)
+                    self.plot_temp.append(current_temp)
+                    if self.total_its % 10 == 0:
+                        self.update_live_plot()
+
+                self.total_its += 1
+
+        return "".join(self.leader)
+
+    def status(self, msg, dG, n, P=None):
+        """Print status"""
+        if P is None: P = self.last_P
+        self.last_P = P
+        print("{:<18} {:>2} {:>5.2f} {:>5.2f} {:>2} {:4.2f}".format(msg, self.total_its, self.dG, dG, n, P))
 
     def check_leader(self, new_seq):
         """Checks the leader sequence for illegal moves.
@@ -228,6 +331,31 @@ class RBS_Monte_Carlo:
                 self.leader[fnd+2] = random.choice(["A", "T", "C"])
                 self.mutations.add(fnd+2)
 
+    def update_live_plot(self):
+        """Silly function"""
+        import matplotlib.pyplot as plt
+        plt.ion()
+        plt.clf()
+        plt.plot(self.plot_dG, "-")
+        plt.plot(self.plot_temp, "-g")
+        plt.ylabel("dG / temp")
+        plt.axis([0, len(self.plot_dG), self.target, 4])
+        plt.twinx()
+        plt.ylabel("Mutations")
+        plt.plot(self.plot_n_mut, "-r")
+        plt.axis([0, len(self.plot_dG), 0, self.max_mutations+1])
+        plt.draw()
+        plt.ioff()
+
+
+def AU_to_dG(AU):
+    """Convert a dG value to expression level (AU)"""
+    return RT_EFF * (LOG_K - math.log(AU))
+
+
+def dG_to_AU(dG):
+    """Convert an expression level to dG"""
+    return K * math.exp(-dG / RT_EFF)
 
 """
 RBS Calculator
