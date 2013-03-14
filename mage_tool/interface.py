@@ -126,7 +126,7 @@ def MAGE_RBS_library(gene, config, options, op):
     kwds = {"target": (float, 5000000.),
             "n": (int, 10),
             "max_mutations": (int, 10),
-            "passes": (int, 3),
+            "passes": (int, 1),
             "id": (str, "-")
     }
     options, opt_str = parse_options(options, kwds, op)

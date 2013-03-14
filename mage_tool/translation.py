@@ -123,6 +123,7 @@ def generate_RBS_library(gene, target, n, max_mutations, passes):
     target = AU_to_dG(target)
 
     MC = RBSMonteCarlo(gene, target)
+    MC.verbose = True
     lib = MC.create_library(n, max_mutations, passes)
 
     org_leader = gene.leader
@@ -175,6 +176,9 @@ class RBSMonteCarlo:
     stationary = 500
     #Tolerance to target (dG)
     tol = 0.25
+
+    #Maximum attempted moves before restarting simulation
+    max_attempted_moves = 100
 
     #Keeping track of mutations
     mutations = set()
@@ -278,6 +282,7 @@ class RBSMonteCarlo:
 
             for i in range(self.max_mutation_period):
                 do_move = True
+                attempted_moves = 0
                 while do_move:
                     mutations = self.mutations.copy()
                     candidate = self.leader[:]
@@ -301,6 +306,12 @@ class RBSMonteCarlo:
 
                     #Check for illegal moves
                     do_move = not self.check_leader(candidate)
+                    attempted_moves += 1
+
+                    if attempted_moves >= self.max_attempted_moves:
+                        #Redo this one after a while
+                        #Let's see if it gets triggered
+                        raise Exception("Too many attempted moves.")
 
                 #Calculate new total free energy
                 new_dG = RBSPredict("".join(candidate), self.cds)["dG"]
