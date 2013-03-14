@@ -123,7 +123,7 @@ def generate_RBS_library(gene, target, n, max_mutations, passes):
     target = AU_to_dG(target)
 
     MC = RBSMonteCarlo(gene, target)
-    MC.verbose = True
+    # MC.verbose = True
     lib = MC.create_library(n, max_mutations, passes)
 
     org_leader = gene.leader
