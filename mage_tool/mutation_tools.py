@@ -34,6 +34,7 @@ def find_mutation_box(parent, child):
     mut = Mutation("eq", mut, offset)
     return mut
 
+
 def compare_seqs(parent, child):
     """Compare two sequences and return number of mutations
 
@@ -60,6 +61,7 @@ def compare_seqs(parent, child):
             on_mut = True
 
     return muts, groups
+
 
 def cheap_alignment(parent, child):
     """Very cheap alignment, only cares about matches at the ends"""

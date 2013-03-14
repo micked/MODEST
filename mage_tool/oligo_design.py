@@ -60,7 +60,7 @@ class Oligo:
         post_seq_start = self.mut.pos+len(self.mut.before)
         post_seq = genome[post_seq_start : post_seq_start+post_seq_len]
         
-        return pre_seq + self.mut.after.lower() + post_seq
+        return pre_seq + self.mut.after + post_seq
 
     def optimise_folding(self, genome, threshold=-20.0):
         """Optimise oligo folding if dG below threshold"""
@@ -193,6 +193,11 @@ class Mutation:
             self._parse_eq(mut, int(pos))
         else:
             raise Exception("Format: \"{}\" unknown".format(mut_format))
+
+        for n in ["a", "t", "g", "c"]:
+            if n in self.after:
+                return
+        self.after = self.after.lower()
     
     #
     # Printing
@@ -202,13 +207,13 @@ class Mutation:
         return "Mutation: [{}={}] at pos {}".format(
             self.before,
             self.after,
-            self.pos)
+            self.pos+1)
 
     def __str__(self):
         return "[{}={}].{}".format(
             self.before,
             self.after,
-            self.pos)
+            self.pos+1)
     
     #
     # Parsers

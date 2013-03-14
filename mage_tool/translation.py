@@ -93,7 +93,7 @@ def RBS_single_mutation(gene, maximise=True, insert=False, delete=False, top=3):
             new_seq = new_leader + str(gene.cds)
             RBS_calc = RBS_Calculator(new_seq, [34+len(m), 34+len(m)], "")
             RBS_calc.calc_dG()
-            tmp_mut = "{}={}".format(n, m)
+            tmp_mut = "{}={}".format(n, m.lower())
             if not len(RBS_calc.dG_total_list):
                 continue
             new_value = RBS_calc.calc_expression_level(RBS_calc.dG_total_list[0])
@@ -103,20 +103,60 @@ def RBS_single_mutation(gene, maximise=True, insert=False, delete=False, top=3):
     for m in sorted(mutation_list, key=lambda x: x[0], reverse=maximise)[0:top]:
         if not m[2]:
             break
-        mut = Mutation("eq", m[2], -35+m[1])
+        mut = Mutation("eq", m[2], -len(leader)+m[1])
         mut._adjustment = m[0] / old_value
         muts.append(gene.do_mutation(mut))
 
     return muts
+
+
+def generate_RBS_library(gene, target, n, max_mutations, passes):
+    """Generate an RBS library
+
+    target          -- Target translation initiation rate (AU).
+    n               -- Number of mutations (oligos) to output.
+    max_mutations   -- Maximum number of mutations to perform.
+    passes          -- Number of passes to perform to increase resolution.
+
+    """
+    #Convert target to dG
+    target = AU_to_dG(target)
+
+    MC = RBSMonteCarlo(gene, target)
+    lib = MC.create_library(n, max_mutations, passes)
+
+    org_leader = gene.leader
+    org_expr = dG_to_AU(MC.original_dG)
+
+    muts_out = list()
+    for expr, muts, seq in lib:
+        muts = sorted(muts)
+        before = org_leader[muts[0]:muts[-1]+1]
+        after = list()
+        for i in range(muts[0], muts[-1]+1):
+            if i in muts:
+                after.append(seq[i].lower())
+            else:
+                after.append(org_leader[i].upper())
+        after = "".join(after)
+
+        mut = "{}={}".format(before, after)
+        mut = Mutation("eq", mut, -len(org_leader)+muts[0])
+        mut._expr = expr
+        mut._org_expr = org_expr
+        mut._n_muts = len(muts)
+        muts_out.append(gene.do_mutation(mut))
+
+    return muts_out
 
 """
 RBS Monte Carlo functions
 """
 
 #Constants
-RT_EFF = 2.222
-LOG_K =  7.824
-K = 2500.0
+RBS_RT_EFF = 2.222
+RBS_LOG_K =  7.824
+RBS_K = 2500.0
 
 class RBSMonteCarlo:
     """Monte Carlo simulations
@@ -136,6 +176,9 @@ class RBSMonteCarlo:
     #Tolerance to target (dG)
     tol = 0.25
 
+    #Keeping track of mutations
+    mutations = set()
+
     #Default possible moves
     moves = {"A": ["T", "G", "C"],
              "T": ["A", "G", "C"],
@@ -145,17 +188,15 @@ class RBSMonteCarlo:
     start_codons = ["ATG", "GTG", "TTG"]
 
     #Maximise/minimise translation rates
-    high = -17. # ~5M
-    low = 17. # ~1
+    high = -17. # ~5M AU
+    low = 32. # ~0.001 AU
+
+    mutation_lib = list()
 
     #Verbose mode
     verbose = False
-    live_plot = False
 
-    #Live plot sillyness
-    plot_dG = list()
-    plot_n_mut = list()
-    plot_temp = list()
+    total_its = 0
 
     def __init__(self, gene, target):
         """Set up Monte Carlo simulations
@@ -165,12 +206,8 @@ class RBSMonteCarlo:
         """
         self.original_leader = str(gene.leader).upper()
         self.leader_len = len(gene.leader)
-        self.leader = list(self.original_leader)
         self.cds = str(gene.cds).upper()
         self.gene = gene
-
-        #To keep track of mutations
-        self.mutations = set()
 
         if target == "high":
             self.target = self.high
@@ -183,16 +220,44 @@ class RBSMonteCarlo:
                 raise ValueError("Could not parse: {} as target dG (use only lower-case for high/low)".format(target))
 
         self.original_dG = RBSPredict(self.original_leader, self.cds)["dG"]
+
+    def create_library(self, n=7, max_mutations=10, passes=1):
+        """Create an RBS library from start to target with n candidates"""
+        self.mutation_lib = list()
+        
+        for pas in range(passes):
+            self.run(max_mutations=max_mutations, make_library=True)
+
+        mut_lib = [(dG_to_AU(dG), sorted(muts), seq) for dG, muts, seq in self.mutation_lib]
+
+        min_expr = min(mut_lib, key=lambda x: x[0])
+        max_expr = max(mut_lib, key=lambda x: x[0])
+        stepsize = (max_expr[0] - min_expr[0]) / (n-1)
+
+        selected_library = [max_expr]
+
+        for i in range(1, n):
+            step = max_expr[0] - (stepsize * i)
+            closest = sorted(mut_lib, key=lambda l: abs(l[0] - step))
+            for close in closest:
+                if close[2] not in [l[2] for l in selected_library]:
+                    selected_library.append(close)
+                    break
+
+        return selected_library
+
+    def run(self, max_mutations=10, make_library=False):
+        """Run simulations"""
+        #Initalisation vars
         self.dG = self.original_dG
         self.energy = abs(self.original_dG - self.target)
+        self.optimal_energy = self.energy
+        self.mutations = set()
+        self.leader = list(self.original_leader)
 
         #Status
         self.target_reached = False
         self.last_P = 0.0
-
-    def run(self, max_mutations=7, iterations=1, max_rounds=10000):
-        """Run simulations"""
-        self.max_mutations = max_mutations
 
         #Start by mutating away start codons
         self.eliminate_start_codons()
@@ -201,8 +266,7 @@ class RBSMonteCarlo:
         if start_mutations >= max_mutations:
             raise Exception("start_mutations ({}) is larger than max_mutations ({}) due to start codons.".format(start_mutations, max_mutations))
 
-        #Total iterations
-        self.total_its = 0
+        #Number of rejects
         rejects = 0
 
         #Main loop
@@ -260,17 +324,22 @@ class RBSMonteCarlo:
                     elif self.verbose:
                         self.status("Randomly_rejected:", new_dG, n_muts)
                 else:
-                    P = math.exp((self.dG - new_dG)/current_temp)
-                    if P > random.random():
-                        #Conditionally accept
-                        accept_move = True
-                        rejects = 0
+                    try:
+                        P = math.exp((self.energy - new_energy)/current_temp)
+                    except OverflowError:
                         if self.verbose:
-                            self.status("Cond_accepted:", new_dG, n_muts, P)
+                            self.status("OverflowError: ", new_dG, n_muts)
                     else:
-                        rejects += 1
-                        if self.verbose:
-                            self.status("Cond_rejected:", new_dG, n_muts, P)
+                        if P > random.random():
+                            #Conditionally accept
+                            accept_move = True
+                            rejects = 0
+                            if self.verbose:
+                                self.status("Cond_accepted:", new_dG, n_muts, P)
+                        else:
+                            rejects += 1
+                            if self.verbose:
+                                self.status("Cond_rejected:", new_dG, n_muts, P)
 
                 #Move is accepted
                 if accept_move:
@@ -278,6 +347,13 @@ class RBSMonteCarlo:
                     self.dG = new_dG
                     self.energy = new_energy
                     self.mutations = mutations
+
+                #Library generation
+                if make_library:
+                    if self.energy < self.optimal_energy:
+                        new_addition = (self.dG, list(self.mutations), "".join(self.leader))
+                        self.mutation_lib.append(new_addition)
+                        self.optimal_energy = self.energy
 
                 #Target reached, STOP
                 if new_energy < self.tol:
@@ -291,13 +367,6 @@ class RBSMonteCarlo:
                 elif rejects >= self.stationary:
                     #Bump number of mutations if we are stationary
                     break
-
-                if self.live_plot: 
-                    self.plot_dG.append(self.dG)
-                    self.plot_n_mut.append(n_muts)
-                    self.plot_temp.append(current_temp)
-                    if self.total_its % 10 == 0:
-                        self.update_live_plot()
 
                 self.total_its += 1
 
@@ -331,31 +400,15 @@ class RBSMonteCarlo:
                 self.leader[fnd+2] = random.choice(["A", "T", "C"])
                 self.mutations.add(fnd+2)
 
-    def update_live_plot(self):
-        """Silly function"""
-        import matplotlib.pyplot as plt
-        plt.ion()
-        plt.clf()
-        plt.plot(self.plot_dG, "-")
-        plt.plot(self.plot_temp, "-g")
-        plt.ylabel("dG / temp")
-        plt.axis([0, len(self.plot_dG), self.target, 4])
-        plt.twinx()
-        plt.ylabel("Mutations")
-        plt.plot(self.plot_n_mut, "-r")
-        plt.axis([0, len(self.plot_dG), 0, self.max_mutations+1])
-        plt.draw()
-        plt.ioff()
-
 
 def AU_to_dG(AU):
     """Convert a dG value to expression level (AU)"""
-    return RT_EFF * (LOG_K - math.log(AU))
+    return RBS_RT_EFF * (RBS_LOG_K - math.log(AU))
 
 
 def dG_to_AU(dG):
     """Convert an expression level to dG"""
-    return K * math.exp(-dG / RT_EFF)
+    return RBS_K * math.exp(-dG / RBS_RT_EFF)
 
 """
 RBS Calculator

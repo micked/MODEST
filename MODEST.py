@@ -51,10 +51,12 @@ if __name__ == '__main__':
     adjustments = list()
     with open(args.adjustments) as f:
         for i,line in enumerate(f,1):
+            if line[0] == "#":
+                continue
             line = line.split()
             if len(line) < 3:
                 pass #TODO
-            if len(line) == 3:
+            elif len(line) == 3:
                 options = ""
             else:
                 options = line[3]

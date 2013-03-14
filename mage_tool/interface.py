@@ -10,6 +10,7 @@ from oligo_design import Oligo
 from translation import replace_start_codon
 from translation import translational_KO
 from translation import RBS_single_mutation
+from translation import generate_RBS_library
 
 #Define a log
 log = logging.getLogger("MODEST")
@@ -28,18 +29,23 @@ def interface(adjustments, genes, genome, config, barcoding_lib, project=None):
 
     i = 0
     for a in adjustments:
-        #Collect gene
-        gene = genes[a["gene"]]
-        #Barcode id
-        barcode_id = a["barcode_id"]
         op = a["operation"]
+        gene = a["gene"]
         op_str = "[{}/{}] line {}".format(op, gene, a["line"])
-        #Try to find operation
+        
         try:
+            #Collect gene
+            gene = genes[gene]
+            #Collect operation
             op = operations[op]
         except KeyError:
-            log.error("{} not found. Doing nothing.".format(op_str))
+            if op not in operations:
+                log.error("Operation {} not found. Doing nothing.".format(op_str))
+            if gene not in genes:
+                log.error("Gene {} not found. Doing nothing.".format(op_str))
         else:
+            #Barcode id
+            barcode_id = a["barcode_id"]
             #Do operation
             muts = op(gene, config, a["options"], op_str)
 
@@ -116,6 +122,38 @@ def MAGE_RBSopt_single(gene, config, options, op):
     return muts_out
 
 
+def MAGE_RBS_library(gene, config, options, op):
+    kwds = {"target": (float, 5000000.),
+            "n": (int, 10),
+            "max_mutations": (int, 10),
+            "passes": (int, 3),
+            "id": (str, "-")
+    }
+    options, opt_str = parse_options(options, kwds, op)
+    if not options:
+        return []
+
+    muts = generate_RBS_library(gene, target=options["target"],
+                                      n=options["n"],
+                                      max_mutations=options["max_mutations"],
+                                      passes=options["passes"])
+    if not muts:
+        return []
+
+    op += " " + opt_str
+    ID = options["id"]
+    if ID == "-":
+        ID = ""
+
+    muts_out = list()
+    for i, m in enumerate(muts):
+        code = "RBSlib{}{}_{:.1f}/{:.1f}({})".format(ID, i, m._expr, m._org_expr, m._n_muts)
+        l_op = op + " {:.3f} (wt: {:.2f})".format(m._expr, m._org_expr)
+        muts_out.append((m, code, l_op))
+
+    return muts_out
+
+
 """
 General options parser
 """
@@ -135,7 +173,7 @@ def parse_options(options, kwds, func):
         float_list: 3.14;5.13;5.0
         string_list: some;thing
         codon_list: ATG;ATC
-        mut: [GTG=ATC]
+        mut: [GTG=ATC].10
         ...?
     """
     if not kwds:
@@ -199,5 +237,6 @@ Dict to map all allowed operations
 operations = {
     "start_codon_optimal":  MAGE_start_codon_optimal,
     "translational_KO":     MAGE_translational_KO,
-    "RBSopt_single":        MAGE_RBSopt_single
+    "RBSopt_single":        MAGE_RBSopt_single,
+    "RBS_library":          MAGE_RBS_library,
     }
