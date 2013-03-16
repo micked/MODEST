@@ -17,6 +17,3 @@ mokC	translational_KO    ID3
 hokC	translational_KO    ID4  KO_frame=1000,something=4
 nhaA	translational_KO    ID1
 nhaR	RBSopt_single   ID2  insert=true,delete=yes,maximise=false
-ileS    RBSopt_single   ID3  insert=0,delete=yes
-folA    RBSopt_single   ID4  top=1
-apaH    RBSopt_single   ID3  top=1

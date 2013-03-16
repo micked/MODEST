@@ -6,13 +6,16 @@ Classes dealing with input/output and format changes
 import logging
 
 from helpers import reverse_complement
+from helpers import reverse_complement_dgn
+from helpers import seqs_to_degenerate
+from helpers import cds_to_wobble
 from oligo_design import Gene
 
 log = logging.getLogger("MODEST.IO")
 log.addHandler(logging.NullHandler())
 
 
-def seqIO_to_genelist(genome, include_genes=None):
+def seqIO_to_genelist(genome, options, include_genes=None, leader_len=35):
     """TODO"""
 
     genes = dict()
@@ -31,10 +34,51 @@ def seqIO_to_genelist(genome, include_genes=None):
             cds = g.extract(genome).seq
             if strand == 1:
                 pos = g.location.start
-                leader = genome.seq[pos-35:pos]
+                #leader = genome.seq[pos-leader_len:pos]
             else:
                 pos = g.location.end
-                leader = reverse_complement(genome.seq[pos:pos+35])
+                #leader = reverse_complement(genome.seq[pos:pos+leader_len])
+
+            l_start = min(pos, pos-leader_len*strand)
+            l_end = max(pos, pos-leader_len*strand)
+
+            #Leader in genome context (+1)
+            leader = genome.seq[l_start:l_end]
+
+            leader_wobble = None
+            #Look for CDS in leader
+            for c in genome.features:
+                    if c.type == "CDS":
+                        if c.location.start < l_start < c.location.end or \
+                           c.location.start < l_end < c.location.end or \
+                           (c.location.start > l_start and c.location.end < l_end):
+                            w_cds = c.extract(genome).seq
+                            # w_seq = w_cds
+                            w_seq = cds_to_wobble(w_cds, options)
+
+                            #Wobble sequence in genome context (+1)
+                            if c.location.strand == -1:
+                                w_seq = reverse_complement_dgn(w_seq)
+
+                            start_offset = l_start - c.location.start
+                            end_offset = l_end - c.location.start
+
+                            st = ""
+                            ed = ""
+                            if start_offset < 0:
+                                st = str(genome.seq[l_start:l_start-start_offset])
+                                start_offset = 0
+                            if end_offset > len(w_seq):
+                                ed = str(genome.seq[l_start+start_offset+len(w_seq):l_end])
+                                end_offset = len(w_seq)
+
+                            leader_wobble = st + str(w_seq[start_offset:end_offset]) + ed
+
+            if strand == -1:
+                leader = reverse_complement(leader)
+                if leader_wobble:
+                    leader_wobble = reverse_complement_dgn(leader_wobble)
+
             #TODO
             promoter = None
             promoter_pos = None
@@ -43,7 +87,7 @@ def seqIO_to_genelist(genome, include_genes=None):
                 log.warn("Gene {} found more than once.".format(name))
                 #raise Exception("Gene {} found twice!".format(name))
 
-            genes[name] = Gene(name, pos, strand, cds, leader, promoter, promoter_pos)
+            genes[name] = Gene(name, pos, strand, cds, leader, leader_wobble, promoter, promoter_pos)
 
     return genes
 
@@ -102,3 +146,26 @@ def parse_barcode_library(barcode_filehandle):
             raise Exception("Primer header not found")
 
     return barcodes
+
+
+def create_config_tables(config):
+    """Create additional lookup tables from the parsed config yaml file."""
+    #Translation table
+    AAtable = dict() #{AA: [] for AA in amino_acids}
+    config["codon_table"] = dict()
+    config["stop_codons"] = list()
+    for triplet, (AA, usage) in config["codon_usage"].items():
+        config["codon_table"][triplet] = AA
+        if AA in AAtable:
+            AAtable[AA].append(triplet)
+        else:
+            AAtable[AA] = [triplet]
+        if AA == "*":
+            config["stop_codons"].append(triplet)
+
+    #Reverse translation table
+    config["dgn_table"] = dict()
+    for AA in AAtable:
+        config["dgn_table"][AA] = seqs_to_degenerate(AAtable[AA])
+
+    return config

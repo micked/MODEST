@@ -16,6 +16,7 @@ from mage_tool.interface import interface
 from mage_tool.IO import seqIO_to_genelist
 from mage_tool.IO import oligolist_to_tabfile
 from mage_tool.IO import parse_barcode_library
+from mage_tool.IO import create_config_tables
 
 
 if __name__ == '__main__':
@@ -72,13 +73,14 @@ if __name__ == '__main__':
     print("Loading config file..")
     with open(args.config) as cfg:
         config = yaml.safe_load(cfg)
+        config = create_config_tables(config)
         #TODO: Validate config
 
     print("Parsing genome..")
     genome = SeqIO.read(args.genome, "genbank")
 
     print("Collecting gene list..")
-    genes = seqIO_to_genelist(genome, include_genes)
+    genes = seqIO_to_genelist(genome, config, include_genes)
 
     print("Making oligos..")
     oligos = interface(adjustments, genes, genome.seq, config, barcoding_lib, args.project)

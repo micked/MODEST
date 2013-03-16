@@ -248,7 +248,8 @@ class Mutation:
 
 class Gene:
     """Defines a single gene and all relevant information"""
-    def __init__(self, name, pos, strand, cds, leader, promoter=None, promoter_pos=None):
+
+    def __init__(self, name, pos, strand, cds, leader, leader_wobble=None, promoter=None, promoter_pos=None):
         self.name = name
         self.pos = pos
         self.strand = strand
@@ -257,6 +258,10 @@ class Gene:
         self.leader_pos = pos-len(leader)
         self.promoter = promoter
         self.promoter_pos = promoter_pos
+
+        self.leader_wobble = leader_wobble
+        if not leader_wobble:
+            self.leader_wobble = "N"*len(self.leader)
 
     def __str__(self):
         return self.name

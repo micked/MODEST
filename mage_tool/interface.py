@@ -73,7 +73,7 @@ Translation modifications
 """
 
 def MAGE_start_codon_optimal(gene, config, options, op):
-    mut = replace_start_codon(gene, config["start codons"][0])
+    mut = replace_start_codon(gene, config["start_codons"][0])
     if not mut:
         log.debug(op + " Not mutating, optimal start codon found.")
         return []
@@ -88,7 +88,7 @@ def MAGE_translational_KO(gene, config, options, op):
         return []
 
     KO_frame = options["ko_frame"]
-    stop_codons = config["stop codons"]
+    stop_codons = config["stop_codons"]
     try:
         mut = translational_KO(gene, stop_codons, KO_frame)
         code = "TransKO{}".format(mut._codon_offset)
