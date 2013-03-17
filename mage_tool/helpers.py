@@ -7,6 +7,20 @@ Constants
 
 amino_acids = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y']
 
+degenerate_nucleotides = {
+    "R": ["A", "G"],
+    "M": ["A", "C"],
+    "Y": ["C", "T"],
+    "K": ["G", "T"],
+    "S": ["C", "G"],
+    "W": ["A", "T"],
+    "B": ["C", "G", "T"],
+    "D": ["A", "G", "T"],
+    "H": ["A", "C", "T"],
+    "V": ["A", "C", "G"],
+    "N": ["A", "C", "G", "T"]
+}
+
 """
 DNA string tools
 """

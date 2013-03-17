@@ -1,10 +1,10 @@
-thiM RBS_library ID1 passes=10
+thiM RBS_library ID1 passes=1
 #thiD
 #thiC
 #thiE
 #thiF
 #thiS
-#thiG
+thiG RBS_library ID1 passes=1
 #thiH
 #thiI
 #dxs

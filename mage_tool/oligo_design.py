@@ -157,7 +157,7 @@ class Oligo:
             prj = self.project if self.project else "",
             i = self.number,
             barcodes = "_BC:" + ",".join(self.barcode_ids) if self.barcode_ids else "",
-            mut = str(self.mut),
+            mut = self.mut.small_str(),
             gene = str(self.gene),
             code = self.code,
             rp = self.replichore,
@@ -210,11 +210,18 @@ class Mutation:
             self.pos+1)
 
     def __str__(self):
-        return "[{}={}].{}".format(
-            self.before,
-            self.after,
-            self.pos+1)
+        return "[{}={}].{}".format(self.before, self.after, self.pos+1)
     
+    def small_str(self):
+        before = self.before
+        after = self.after
+        if len(before) > 6:
+            before = before[0:2] + ".." + before[-2:]
+        if len(after) > 6:
+            after = after[0:2] + ".." + after[-2:]
+
+        return "[{}={}].{}".format(before, after, self.pos+1)
+
     #
     # Parsers
     #

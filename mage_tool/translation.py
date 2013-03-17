@@ -14,6 +14,7 @@ from mutation_tools import compare_seqs
 from RBS.RBS_Calculator import RBS_Calculator
 from RBS.RBS_Calculator import NoRBSError
 from oligo_design import Mutation
+from helpers import degenerate_nucleotides
 
 
 def replace_start_codon(gene, start_codon="ATG"):
@@ -123,7 +124,7 @@ def generate_RBS_library(gene, target, n, max_mutations, passes):
     target = AU_to_dG(target)
 
     MC = RBSMonteCarlo(gene, target)
-    # MC.verbose = True
+    #MC.verbose = True
     lib = MC.create_library(n, max_mutations, passes)
 
     org_leader = gene.leader
@@ -183,13 +184,9 @@ class RBSMonteCarlo:
     #Keeping track of mutations
     mutations = set()
 
-    #Default possible moves
-    moves = {"A": ["T", "G", "C"],
-             "T": ["A", "G", "C"],
-             "G": ["A", "T", "C"],
-             "C": ["A", "T", "G"]}
-
-    start_codons = ["ATG", "GTG", "TTG"]
+    # start_codons = ["ATG", "GTG", "TTG"]
+    start_codons = ["ATG"]
+    prevent_start_codons = False
 
     #Maximise/minimise translation rates
     high = -17. # ~5M AU
@@ -225,7 +222,18 @@ class RBSMonteCarlo:
 
         self.original_dG = RBSPredict(self.original_leader, self.cds)["dG"]
 
-    def create_library(self, n=7, max_mutations=10, passes=1):
+        self.wobble = list()
+        #Wobble sequences
+        for N in gene.leader_wobble.upper():
+            if N in ["A", "T", "G", "C"]:
+                self.wobble.append(False)
+            else:
+                self.wobble.append(degenerate_nucleotides[N])
+
+        if not any(self.wobble):
+            raise ValueError("Wobble sequnce [{}] has no possibility for mutation.".format(gene.leader_wobble))
+
+    def create_library(self, n=7, max_mutations=10, passes=1, prioritise_low_count=True):
         """Create an RBS library from start to target with n candidates"""
         self.mutation_lib = list()
         
@@ -234,12 +242,27 @@ class RBSMonteCarlo:
 
         mut_lib = [(dG_to_AU(dG), sorted(muts), seq) for dG, muts, seq in self.mutation_lib]
 
+        target_expr_lvl = dG_to_AU(self.target)   
+
         min_expr = min(mut_lib, key=lambda x: x[0])
         max_expr = max(mut_lib, key=lambda x: x[0])
-        stepsize = (max_expr[0] - min_expr[0]) / (n-1)
 
         selected_library = [max_expr]
 
+        #Loop through each leader with m mutations
+        #And pickup the one closest to the target
+        if prioritise_low_count:
+            for m in range(1, max_mutations+1):
+                best_n = [l for l in mut_lib if len(l[1]) == m]
+                if best_n:
+                    best_n = min(best_n, key=lambda l: abs(l[0]-target_expr_lvl))
+                    if best_n[2] not in [l[2] for l in selected_library]:
+                        selected_library.append(best_n)
+
+        n -= len(selected_library) - 1
+        stepsize = (max_expr[0] - min_expr[0]) / n
+
+        #Go through each leader in library and select one closest to target
         for i in range(1, n):
             step = max_expr[0] - (stepsize * i)
             closest = sorted(mut_lib, key=lambda l: abs(l[0] - step))
@@ -247,6 +270,8 @@ class RBSMonteCarlo:
                 if close[2] not in [l[2] for l in selected_library]:
                     selected_library.append(close)
                     break
+
+        selected_library.sort(key=lambda l: abs(l[0]-target_expr_lvl))
 
         return selected_library
 
@@ -264,7 +289,8 @@ class RBSMonteCarlo:
         self.last_P = 0.0
 
         #Start by mutating away start codons
-        self.eliminate_start_codons()
+        if self.prevent_start_codons:
+            self.eliminate_start_codons()
 
         start_mutations = len(self.mutations) + 1
         if start_mutations >= max_mutations:
@@ -281,19 +307,31 @@ class RBSMonteCarlo:
             current_temp = start_temp
 
             for i in range(self.max_mutation_period):
-                do_move = True
-                attempted_moves = 0
-                while do_move:
+                #do_move = True
+                #attempted_moves = 0
+                # while do_move:
+                for attempted_move in xrange(self.max_attempted_moves):
                     mutations = self.mutations.copy()
                     candidate = self.leader[:]
 
                     #Pick a random position to move
                     mp = random.randint(0, self.leader_len-1)
-                    candidate[mp] = random.choice(self.moves[self.leader[mp]])
+                    while not self.wobble[mp]:
+                        mp = random.randint(0, self.leader_len-1)
+
+                    #Pick a new nucleotide to mutate to
+                    new_NT = random.choice(self.wobble[mp])
+                    while new_NT == self.leader[mp]:
+                        new_NT = random.choice(self.wobble[mp])
+
+                    candidate[mp] = new_NT
+
+                    # print("   ", "".join(self.leader))
+                    # print(mp, new_NT, "".join(candidate))
 
                     #Reset mutation list if mutations mutate to original sequence
                     if mp in mutations:
-                        if candidate[mp] == self.original_leader[mp]:
+                        if new_NT == self.original_leader[mp]:
                             mutations.remove(mp)
                     else:
                         mutations.add(mp)
@@ -301,17 +339,19 @@ class RBSMonteCarlo:
                     #Revert a position
                     if len(mutations) > n_muts:
                         rev = random.choice(list(mutations))
+                        while rev != mp:
+                            rev = random.choice(list(mutations))
                         candidate[rev] = self.original_leader[rev]
                         mutations.remove(rev)
 
                     #Check for illegal moves
-                    do_move = not self.check_leader(candidate)
-                    attempted_moves += 1
+                    if not self.prevent_start_codons or self.check_leader(candidate):
+                        break
 
-                    if attempted_moves >= self.max_attempted_moves:
-                        #Redo this one after a while
-                        #Let's see if it gets triggered
-                        raise Exception("Too many attempted moves.")
+                else:
+                    #Redo this one after a while
+                    #Let's see if it gets triggered
+                    raise Exception("Too many attempted moves.")
 
                 #Calculate new total free energy
                 new_dG = RBSPredict("".join(candidate), self.cds)["dG"]
