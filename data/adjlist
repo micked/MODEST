@@ -1,22 +1,22 @@
-thiM RBS_library ID1 passes=1
-#thiD
-#thiC
-#thiE
-#thiF
-#thiS
-thiG RBS_library ID1 passes=1
-#thiH
-#thiI
-#dxs
-#iscS
-#iscR
-#yjbQ
-#thiK
-#purR
-#purM
-#purN
-#purL
-#purD
-#purF
-#purT
-#purK RBS_librar ID1
+thiM RBS_library ID1
+thiD RBS_library ID1
+thiC RBS_library ID1
+thiE RBS_library ID1
+thiF RBS_library ID1
+thiS RBS_library ID1
+thiG RBS_library ID1
+thiH RBS_library ID1
+thiI RBS_library ID1
+dxs RBS_library ID1
+iscS RBS_library ID1
+iscR RBS_library ID1 target=1
+yjbQ RBS_library ID1
+thiK RBS_library ID1
+purR RBS_library ID1 target=1
+purM RBS_library ID1
+purN RBS_library ID1
+purL RBS_library ID1
+purD RBS_library ID1
+purF RBS_library ID1
+purT RBS_library ID1
+purK RBS_library ID1 target=1

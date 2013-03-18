@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Python wrapper for the Vienna RNA Package by Andreas R. Gruber, Ronny Lorenz, Stephan H. Bernhart, Richard Neuböck,
+Python wrapper for the Vienna RNA Package by Andreas R. Gruber, Ronny Lorenz, Stephan H. Bernhart, Richard Neubock,
 and Ivo L. Hofacker (NAR, 2008).
 """
 
@@ -74,7 +74,7 @@ Modfied from Ribosome-Binding-Site-Calculator:
 <https://github.com/hsalis/ribosome-binding-site-calculator>
 <https://salis.psu.edu/software/>
 
-Python wrapper for the Vienna RNA Package by Andreas R. Gruber, Ronny Lorenz, Stephan H. Bernhart, Richard Neuböck,
+Python wrapper for the Vienna RNA Package by Andreas R. Gruber, Ronny Lorenz, Stephan H. Bernhart, Richard Neubock,
 and Ivo L. Hofacker (NAR, 2008).
 
 This file is part of the Ribosome Binding Site Calculator.

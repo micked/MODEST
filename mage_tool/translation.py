@@ -127,6 +127,9 @@ def generate_RBS_library(gene, target, n, max_mutations, passes):
     #MC.verbose = True
     lib = MC.create_library(n, max_mutations, passes)
 
+    if not lib:
+        return False
+
     org_leader = gene.leader
     org_expr = dG_to_AU(MC.original_dG)
 
@@ -242,6 +245,9 @@ class RBSMonteCarlo:
 
         mut_lib = [(dG_to_AU(dG), sorted(muts), seq) for dG, muts, seq in self.mutation_lib]
 
+        if not mut_lib:
+            return False
+
         target_expr_lvl = dG_to_AU(self.target)   
 
         min_expr = min(mut_lib, key=lambda x: x[0])
@@ -260,6 +266,10 @@ class RBSMonteCarlo:
                         selected_library.append(best_n)
 
         n -= len(selected_library) - 1
+
+        if n <= 0:
+            return selected_library
+
         stepsize = (max_expr[0] - min_expr[0]) / n
 
         #Go through each leader in library and select one closest to target

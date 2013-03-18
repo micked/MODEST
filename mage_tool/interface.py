@@ -49,6 +49,9 @@ def interface(adjustments, genes, genome, config, barcoding_lib, project=None):
             #Do operation
             muts = op(gene, config, a["options"], op_str)
 
+            if not muts:
+                log.warn(op_str + " did not make any mutations.")
+
             #Functions may return several oligos
             for mut, code, operation in muts:
                 oligo = Oligo(mut, gene, project, i, oligo_len=90)
@@ -137,13 +140,14 @@ def MAGE_RBS_library(gene, config, options, op):
                                       n=options["n"],
                                       max_mutations=options["max_mutations"],
                                       passes=options["passes"])
-    if not muts:
-        return []
 
     op += " " + opt_str
     ID = options["id"]
     if ID == "-":
         ID = ""
+
+    if not muts:
+        return []
 
     muts_out = list()
     for i, m in enumerate(muts):

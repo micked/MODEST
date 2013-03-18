@@ -66,11 +66,13 @@ def seqIO_to_genelist(genome, options, include_genes=None, leader_len=35):
                             st = ""
                             ed = ""
                             if start_offset < 0:
-                                st = str(genome.seq[l_start:l_start-start_offset])
+                                # st = str(genome.seq[l_start:l_start-start_offset])
+                                st = "N"*-start_offset
                                 start_offset = 0
                             if end_offset > len(w_seq):
                                 #DOUBLE CHECK!!!
-                                ed = str(genome.seq[l_start+start_offset+len(w_seq):l_end])
+                                # ed = str(genome.seq[l_start+start_offset+len(w_seq):l_end])
+                                ed = "N"*(end_offset-len(w_seq))
                                 end_offset = len(w_seq)
 
                             leader_wobble = st + str(w_seq[start_offset:end_offset]) + ed
