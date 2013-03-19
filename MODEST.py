@@ -17,6 +17,7 @@ from mage_tool.IO import seqIO_to_genelist
 from mage_tool.IO import oligolist_to_tabfile
 from mage_tool.IO import parse_barcode_library
 from mage_tool.IO import create_config_tables
+from mage_tool.IO import oligolist_to_report
 
 
 if __name__ == '__main__':
@@ -92,3 +93,7 @@ if __name__ == '__main__':
 
     print("Writing to {}..".format(output))
     oligolist_to_tabfile(oligos, output)
+
+    output_csv = args.project + ".csv"
+    print("Writing report CSV to {}..".format(output_csv))
+    oligolist_to_report(oligos, output_csv)

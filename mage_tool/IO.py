@@ -4,6 +4,9 @@ Classes dealing with input/output and format changes
 """
 
 import logging
+import csv
+import re
+import codecs
 
 from helpers import reverse_complement
 from helpers import reverse_complement_dgn
@@ -89,28 +92,10 @@ def seqIO_to_genelist(genome, options, include_genes=None, leader_len=35):
             if name in genes:
                 log.warn("Gene {} found more than once.".format(name))
                 #raise Exception("Gene {} found twice!".format(name))
-
-            genes[name] = Gene(name, pos, strand, cds, leader, leader_wobble, promoter, promoter_pos)
+            else:
+                genes[name] = Gene(name, pos, strand, cds, leader, leader_wobble, promoter, promoter_pos)
 
     return genes
-
-
-def oligolist_to_tabfile(oligolist, output):
-    """Writeout oligolist to a tab separeted file.
-
-    Supply string filename or open file
-    
-    """
-    cls = False
-    if not hasattr("write", output):
-        output = open(output, "w")
-        cls = True
-
-    for o in oligolist:
-        output.write(o.id() + "\t" + o.output() + "\n")
-
-    if cls:
-        output.close()
 
 
 def parse_barcode_library(barcode_filehandle):
@@ -139,8 +124,8 @@ def parse_barcode_library(barcode_filehandle):
         
         if barcodes_flag:
             line = line.split()
-            forward = reverse_complement(primers[line[1]])
-            reverse = primers[line[2]]
+            forward = primers[line[1]]
+            reverse = reverse_complement(primers[line[2]])
             barcodes[line[0]] = {"forward": forward, "reverse": reverse}
         elif primer_flag:
             line = line.split()
@@ -172,3 +157,51 @@ def create_config_tables(config):
         config["dgn_table"][AA] = seqs_to_degenerate(AAtable[AA])
 
     return config
+
+"""
+Oligolist functions
+"""
+
+def oligolist_to_tabfile(oligolist, output):
+    """Writeout oligolist to a tab separeted file.
+
+    Supply string filename or open file
+    
+    """
+    cls = False
+    if not hasattr("write", output):
+        output = open(output, "w")
+        cls = True
+
+    for o in oligolist:
+        output.write(o.id() + "\t" + o.output() + "\n")
+
+    if cls:
+        output.close()
+
+
+def oligolist_to_report(oligolist, output):
+    """Print report from oligolist in CSV format."""
+    csvoutlist = list()
+
+    op_reg = re.compile(r"\[(\w+)/(\w+)\] (line \d+)\s?(\S*)")
+
+    for o in oligolist:
+        m = re.match(op_reg, o.operation)
+        op_cmd, gene, line, op_options = m.groups()
+        csvoutlist.append([o.short_id(), op_cmd, gene, line, op_options, str(o.mut), "+".join(o.barcode_ids), o.output()] + o.operation_values)
+
+    cls = False
+    if not hasattr("write", output):
+        output = open(output, "w")
+        cls = True
+
+    #For Libreoffice Calc
+    output.write(codecs.BOM_UTF8)
+    csv_w = csv.writer(output)
+
+    for n in csvoutlist:
+        csv_w.writerow(n)
+
+    if cls:
+        output.close()

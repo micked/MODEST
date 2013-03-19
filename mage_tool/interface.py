@@ -5,6 +5,7 @@ General interface to <>
 """
 
 import logging
+from multiprocessing import Pool
 
 from oligo_design import Oligo
 from translation import replace_start_codon
@@ -17,15 +18,46 @@ log = logging.getLogger("MODEST")
 log.addHandler(logging.NullHandler())
 
 
+def create_oligos(genome, op, gene, config, options, op_str, project, barcode_id, barcoding_lib, i):
+    """Run an operation and create oligos"""
+    muts = op(gene, config, options, op_str)
+
+    oligos = list()
+
+    if muts is None:
+        log.warn(op_str + " did not make any mutations.")
+
+    j = 0
+    for mut, code, operation, values in muts:
+        number = "{:0>4}.{}".format(i, j) # + barcoding
+        oligo = Oligo(mut, gene, project, number, oligo_len=90)
+        oligo.set_oligo(genome, optimise=True, threshold=-20.0)
+        oligo.target_lagging_strand(config["replication"]["ori"], config["replication"]["ter"])
+        #Add barcodes
+        oligo.add_barcode(barcode_id, barcoding_lib)
+        #Back tracing
+        oligo.code = code
+        oligo.operation = operation
+        oligo.operation_values = values
+        #Add to log
+        log.info(" ".join([operation, str(mut), ">>", oligo.id()]))
+        #Add
+        oligos.append(oligo)
+        j += 1
+
+    return oligos
+
+
 def interface(adjustments, genes, genome, config, barcoding_lib, project=None):
     """General interface to <>
 
     adjustments is a parsed list
     genes is a dictionary with Gene objects
     genome is a Biopython Seq object or a string
-    """
 
-    oligos = list()
+    """
+    p_pool = Pool(processes=4)
+    oligos_list = list()
 
     i = 0
     for a in adjustments:
@@ -46,27 +78,22 @@ def interface(adjustments, genes, genome, config, barcoding_lib, project=None):
         else:
             #Barcode id
             barcode_id = a["barcode_id"]
+
             #Do operation
-            muts = op(gene, config, a["options"], op_str)
+            args = (genome, op, gene, config, a["options"], op_str, project, barcode_id, barcoding_lib, i)
+            oligos_list.append(p_pool.apply_async(create_oligos, args))
+            i += 1
 
-            if not muts:
-                log.warn(op_str + " did not make any mutations.")
+    #This does not work:
+    #DO SOMETHINGNGNGNGN!
+    try:
+        p_pool.close()
+    except KeyboardInterrupt:
+        log.warn("Computation manually stopped.")
 
-            #Functions may return several oligos
-            for mut, code, operation in muts:
-                oligo = Oligo(mut, gene, project, i, oligo_len=90)
-                oligo.set_oligo(genome, optimise=True, threshold=-20.0)
-                oligo.target_lagging_strand(config["replication"]["ori"], config["replication"]["ter"])
-                #Add barcodes
-                oligo.add_barcode(barcode_id, barcoding_lib)
-                #Back tracing
-                oligo.code = code
-                oligo.operation = operation
-                #Add to log
-                log.info(" ".join([operation, str(mut), ">>", oligo.id()]))
-                #Add
-                oligos.append(oligo)
-                i += 1
+    oligos = list()
+    for oligos_out in oligos_list:
+        oligos.extend(oligos_out.get())
 
     return oligos
 
@@ -82,23 +109,23 @@ def MAGE_start_codon_optimal(gene, config, options, op):
         return []
 
     code = "OptStart{}".format(len(mut.before))
-    return [(mut, code, op)]
+    return [(mut, code, op, [])]
 
 def MAGE_translational_KO(gene, config, options, op):
     options, opt_str = parse_options(options, {"ko_frame": (int, 10)}, op)
     op += " " + opt_str
     if not options:
-        return []
+        return None
 
     KO_frame = options["ko_frame"]
     stop_codons = config["stop_codons"]
     try:
         mut = translational_KO(gene, stop_codons, KO_frame)
         code = "TransKO{}".format(mut._codon_offset)
-        return [(mut, code, op)]
+        return [(mut, code, op, [mut._codon_offset])]
     except Exception as e:
         log.error(op + " Caught exception: " + str(e))
-        return []
+        return None
 
 
 def MAGE_RBSopt_single(gene, config, options, op):
@@ -109,10 +136,10 @@ def MAGE_RBSopt_single(gene, config, options, op):
     }
     options, opt_str = parse_options(options, kwds, op)
     if not options:
-        return []
+        return None
     muts = RBS_single_mutation(gene, **options)
     if not muts:
-        return []
+        return None
 
     op += " " + opt_str
 
@@ -120,7 +147,7 @@ def MAGE_RBSopt_single(gene, config, options, op):
     for m in muts:
         code = "RBSoptSingle{:.2f}".format(m._adjustment)
         l_op = op + " {:.4f}X wt".format(m._adjustment)
-        muts_out.append((m, code, l_op))
+        muts_out.append((m, code, l_op, [m._adjustment]))
 
     return muts_out
 
@@ -134,7 +161,7 @@ def MAGE_RBS_library(gene, config, options, op):
     }
     options, opt_str = parse_options(options, kwds, op)
     if not options:
-        return []
+        return None
 
     muts = generate_RBS_library(gene, target=options["target"],
                                       n=options["n"],
@@ -147,13 +174,13 @@ def MAGE_RBS_library(gene, config, options, op):
         ID = ""
 
     if not muts:
-        return []
+        return None
 
     muts_out = list()
     for i, m in enumerate(muts):
         code = "RBSlib{}{}_{:.1f}/{:.1f}({})".format(ID, i, m._expr, m._org_expr, m._n_muts)
         l_op = op + " {:.3f} (wt: {:.2f})".format(m._expr, m._org_expr)
-        muts_out.append((m, code, l_op))
+        muts_out.append((m, code, l_op, [m._expr, m._org_expr]))
 
     return muts_out
 

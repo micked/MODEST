@@ -17,6 +17,7 @@ log.addHandler(logging.NullHandler())
 
 class Oligo:
     """Oligo Object"""
+
     def __init__(self, mut, gene, project=None, number=0, oligo_len=90):
         self.mut = mut
         self.gene = gene
@@ -28,11 +29,13 @@ class Oligo:
         self.replichore = None
         self.project = project
         self.number = number
-        self.barcodes_forward = []
-        self.barcodes_reverse = []
-        self.barcode_ids = []
+
+        self.barcodes_forward = list()
+        self.barcodes_reverse = list()
+        self.barcode_ids = list()
         self.code = ""
         self.operation = ""
+        self.operation_values = list()
 
     def set_oligo(self, genome, optimise=True, threshold=-20):
         if optimise:
@@ -156,12 +159,18 @@ class Oligo:
         return "{prj}{i:0>4}{barcodes}_{mut}_{gene}_{code}_RP{rp}{opt}".format(
             prj = self.project if self.project else "",
             i = self.number,
-            barcodes = "_BC:" + ",".join(self.barcode_ids) if self.barcode_ids else "",
+            barcodes = "_BC:" + "+".join(self.barcode_ids) if self.barcode_ids else "",
             mut = self.mut.small_str(),
             gene = str(self.gene),
             code = self.code,
             rp = self.replichore,
             opt = "_OPT:{}({:.1f})".format(str(self.optimised), self.dG_fold) if self.optimised else ""
+            )
+
+    def short_id(self):
+        return "{prj}{i:0>4}".format(
+            prj = self.project if self.project else "",
+            i = self.number
             )
 
     def copy(self):
