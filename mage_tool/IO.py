@@ -173,7 +173,7 @@ def oligolist_to_tabfile(oligolist, output):
         output = open(output, "w")
         cls = True
 
-    for o in oligolist:
+    for o in sorted(oligolist, key=lambda x:x.number):
         output.write(o.id() + "\t" + o.output() + "\n")
 
     if cls:
@@ -186,7 +186,7 @@ def oligolist_to_report(oligolist, output):
 
     op_reg = re.compile(r"\[(\w+)/(\w+)\] (line \d+)\s?(\S*)")
 
-    for o in oligolist:
+    for o in sorted(oligolist, key=lambda x:x.number):
         m = re.match(op_reg, o.operation)
         op_cmd, gene, line, op_options = m.groups()
         csvoutlist.append([o.short_id(), op_cmd, gene, line, op_options, str(o.mut), "+".join(o.barcode_ids), o.output()] + o.operation_values)

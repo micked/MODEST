@@ -5,7 +5,7 @@ General interface to <>
 """
 
 import logging
-from multiprocessing import Pool
+from multiprocessing import Pool, Value, Lock
 import copy
 import signal
 
@@ -23,7 +23,15 @@ log.addHandler(logging.NullHandler())
 """ Config """
 NUM_PROCESSES = 4
 
-def create_oligos(genome, op, gene, config, options, op_str, project, multi_oligo_barcodes, barcoding_lib, i):
+counter = Value('i', 0)
+lock = Lock()
+    
+def initializer(*args):
+    global number, lock
+    number, lock = args
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    
+def create_oligos(genome, op, gene, config, options, op_str, project, multi_oligo_barcodes, barcoding_lib):
     """Run an operation and create oligos"""
     try:
         muts = op(gene, config, options, op_str)
@@ -40,8 +48,9 @@ def create_oligos(genome, op, gene, config, options, op_str, project, multi_olig
             #reset barcode counter
             j = 1
             #increase oligo counter
-            i += 1
-            number = "{:0>4}".format(i) # + barcoding
+            with lock:
+                counter.value += 1
+            number = "{:0>4}".format(counter.value) # + barcoding
             oligo = Oligo(mut, gene, project, number, oligo_len=90)
             oligo.set_oligo(genome, optimise=True, threshold=-20.0)
             oligo.target_lagging_strand(config["replication"]["ori"], config["replication"]["ter"])
@@ -63,10 +72,7 @@ def create_oligos(genome, op, gene, config, options, op_str, project, multi_olig
                 j += 1
         
         return oligos
-    
-def init_worker():
-    signal.signal(signal.SIGINT, signal.SIG_IGN)
-    
+
 def interface(adjustments, genes, genome, config, barcoding_lib, project=None):
     """General interface to <>
 
@@ -75,10 +81,9 @@ def interface(adjustments, genes, genome, config, barcoding_lib, project=None):
     genome is a Biopython Seq object or a string
 
     """
-    p_pool = Pool(NUM_PROCESSES, init_worker)
+    p_pool = Pool(NUM_PROCESSES, initializer, (counter, lock))
     oligos_list = list()
 
-    i = 0
     for a in adjustments:
         op = a["operation"]
         gene = a["gene"]
@@ -104,12 +109,9 @@ def interface(adjustments, genes, genome, config, barcoding_lib, project=None):
 
             #Do operation
             try:
-                args = (genome, op, gene, config, a["options"], op_str, project, multi_oligo_barcodes, barcoding_lib, i)
+                args = (genome, op, gene, config, a["options"], op_str, project, multi_oligo_barcodes, barcoding_lib)
                 olis = p_pool.apply_async(create_oligos, args)
                 oligos_list.append(olis)
-                #Increase index by number of new oligos, not considering barcodes
-                increase = len(olis.get())/len(multi_oligo_barcodes)
-                i += increase
             except KeyboardInterrupt:
                 #Kills program .. No output.
                 print ""
