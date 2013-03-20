@@ -6,48 +6,67 @@ General interface to <>
 
 import logging
 from multiprocessing import Pool
+import copy
+import signal
 
 from oligo_design import Oligo
 from translation import replace_start_codon
 from translation import translational_KO
 from translation import RBS_single_mutation
 from translation import generate_RBS_library
+from custom import custom_mutation
 
 #Define a log
 log = logging.getLogger("MODEST")
 log.addHandler(logging.NullHandler())
 
+""" Config """
+NUM_PROCESSES = 4
 
-def create_oligos(genome, op, gene, config, options, op_str, project, barcode_id, barcoding_lib, i):
+def create_oligos(genome, op, gene, config, options, op_str, project, multi_oligo_barcodes, barcoding_lib, i):
     """Run an operation and create oligos"""
-    muts = op(gene, config, options, op_str)
+    try:
+        muts = op(gene, config, options, op_str)
+        oligos = list()
+    except KeyboardInterrupt:
+        #Kills program .. No output.
+        #Is kills after muts finishes .. Slow on RBSoptSingle .. possibly need keyboardinterrupts inside functions
+        pass
+    else:
+        if muts is None:
+            log.warn(op_str + " did not make any mutations.")
 
-    oligos = list()
-
-    if muts is None:
-        log.warn(op_str + " did not make any mutations.")
-
-    j = 0
-    for mut, code, operation, values in muts:
-        number = "{:0>4}.{}".format(i, j) # + barcoding
-        oligo = Oligo(mut, gene, project, number, oligo_len=90)
-        oligo.set_oligo(genome, optimise=True, threshold=-20.0)
-        oligo.target_lagging_strand(config["replication"]["ori"], config["replication"]["ter"])
-        #Add barcodes
-        oligo.add_barcode(barcode_id, barcoding_lib)
-        #Back tracing
-        oligo.code = code
-        oligo.operation = operation
-        oligo.operation_values = values
-        #Add to log
-        log.info(" ".join([operation, str(mut), ">>", oligo.id()]))
-        #Add
-        oligos.append(oligo)
-        j += 1
-
-    return oligos
-
-
+        for mut, code, operation, values in muts:
+            #reset barcode counter
+            j = 1
+            #increase oligo counter
+            i += 1
+            number = "{:0>4}".format(i) # + barcoding
+            oligo = Oligo(mut, gene, project, number, oligo_len=90)
+            oligo.set_oligo(genome, optimise=True, threshold=-20.0)
+            oligo.target_lagging_strand(config["replication"]["ori"], config["replication"]["ter"])
+            #Back tracing
+            oligo.code = code
+            oligo.operation = operation
+            oligo.operation_values = values
+            #Add to log
+            log.info(" ".join([operation, str(mut), ">>", oligo.id()]))
+            #Add barcodes
+            for barcode_ids in multi_oligo_barcodes:
+                temp_oligo = copy.deepcopy(oligo)
+                temp_oligo.number = "{}.{}".format(number, j) # + barcoding
+                for barcode_id in barcode_ids:
+                    temp_oligo.add_barcode(barcode_id, barcoding_lib)
+                temp_oligo.barcode_ids.reverse()
+                #Add
+                oligos.append(temp_oligo)
+                j += 1
+        
+        return oligos
+    
+def init_worker():
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    
 def interface(adjustments, genes, genome, config, barcoding_lib, project=None):
     """General interface to <>
 
@@ -56,7 +75,7 @@ def interface(adjustments, genes, genome, config, barcoding_lib, project=None):
     genome is a Biopython Seq object or a string
 
     """
-    p_pool = Pool(processes=4)
+    p_pool = Pool(NUM_PROCESSES, init_worker)
     oligos_list = list()
 
     i = 0
@@ -77,19 +96,33 @@ def interface(adjustments, genes, genome, config, barcoding_lib, project=None):
                 log.error("Gene {} not found. Doing nothing.".format(op_str))
         else:
             #Barcode id
-            barcode_id = a["barcode_id"]
+            multi_oligo_barcodes = a["barcode_id"].split(',')
+            for j, barcodes in enumerate(multi_oligo_barcodes):
+                barcode_ids = barcodes.split('+')
+                barcode_ids.reverse()
+                multi_oligo_barcodes[j] = barcode_ids
 
             #Do operation
-            args = (genome, op, gene, config, a["options"], op_str, project, barcode_id, barcoding_lib, i)
-            oligos_list.append(p_pool.apply_async(create_oligos, args))
-            i += 1
-
+            try:
+                args = (genome, op, gene, config, a["options"], op_str, project, multi_oligo_barcodes, barcoding_lib, i)
+                olis = p_pool.apply_async(create_oligos, args)
+                oligos_list.append(olis)
+                #Increase index by number of new oligos, not considering barcodes
+                increase = len(olis.get())/len(multi_oligo_barcodes)
+                i += increase
+            except KeyboardInterrupt:
+                #Kills program .. No output.
+                print ""
+                log.warn("Computation manually stopped.")
+                p_pool.terminate()
+    
+    
     #This does not work:
     #DO SOMETHINGNGNGNGN!
-    try:
-        p_pool.close()
-    except KeyboardInterrupt:
-        log.warn("Computation manually stopped.")
+    #try:
+    #    p_pool.close()
+    #except KeyboardInterrupt:
+    #    log.warn("Computation manually stopped.")
 
     oligos = list()
     for oligos_out in oligos_list:
@@ -97,7 +130,23 @@ def interface(adjustments, genes, genome, config, barcoding_lib, project=None):
 
     return oligos
 
+"""
 
+Custom Mutations
+
+"""
+
+def MAGE_custom_mutation(gene, config, options, op):
+    options, opt_str = parse_options(options, {"mut": (str, "[=]")}, op)
+    op += " " + opt_str
+    mut = custom_mutation(gene, options["mut"])
+    if not mut:
+        log.debug(op + " Not mutating, did not find mutation box")
+        return []
+        
+    code = "CustomMut"
+    return [(mut, code, op, [])]
+    
 """
 Translation modifications
 """
@@ -218,7 +267,7 @@ def parse_options(options, kwds, func):
     #Parse supplied keywords and values
     supp_opt = dict()
     for option in options:
-        tmp = option.split("=")
+        tmp = option.split("=", 1)
         if len(tmp) < 2:
             log.error("{} invalid option without value <{}>".format(func, option))
             return None, ""
@@ -270,4 +319,5 @@ operations = {
     "translational_KO":     MAGE_translational_KO,
     "RBSopt_single":        MAGE_RBSopt_single,
     "RBS_library":          MAGE_RBS_library,
+    "custom_mutation":      MAGE_custom_mutation,
     }

@@ -2,8 +2,8 @@ thrL	start_codon_optimal ID1
 thrA	start_codon_optimal ID2
 thrB	start_codon_optimal ID3
 thrC	start_codon_optimal ID4
-yaaX	start_codon_optimal ID1
-yaaA	start_codon_optimal ID2
+yaaX	start_codon_optimal ID1+ID2,ID2+ID3
+yaaA	custom_mutation ID2 mut=TATCAACGCC[GCTC=]GCTTTCATGACT
 yaaJ	start_codon_optimal ID3
 talB	start_codon_optimal ID4
 mog	start_codon_optimal ID1
@@ -13,7 +13,7 @@ yaaI	start_codon_optimal ID4
 dnaK	start_codon_optimal ID2
 dnaJ	translational_KO    ID1  KO_frame=10
 insL	translational_KO    ID2  KO_frame=20
-mokC	RBSopt_single   ID2  insert=true,delete=yes
+mokC	RBSopt_single   ID1+ID2,ID2+ID3  insert=true,delete=yes
 hokC	RBSopt_single   ID2  insert=true,delete=yes
 nhaA	RBSopt_single   ID2  insert=true,delete=yes
 nhaR	RBSopt_single   ID2  insert=true,delete=yes,maximise=false
