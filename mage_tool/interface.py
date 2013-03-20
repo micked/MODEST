@@ -6,7 +6,6 @@ General interface to <>
 
 import logging
 from multiprocessing import Pool, Value, Lock
-import copy
 import signal
 
 from oligo_design import Oligo
@@ -21,7 +20,7 @@ log = logging.getLogger("MODEST")
 log.addHandler(logging.NullHandler())
 
 """ Config """
-NUM_PROCESSES = 4
+NUM_PROCESSES = None #Use max available processes.
 
 counter = Value('i', 0)
 lock = Lock()
@@ -62,11 +61,9 @@ def create_oligos(genome, op, gene, config, options, op_str, project, multi_olig
             log.info(" ".join([operation, str(mut), ">>", oligo.id()]))
             #Add barcodes
             for barcode_ids in multi_oligo_barcodes:
-                temp_oligo = copy.deepcopy(oligo)
+                temp_oligo = oligo.copy()
                 temp_oligo.number = "{}.{}".format(number, j) # + barcoding
-                for barcode_id in barcode_ids:
-                    temp_oligo.add_barcode(barcode_id, barcoding_lib)
-                temp_oligo.barcode_ids.reverse()
+                temp_oligo.add_barcodes(barcode_ids, barcoding_lib)
                 #Add
                 oligos.append(temp_oligo)
                 j += 1
@@ -102,10 +99,6 @@ def interface(adjustments, genes, genome, config, barcoding_lib, project=None):
         else:
             #Barcode id
             multi_oligo_barcodes = a["barcode_id"].split(',')
-            for j, barcodes in enumerate(multi_oligo_barcodes):
-                barcode_ids = barcodes.split('+')
-                barcode_ids.reverse()
-                multi_oligo_barcodes[j] = barcode_ids
 
             #Do operation
             try:

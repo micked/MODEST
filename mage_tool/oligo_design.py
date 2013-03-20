@@ -136,16 +136,30 @@ class Oligo:
             else:
                 self.replichore = 2
                 return True
-
-    def add_barcode(self, barcode, barcoding_lib):
+    
+    #OLD
+    #def add_barcode(self, barcode, barcoding_lib):
+    #    """TODO"""
+    #    #Add a barcode ID to self.barcode_ids
+    #    #and add barcode sequences to self.barcodes_*
+    #    #forward should be prepended, and backward should be appended
+    #    #Maybe add some primer checking too (maybe second function)
+    #    self.barcodes_forward.insert(0, barcoding_lib[barcode]["forward"].lower())
+    #    self.barcodes_reverse.append(barcoding_lib[barcode]["reverse"].lower())
+    #    self.barcode_ids.insert(0, barcode)
+        
+    def add_barcodes(self, barcode_ids, barcoding_lib):
         """TODO"""
-        #Add a barcode ID to self.barcode_ids
+        #Add barcode IDs to self.barcode_ids
         #and add barcode sequences to self.barcodes_*
-        #forward should be prepended, and backward should be appended
+        #forward barcodes should be prepended, and backward barcodes should be appended
         #Maybe add some primer checking too (maybe second function)
-        self.barcodes_forward.insert(0, barcoding_lib[barcode]["forward"].lower())
-        self.barcodes_reverse.append(barcoding_lib[barcode]["reverse"].lower())
-        self.barcode_ids.append(barcode)
+        barcode_ids = barcode_ids.split('+')
+        barcode_ids.reverse()
+        for barcode in barcode_ids:
+            self.barcodes_forward.insert(0, barcoding_lib[barcode]["forward"].lower())
+            self.barcodes_reverse.append(barcoding_lib[barcode]["reverse"].lower())
+            self.barcode_ids.insert(0, barcode)
 
 
     def output(self):
