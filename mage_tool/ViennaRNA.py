@@ -10,7 +10,22 @@ from subprocess import Popen, PIPE
 
 RNACOFOLD = "RNAcofold"
 
-def rnacofold(seq, options=["--noPS"], calc_basepairing=True):
+def run_command(cmd, input_string):
+    """Run the specified command and return output"""
+    p = Popen(cmd, stdout=PIPE, stdin=PIPE, stderr=PIPE, universal_newlines=True)
+    out, stderr = p.communicate(input=input_string)
+    if p.returncode:
+        raise Exception("Cmd {} failed: {}".format(cmd[0], stderr))
+    return out
+
+try:
+    run_command(["RNAcofold", "-noPS"], "")
+except Exception:
+    noPS = "--noPS"
+else:
+    noPS = "-noPS"
+
+def rnacofold(seq, options=[noPS], calc_basepairing=True):
     """Run RNAcofold"""
     cmd = [RNACOFOLD] + options
     output = run_command(cmd, seq)
@@ -58,15 +73,6 @@ def brackets_to_basepairing(brackets):
                 raise Exception("Missing \"{}\" bracket in {}".format(a, brackets))
 
     return strands, bp_x, bp_y
-
-
-def run_command(cmd, input_string):
-    """Run the specified command and return output"""
-    p = Popen(cmd, stdout=PIPE, stdin=PIPE, stderr=PIPE, universal_newlines=True)
-    out, stderr = p.communicate(input=input_string)
-    if p.returncode:
-        raise Exception("Cmd {} failed: {}".format(cmd[0], stderr))
-    return out
 
 
 """
