@@ -12,7 +12,6 @@ yaaW	start_codon_optimal ID3
 yaaI	start_codon_optimal ID4
 dnaK	start_codon_optimal ID2
 dnaJ	translational_KO    ID1  KO_frame=10
-insL	translational_KO    ID2  KO_frame=20
 mokC	RBSopt_single   ID1+ID2,ID2+ID3  insert=true,delete=yes
 hokC	RBSopt_single   ID2  insert=true,delete=yes
 nhaA	RBSopt_single   ID2  insert=true,delete=yes

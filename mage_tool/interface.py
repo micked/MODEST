@@ -9,17 +9,19 @@ from multiprocessing import Pool, Value, Lock
 import signal
 
 from oligo_design import Oligo
-from translation import replace_start_codon
-from translation import translational_KO
-from translation import RBS_single_mutation
-from translation import generate_RBS_library
-from custom import custom_mutation
+import translation
+#from translation import translational_KO
+#from translation import RBS_single_mutation
+#from translation import generate_RBS_library
+import custom# import custom_mutation
 
 #Define a log
 log = logging.getLogger("MODEST")
 log.addHandler(logging.NullHandler())
 
-""" Config """
+"""
+Config
+"""
 NUM_PROCESSES = None #Use max available processes.
 
 counter = Value('i', 0)
@@ -110,14 +112,6 @@ def interface(adjustments, genes, genome, config, barcoding_lib, project=None):
                 print ""
                 log.warn("Computation manually stopped.")
                 p_pool.terminate()
-    
-    
-    #This does not work:
-    #DO SOMETHINGNGNGNGN!
-    #try:
-    #    p_pool.close()
-    #except KeyboardInterrupt:
-    #    log.warn("Computation manually stopped.")
 
     oligos = list()
     for oligos_out in oligos_list:
@@ -126,15 +120,23 @@ def interface(adjustments, genes, genome, config, barcoding_lib, project=None):
     return oligos
 
 """
-
 Custom Mutations
-
 """
 
-def MAGE_custom_mutation(gene, config, options, op):
+def custom_mutation(gene, config, options, op):
+    """Allows for a desired mutation.
+
+    Options:
+      - ``mut=upstream[before=after]downstream``
+
+    I.e. ``mut=TATCAACGCC[GCTC=A]GCTTTCATGACT`` changes
+    TATCAACGCC\ **GCTCG**\ CTTTCATGACT to TATCAACGCC\ **A**\ GCTTTCATGACT.
+
+    """
+
     options, opt_str = parse_options(options, {"mut": (str, "[=]")}, op)
     op += " " + opt_str
-    mut = custom_mutation(gene, options["mut"])
+    mut = custom.custom_mutation(gene, options["mut"])
     if not mut:
         log.debug(op + " Not mutating, did not find mutation box")
         return []
@@ -146,8 +148,17 @@ def MAGE_custom_mutation(gene, config, options, op):
 Translation modifications
 """
 
-def MAGE_start_codon_optimal(gene, config, options, op):
-    mut = replace_start_codon(gene, config["start_codons"][0])
+def start_codon_optimal(gene, config, options, op):
+    """Mutates a start codon to the optimal start codon.
+
+    Tries to mutate the start codon to the optimal start codon defined in the
+    strain config file (Usually ``ATG``\ ).
+
+    Options and default values:
+      - None
+
+    """
+    mut = translation.replace_start_codon(gene, config["start_codons"][0])
     if not mut:
         log.debug(op + " Not mutating, optimal start codon found.")
         return []
@@ -155,7 +166,25 @@ def MAGE_start_codon_optimal(gene, config, options, op):
     code = "OptStart{}".format(len(mut.before))
     return [(mut, code, op, [])]
 
-def MAGE_translational_KO(gene, config, options, op):
+
+def translational_KO(gene, config, options, op):
+    """Gene knock-out by premature stop-codon.
+
+    Tries to knock out a gene by introducing an early stop-codon in the CDS with
+    the least amount of mutations possible.
+
+    Options and default values:
+      - ``ko_frame=10`` Number of codons that are applicable to be mutated.
+        E.g. a value of 10 means the operation will try to mutate a stop codon
+        into the CDS within 10 codons of the start codon.
+
+    Mutations are prioritised as:
+        - Single mutation, NNN -> XNN
+        - Double concurrent mutation, NNN -> XXN
+        - Double gapped mutation, NNN -> XNX
+        - Triple mutation, NNN -> XXX
+
+    """
     options, opt_str = parse_options(options, {"ko_frame": (int, 10)}, op)
     op += " " + opt_str
     if not options:
@@ -164,7 +193,7 @@ def MAGE_translational_KO(gene, config, options, op):
     KO_frame = options["ko_frame"]
     stop_codons = config["stop_codons"]
     try:
-        mut = translational_KO(gene, stop_codons, KO_frame)
+        mut = translation.translational_KO(gene, stop_codons, KO_frame)
         code = "TransKO{}".format(mut._codon_offset)
         return [(mut, code, op, [mut._codon_offset])]
     except Exception as e:
@@ -172,7 +201,9 @@ def MAGE_translational_KO(gene, config, options, op):
         return None
 
 
-def MAGE_RBSopt_single(gene, config, options, op):
+
+def RBSopt_single(gene, config, options, op):
+    """Depreceated"""
     kwds = {"insert": (truefalse, False),
             "delete": (truefalse, False),
             "top": (int, 3),
@@ -181,7 +212,7 @@ def MAGE_RBSopt_single(gene, config, options, op):
     options, opt_str = parse_options(options, kwds, op)
     if not options:
         return None
-    muts = RBS_single_mutation(gene, **options)
+    muts = translation.RBS_single_mutation(gene, **options)
     if not muts:
         return None
 
@@ -196,7 +227,34 @@ def MAGE_RBSopt_single(gene, config, options, op):
     return muts_out
 
 
-def MAGE_RBS_library(gene, config, options, op):
+def RBS_library(gene, config, options, op):
+    """Create a library of different RBS expression levels.
+
+    Options and default values:
+      - ``target=5000000`` Target expression level to reach for, in AU. If
+        target is reached, computation is stopped, and library will be created.
+        if target is not reached within the specified number of mutations, a
+        library of expression levels closest to target as possible will be
+        created.
+      - ``n=10`` Number of mutations in library to create.
+      - ``max_mutations=10`` Maximum number of mutations to attempt.
+      - ``passes=1`` Number of computations. Specifying more passes will result
+        in the computation restarting. Doing more passes creates more diversity
+        and will result in a library with a higher resolution.
+      - ``id=-`` Specify an ID for the library, which will be included in the
+        code/ID for the resulting oligo. Usefull for tracing important libraries.
+        Leave at ``-`` to have an empty id.
+
+    This operation will run an Monte-Carlo simulation in an attempt to reach the
+    specified target value within a number of mutations. Lower numbers of
+    mutations are tried first and are always prioritised over similar expression
+    levels with a higher mutation count.
+
+    If target is quickly reached (usually happens when lowering expression
+    levels), then RBS_library may not result in a full library. This can helped
+    by doing more passes.
+
+    """
     kwds = {"target": (float, 5000000.),
             "n": (int, 10),
             "max_mutations": (int, 10),
@@ -207,10 +265,10 @@ def MAGE_RBS_library(gene, config, options, op):
     if not options:
         return None
 
-    muts = generate_RBS_library(gene, target=options["target"],
-                                      n=options["n"],
-                                      max_mutations=options["max_mutations"],
-                                      passes=options["passes"])
+    muts = translation.generate_RBS_library(gene, target=options["target"],
+                                            n=options["n"],
+                                            max_mutations=options["max_mutations"],
+                                            passes=options["passes"])
 
     op += " " + opt_str
     ID = options["id"]
@@ -310,9 +368,9 @@ Dict to map all allowed operations
 """
 
 operations = {
-    "start_codon_optimal":  MAGE_start_codon_optimal,
-    "translational_KO":     MAGE_translational_KO,
-    "RBSopt_single":        MAGE_RBSopt_single,
-    "RBS_library":          MAGE_RBS_library,
-    "custom_mutation":      MAGE_custom_mutation,
+    "start_codon_optimal":  start_codon_optimal,
+    "translational_KO":     translational_KO,
+    "RBSopt_single":        RBSopt_single,
+    "RBS_library":          RBS_library,
+    "custom_mutation":      custom_mutation,
     }
