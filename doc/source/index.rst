@@ -1,11 +1,3 @@
-.. MAGE oligo design documentation master file, created by
-   sphinx-quickstart on Fri Mar 22 19:10:24 2013.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
-Welcome to MAGE oligo design's documentation!
-=============================================
-
 Contents:
 
 .. toctree::
