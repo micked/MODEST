@@ -186,9 +186,13 @@ def oligolist_to_report(oligolist, output):
 
     op_reg = re.compile(r"\[(\w+)/(\w+)\] (line \d+)\s?(\S*)")
 
-    for o in sorted(oligolist, key=lambda x:x.number):
+    for o in oligolist:
         m = re.match(op_reg, o.operation)
-        op_cmd, gene, line, op_options = m.groups()
+        try:
+            op_cmd, gene, line, op_options = m.groups()
+        except AttributeError:
+            print("Operation not recognized: {}".format(o.operation))
+            return
         csvoutlist.append([o.short_id(), op_cmd, gene, line, op_options, str(o.mut), "+".join(o.barcode_ids), o.output()] + o.operation_values)
 
     cls = False
@@ -196,12 +200,19 @@ def oligolist_to_report(oligolist, output):
         output = open(output, "w")
         cls = True
 
+    csvoutlist.sort(key=lambda x: (x[1], x[0]))
+
     #For Libreoffice Calc
     output.write(codecs.BOM_UTF8)
     csv_w = csv.writer(output)
+
+    headers = ["short_id", "operation", "gene", "line", "options", "mutation", "barcodes", "oligo", "wt", "altered"]
+    csv_w.writerow(headers)
 
     for n in csvoutlist:
         csv_w.writerow(n)
 
     if cls:
         output.close()
+
+    return csvoutlist
