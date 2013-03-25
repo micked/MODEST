@@ -81,7 +81,7 @@ def run_adjustments(adjfilehandle, genes, genome, config, project, barcoding_lib
 
     oligo_kwargs = {"genome": genome, "config": config, "project": project, "barcoding_lib": barcoding_lib}
 
-    pool = Pool(NUM_PROCESSES)
+    pool = Pool(NUM_PROCESSES, process_initializer)
     results = list()
 
     for run_op in parsed_operations:
@@ -101,10 +101,12 @@ def run_adjustments(adjfilehandle, genes, genome, config, project, barcoding_lib
     return oligos, []
 
 
-def create_oligos(genome, op, gene, config, options, op_str, project, barcodes, barcoding_lib):
-    """Run an operation and create oligos"""
+def process_initializer():
+    """Ignores all exceptions. Useful for subprocesses"""
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
+def create_oligos(genome, op, gene, config, options, op_str, project, barcodes, barcoding_lib):
+    """Run an operation and create oligos"""
     oligos = list()
     muts = op(gene, op_str, config, **options)
 
@@ -154,9 +156,6 @@ def custom_mutation(gene, op, config, mut):
     TATCAACGCC\ **GCTCG**\ CTTTCATGACT to TATCAACGCC\ **A**\ GCTTTCATGACT.
 
     """
-
-    #options, opt_str = parse_options(options, {"mut": (str, "[=]")}, op)
-    #op += " " + opt_str
     mut = custom.custom_mutation(gene, mut)
     if not mut:
         log.debug(op + " Not mutating, did not find mutation box")

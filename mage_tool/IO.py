@@ -7,6 +7,7 @@ import logging
 import csv
 import re
 import codecs
+import cStringIO as strIO
 
 from helpers import reverse_complement
 from helpers import reverse_complement_dgn
@@ -180,7 +181,7 @@ def oligolist_to_tabfile(oligolist, output):
         output.close()
 
 
-def oligolist_to_report(oligolist, output):
+def oligolist_to_csv(oligolist, output=None):
     """Print report from oligolist in CSV format."""
     csvoutlist = list()
 
@@ -195,24 +196,280 @@ def oligolist_to_report(oligolist, output):
             return
         csvoutlist.append([o.short_id(), op_cmd, gene, line, op_options, str(o.mut), "+".join(o.barcode_ids), o.output()] + o.operation_values)
 
-    cls = False
-    if not hasattr("write", output):
-        output = open(output, "w")
-        cls = True
-
     csvoutlist.sort(key=lambda x: (x[1], x[0]))
 
-    #For Libreoffice Calc
-    output.write(codecs.BOM_UTF8)
-    csv_w = csv.writer(output)
+    if output:
+        cls = False
+        if not hasattr("write", output):
+            output = open(output, "w")
+            cls = True
 
-    headers = ["short_id", "operation", "gene", "line", "options", "mutation", "barcodes", "oligo", "wt", "altered"]
-    csv_w.writerow(headers)
+        #For Libreoffice Calc
+        output.write(codecs.BOM_UTF8)
+        csv_w = csv.writer(output)
 
-    for n in csvoutlist:
-        csv_w.writerow(n)
+        #TODO add additional headers
+        headers = ["id", "operation", "gene", "line", "options", "mutation", "barcodes", "oligo", "wt", "altered"]
+        csv_w.writerow(headers)
 
-    if cls:
-        output.close()
+        for n in csvoutlist:
+            csv_w.writerow(n)
+
+        if cls:
+            output.close()
 
     return csvoutlist
+
+
+class OligoLibraryReport:
+    """Print a report from a csv report.
+
+    This is meant to be general, and new file format writers can easily be
+    plugged into the class
+
+    """
+    def __init__(self, project):
+        self.project = project
+        self.sections = dict()
+        self.parsed = False
+
+    def parse_and_generate(self, csv_in, csv_file=False):
+        """Wrapper to parse csv and generate report"""
+        if csv_file:
+            self.parse_csvfile(csv_in)
+        else:
+            self.parse_csvlist(csv_in)
+
+        self.generate_report()
+
+    def parse_csvlist(self, csvlist):
+        """Parse input csvlist"""
+        self.oplib = dict()
+        header = False
+        for line in csvlist:
+            if not header:
+                header = line
+                header[0] = header[0].strip(codecs.BOM_UTF8)
+                continue
+            entry = {h: line[i] for i,h in enumerate(header) if len(line) > i}
+
+            op = entry["operation"]
+            gene = entry["gene"]
+            if op not in self.oplib:
+                self.oplib[op] = dict()
+            if gene not in self.oplib[op]:
+                self.oplib[op][gene] = list()
+
+            self.oplib[op][gene].append(entry)
+
+        self.parsed = True
+
+    def parse_csvfile(self, csvfile):
+        """Parse input csv file"""
+        with open(csvfile) as csvf:
+            reader = csv.reader(csvf)
+            self.parse_csvlist(reader)
+
+    def generate_report(self):
+        """TODO"""
+        if not self.parsed:
+            raise Exception("generate_report called with parsed data")
+
+        self.generate_rbs_lib_section()
+
+    """
+    Specific sections
+    """
+
+    def generate_rbs_lib_section(self, prefix="01", plot_log=True):
+        """RBS_library stats generation"""
+        from matplotlib import pyplot as plt
+        import math
+
+        if "RBS_library" not in self.oplib:
+            return
+
+        elements = [("p", "Ribosome binding sites libraries.")]
+
+        bar_width = 0.3
+        #Genes per plot
+        gpp = 8
+        #sort by altered
+        sba = lambda gene: max([float(oligo["altered"]) for oligo in self.oplib["RBS_library"][gene]])
+        genes = sorted(self.oplib["RBS_library"].keys(), key=sba, reverse=True)
+        for i in range(0, len(genes), gpp):
+            curr_genes = genes[i:i+gpp]
+            x = [0]
+            y1 = list()
+            y2 = list()
+            labels = list()
+            for gene in curr_genes:
+                wt = float(self.oplib["RBS_library"][gene][0]["wt"])
+                expr = max([float(oligo["altered"]) for oligo in self.oplib["RBS_library"][gene]])
+                x.append(x[-1]+1)
+                y1.append(wt)
+                y2.append(expr)
+                labels.append(gene)
+
+            del(x[0])
+
+            fig = plt.figure(figsize=(8, 3))
+            ax = fig.add_subplot(111)
+            plt.bar(x, y1, bar_width, color="#9FF33D", linewidth=0, log=plot_log)
+            plt.bar([x1+bar_width for x1 in x], y2, bar_width, color="#007633", linewidth=0, log=plot_log)
+
+            ax.set_xticklabels(labels)
+            ax.set_xticks([x1+bar_width for x1 in x])
+
+            if plot_log:
+                ma = round(max(y2), len(str(max(y2))))
+                ax.set_ylim(1, ma*2)
+            #ax.set_xlim(bar_width, len(curr_genes)+1)
+
+            for gene, j in zip(curr_genes, x):
+                step = 0.5 / (len(self.oplib["RBS_library"][gene]))
+                clr = 0.5
+                for oligo in self.oplib["RBS_library"][gene]:
+                    color = "{:.1f}".format(clr)
+                    y3 = float(oligo["altered"])
+                    ax.annotate("", xy=(j+1.5*bar_width, y3), xytext=(j+0.75+bar_width*0.5, y3),
+                                arrowprops={"arrowstyle": "wedge", "linewidth": 0,
+                                            "color": color})
+                    clr -= step
+
+            imgdata_png = strIO.StringIO()
+            imgdata_pdf = strIO.StringIO()
+            fig.savefig(imgdata_png, format="PNG", dpi=300)
+            fig.savefig(imgdata_pdf, format="PDF")
+            imgdata_png.seek(0)
+            imgdata_pdf.seek(0)
+
+            elements.append(("png/pdf", imgdata_png, imgdata_pdf, "page", 3./8))
+
+        self.sections[prefix + "RBS_library"] = elements
+ 
+    """
+    Output formats
+    """
+
+    def write_pdf(self, report_out):
+        """Write report directly to PDF"""
+        #Local imports since reports are not strictly necessary
+        from reportlab import platypus as RL
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.pagesizes import A4
+
+        styles = getSampleStyleSheet()
+
+        page_width, page_height = A4
+        rmargin = lmargin = tmargin = 72
+        bmargin = 18
+        doc = RL.SimpleDocTemplate(report_out, pagesize=A4,
+                                   rightMargin=rmargin, leftMargin=lmargin,
+                                   topMargin=tmargin, bottomMargin=bmargin)
+
+        elements = [RL.Paragraph("Project: " + self.project, styles["Title"])]
+
+        for h in sorted(self.sections):
+            header = h.lstrip("0123456789 ")
+            e = self.sections[h]
+            elements.append(RL.Paragraph(header, styles["Heading1"]))
+            for t in e:
+                if t[0] == "p":
+                    elements.append(RL.Paragraph(t[1], styles["Normal"]))
+                if t[0] == "png/pdf":
+                    if t[3] == "page":
+                        img_width = page_width - rmargin - lmargin
+                        img_height = img_width*t[4]
+                    if PdfImage:
+                        img = PdfImage(t[2], width=img_width, height=img_height)
+                    else:
+                        t[1].seek(0)
+                        img = RL.Image(t[1], width=img_width, height=img_height)
+                    elements.append(img)
+
+        doc.build(elements)
+
+
+"""
+PDF flowable for report lab
+
+Wrapped in a try statement since it can fail silently if reportlab and pdfrw is
+not installed.
+
+"""
+
+try:
+    from pdfrw import PdfReader
+    from pdfrw.buildxobj import pagexobj
+    from pdfrw.toreportlab import makerl
+
+    from reportlab.platypus import Flowable
+    from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
+    # import aeaoe
+
+    class PdfImage(Flowable):
+        """PdfImage wraps the first page from a PDF file as a Flowable
+        which can be included into a ReportLab Platypus document.
+        Based on the vectorpdf extension in rst2pdf code.google.com/p/rst2pdf
+
+        Hijacked from: http://stackoverflow.com/a/13870512
+
+        """
+
+        def __init__(self, filename_or_object, width=None, height=None, kind='direct'):
+            # If using StringIO buffer, set pointer to begining
+            if hasattr(filename_or_object, 'read'):
+                filename_or_object.seek(0)
+
+            page = PdfReader(filename_or_object, decompress=False).pages[0]
+            self.xobj = pagexobj(page)
+            self.imageWidth = width
+            self.imageHeight = height
+            x1, y1, x2, y2 = self.xobj.BBox
+
+            self._w, self._h = x2 - x1, y2 - y1
+            if not self.imageWidth:
+                self.imageWidth = self._w
+            if not self.imageHeight:
+                self.imageHeight = self._h
+            self.__ratio = float(self.imageWidth)/self.imageHeight
+            if kind in ['direct','absolute'] or width==None or height==None:
+                self.drawWidth = width or self.imageWidth
+                self.drawHeight = height or self.imageHeight
+            elif kind in ['bound','proportional']:
+                factor = min(float(width)/self._w,float(height)/self._h)
+                self.drawWidth = self._w*factor
+                self.drawHeight = self._h*factor
+
+        def wrap(self, aW, aH):
+            return self.drawWidth, self.drawHeight
+
+        def drawOn(self, canv, x, y, _sW=0):
+            if _sW > 0 and hasattr(self, 'hAlign'):
+                a = self.hAlign
+                if a in ('CENTER', 'CENTRE', TA_CENTER):
+                    x += 0.5*_sW
+                elif a in ('RIGHT', TA_RIGHT):
+                    x += _sW
+                elif a not in ('LEFT', TA_LEFT):
+                    raise ValueError("Bad hAlign value " + str(a))
+
+            xobj = self.xobj
+            xobj_name = makerl(canv._doc, xobj)
+
+            xscale = self.drawWidth/self._w
+            yscale = self.drawHeight/self._h
+
+            x -= xobj.BBox[0] * xscale
+            y -= xobj.BBox[1] * yscale
+
+            canv.saveState()
+            canv.translate(x, y)
+            canv.scale(xscale, yscale)
+            canv.doForm(xobj_name)
+            canv.restoreState()
+
+except ImportError:
+    PdfImage = False
+    log.debug("pdfrw or reportlab not found, pdf output not available")
