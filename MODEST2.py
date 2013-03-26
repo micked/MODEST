@@ -18,6 +18,8 @@ from mage_tool.IO import oligolist_to_tabfile
 from mage_tool.IO import parse_barcode_library
 from mage_tool.IO import create_config_tables
 from mage_tool.IO import oligolist_to_csv
+from mage_tool.IO import OligoLibraryReport
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -42,7 +44,7 @@ if __name__ == '__main__':
         #Log to file and warnings to screen
         logging.basicConfig(level=logging.DEBUG, format=format, datefmt='%Y-%m-%d %H:%M', filename=args.log, filemode='w')
         console = logging.StreamHandler()
-        console.setLevel(logging.WARNING)
+        console.setLevel(logging.DEBUG)
         formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
         console.setFormatter(formatter)
         logging.getLogger('').addHandler(console)
@@ -85,4 +87,10 @@ if __name__ == '__main__':
 
     output_csv = args.project + ".csv"
     print("Writing report CSV to {}..".format(output_csv))
-    oligolist_to_csv(oligos, output_csv)
+    csvlist = oligolist_to_csv(oligos, output_csv)
+
+    output_pdf = args.project + ".pdf"
+    print("Writing report PDF to {}..".format(output_pdf))
+    report = OligoLibraryReport(args.project)
+    report.parse_and_generate(csvlist, csv_file=False)
+    report.write_pdf(output_pdf)

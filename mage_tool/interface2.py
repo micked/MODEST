@@ -143,7 +143,24 @@ def create_oligos(genome, op, gene, config, options, op_str, project, barcodes, 
 
 
 """
+==================
+Mutation functions
+==================
+
+Each function described here must take a gene object, an op string (for logging
+purposes), a strain config dict, and additional kwargs described in global
+OPERATIONS dict.
+
+Each function must output a list of tuples, each tuple buing a mutation and
+containing (Mutation object, small code string, operation string + status, 
+            list of status/output values: [wt value, altered value, *other])
+
+List of status/output values can be empty, but wt value must always be at 0, and
+altered at 1. If wt valueis not applicable, return 0 or "" as wt value.
+
+
 Custom Mutations
+~~~~~~~~~~~~~~~~
 """
 
 def custom_mutation(gene, op, config, mut):
@@ -167,6 +184,7 @@ def custom_mutation(gene, op, config, mut):
 
 """
 Translation modifications
+~~~~~~~~~~~~~~~~~~~~~~~~~
 """
 
 def start_codon_optimal(gene, op, config):
@@ -209,7 +227,7 @@ def translational_KO(gene, op, config, ko_frame):
     stop_codons = config["stop_codons"]
     mut = translation.translational_KO(gene, stop_codons, ko_frame)
     code = "TransKO{}".format(mut._codon_offset)
-    return [(mut, code, op, [mut._codon_offset])]
+    return [(mut, code, op, [0, mut._codon_offset])]
 
 
 def RBSopt_single(gene, op, config, insert, delete, top, maximise):
@@ -266,7 +284,7 @@ def RBS_library(gene, op, config, target, n, max_mutations, passes):
     for i, m in enumerate(muts):
         code = "RBSlib{}_{:.1f}/{:.1f}({})".format(i, m._expr, m._org_expr, m._n_muts)
         l_op = op + " {:.3f} (wt: {:.2f})".format(m._expr, m._org_expr)
-        muts_out.append((m, code, l_op, [m._expr, m._org_expr]))
+        muts_out.append((m, code, l_op, [m._org_expr, m._expr]))
 
     return muts_out
 

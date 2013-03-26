@@ -194,7 +194,9 @@ def oligolist_to_csv(oligolist, output=None):
         except AttributeError:
             print("Operation not recognized: {}".format(o.operation))
             return
-        csvoutlist.append([o.short_id(), op_cmd, gene, line, op_options, str(o.mut), "+".join(o.barcode_ids), o.output()] + o.operation_values)
+        csvoutlist.append([o.short_id(), op_cmd, gene, line, op_options,
+                           str(o.mut), "+".join(o.barcode_ids), o.output(),
+                           o.dG_fold] + o.operation_values)
 
     csvoutlist.sort(key=lambda x: (x[1], x[0]))
 
@@ -209,7 +211,8 @@ def oligolist_to_csv(oligolist, output=None):
         csv_w = csv.writer(output)
 
         #TODO add additional headers
-        headers = ["id", "operation", "gene", "line", "options", "mutation", "barcodes", "oligo", "wt", "altered"]
+        headers = ["id", "operation", "gene", "line", "options", "mutation",
+                   "barcodes", "oligo", "mfe", "wt", "altered"]
         csv_w.writerow(headers)
 
         for n in csvoutlist:
@@ -218,7 +221,7 @@ def oligolist_to_csv(oligolist, output=None):
         if cls:
             output.close()
 
-    return csvoutlist
+    return [headers] + csvoutlist
 
 
 class OligoLibraryReport:
@@ -381,95 +384,95 @@ class OligoLibraryReport:
                     if t[3] == "page":
                         img_width = page_width - rmargin - lmargin
                         img_height = img_width*t[4]
+                    PdfImage = self.PdfImage()
                     if PdfImage:
                         img = PdfImage(t[2], width=img_width, height=img_height)
                     else:
+                        log.debug("pdfrw not found, using png images in output report.")
                         t[1].seek(0)
                         img = RL.Image(t[1], width=img_width, height=img_height)
                     elements.append(img)
 
         doc.build(elements)
 
+    def PdfImage(self):
+        """PDF flowable for report lab
 
-"""
-PDF flowable for report lab
-
-Wrapped in a try statement since it can fail silently if reportlab and pdfrw is
-not installed.
-
-"""
-
-try:
-    from pdfrw import PdfReader
-    from pdfrw.buildxobj import pagexobj
-    from pdfrw.toreportlab import makerl
-
-    from reportlab.platypus import Flowable
-    from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
-    # import aeaoe
-
-    class PdfImage(Flowable):
-        """PdfImage wraps the first page from a PDF file as a Flowable
-        which can be included into a ReportLab Platypus document.
-        Based on the vectorpdf extension in rst2pdf code.google.com/p/rst2pdf
-
-        Hijacked from: http://stackoverflow.com/a/13870512
+        Wrapped in a try statement since it can fail silently if pdfrw is
+        not installed, and wrapped inside a def statement to shield the logger
+        from the pdfrw logger, which overwrites a logger config.
 
         """
+        try:
+            from pdfrw import PdfReader
+            from pdfrw.buildxobj import pagexobj
+            from pdfrw.toreportlab import makerl
 
-        def __init__(self, filename_or_object, width=None, height=None, kind='direct'):
-            # If using StringIO buffer, set pointer to begining
-            if hasattr(filename_or_object, 'read'):
-                filename_or_object.seek(0)
+            from reportlab.platypus import Flowable
+            from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
+        except ImportError:
+            return False
 
-            page = PdfReader(filename_or_object, decompress=False).pages[0]
-            self.xobj = pagexobj(page)
-            self.imageWidth = width
-            self.imageHeight = height
-            x1, y1, x2, y2 = self.xobj.BBox
+        class PdfImageInner(Flowable):
+            """PdfImage wraps the first page from a PDF file as a Flowable
+            which can be included into a ReportLab Platypus document.
+            Based on the vectorpdf extension in rst2pdf code.google.com/p/rst2pdf
 
-            self._w, self._h = x2 - x1, y2 - y1
-            if not self.imageWidth:
-                self.imageWidth = self._w
-            if not self.imageHeight:
-                self.imageHeight = self._h
-            self.__ratio = float(self.imageWidth)/self.imageHeight
-            if kind in ['direct','absolute'] or width==None or height==None:
-                self.drawWidth = width or self.imageWidth
-                self.drawHeight = height or self.imageHeight
-            elif kind in ['bound','proportional']:
-                factor = min(float(width)/self._w,float(height)/self._h)
-                self.drawWidth = self._w*factor
-                self.drawHeight = self._h*factor
+            Hijacked from: http://stackoverflow.com/a/13870512
 
-        def wrap(self, aW, aH):
-            return self.drawWidth, self.drawHeight
+            """
 
-        def drawOn(self, canv, x, y, _sW=0):
-            if _sW > 0 and hasattr(self, 'hAlign'):
-                a = self.hAlign
-                if a in ('CENTER', 'CENTRE', TA_CENTER):
-                    x += 0.5*_sW
-                elif a in ('RIGHT', TA_RIGHT):
-                    x += _sW
-                elif a not in ('LEFT', TA_LEFT):
-                    raise ValueError("Bad hAlign value " + str(a))
+            def __init__(self, filename_or_object, width=None, height=None, kind='direct'):
+                # If using StringIO buffer, set pointer to begining
+                if hasattr(filename_or_object, 'read'):
+                    filename_or_object.seek(0)
 
-            xobj = self.xobj
-            xobj_name = makerl(canv._doc, xobj)
+                page = PdfReader(filename_or_object, decompress=False).pages[0]
+                self.xobj = pagexobj(page)
+                self.imageWidth = width
+                self.imageHeight = height
+                x1, y1, x2, y2 = self.xobj.BBox
 
-            xscale = self.drawWidth/self._w
-            yscale = self.drawHeight/self._h
+                self._w, self._h = x2 - x1, y2 - y1
+                if not self.imageWidth:
+                    self.imageWidth = self._w
+                if not self.imageHeight:
+                    self.imageHeight = self._h
+                self.__ratio = float(self.imageWidth)/self.imageHeight
+                if kind in ['direct','absolute'] or width==None or height==None:
+                    self.drawWidth = width or self.imageWidth
+                    self.drawHeight = height or self.imageHeight
+                elif kind in ['bound','proportional']:
+                    factor = min(float(width)/self._w,float(height)/self._h)
+                    self.drawWidth = self._w*factor
+                    self.drawHeight = self._h*factor
 
-            x -= xobj.BBox[0] * xscale
-            y -= xobj.BBox[1] * yscale
+            def wrap(self, aW, aH):
+                return self.drawWidth, self.drawHeight
 
-            canv.saveState()
-            canv.translate(x, y)
-            canv.scale(xscale, yscale)
-            canv.doForm(xobj_name)
-            canv.restoreState()
+            def drawOn(self, canv, x, y, _sW=0):
+                if _sW > 0 and hasattr(self, 'hAlign'):
+                    a = self.hAlign
+                    if a in ('CENTER', 'CENTRE', TA_CENTER):
+                        x += 0.5*_sW
+                    elif a in ('RIGHT', TA_RIGHT):
+                        x += _sW
+                    elif a not in ('LEFT', TA_LEFT):
+                        raise ValueError("Bad hAlign value " + str(a))
 
-except ImportError:
-    PdfImage = False
-    log.debug("pdfrw or reportlab not found, pdf output not available")
+                xobj = self.xobj
+                xobj_name = makerl(canv._doc, xobj)
+
+                xscale = self.drawWidth/self._w
+                yscale = self.drawHeight/self._h
+
+                x -= xobj.BBox[0] * xscale
+                y -= xobj.BBox[1] * yscale
+
+                canv.saveState()
+                canv.translate(x, y)
+                canv.scale(xscale, yscale)
+                canv.doForm(xobj_name)
+                canv.restoreState()
+
+        return PdfImageInner

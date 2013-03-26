@@ -42,6 +42,7 @@ class Oligo:
             self.oligo, self.dG_fold, self.optimised = self.optimise_folding(genome, threshold)
         else:
             self.oligo = self.make_oligo(genome, offset=0)
+            self.dG_fold = ViennaRNA.mfe(str(self.oligo))
 
     def make_oligo(self, genome, offset=0):
         """Make oligo from mutation"""

@@ -303,7 +303,7 @@ class RBSMonteCarlo:
             self.eliminate_start_codons()
 
         start_mutations = len(self.mutations) + 1
-        if start_mutations >= max_mutations:
+        if start_mutations > max_mutations:
             raise Exception("start_mutations ({}) is larger than max_mutations ({}) due to start codons.".format(start_mutations, max_mutations))
 
         #Number of rejects

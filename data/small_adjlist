@@ -16,3 +16,4 @@ mokC	RBSopt_single   ID1+ID2,ID2+ID3  insert=true,delete=yes
 hokC	RBSopt_single   ID2  insert=true,delete=yes
 nhaA	RBSopt_single   ID2  insert=true,delete=yes
 nhaR	RBSopt_single   ID2  insert=true,delete=yes,maximise=false
+thiM RBS_library ID1 max_mutations=1
