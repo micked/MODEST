@@ -1,64 +1,43 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 """
-Python wrapper for the Vienna RNA Package by Andreas R. Gruber, Ronny Lorenz, Stephan H. Bernhart, Richard Neubock,
-and Ivo L. Hofacker (NAR, 2008).
+Python wrapper for the Vienna RNA Package by Andreas R. Gruber, Ronny Lorenz,
+Stephan H. Bernhart, Richard Neubock, and Ivo L. Hofacker (NAR, 2008).
 """
 
 import re
 from subprocess import Popen, PIPE
 
-RNACOFOLD = "RNAcofold"
-
-def run_command(cmd, input_string):
-    """Run the specified command and return output"""
-    p = Popen(cmd, stdout=PIPE, stdin=PIPE, stderr=PIPE, universal_newlines=True)
-    out, stderr = p.communicate(input=input_string)
-    if p.returncode:
-        raise Exception("Cmd {} failed: {}".format(cmd[0], stderr))
-    return out
-
-try:
-    run_command(["RNAcofold", "-noPS"], "")
-except Exception:
-    noPS = "--noPS"
-else:
-    noPS = "-noPS"
-
-def rnacofold(seq, options=[noPS], calc_basepairing=True):
-    """Run RNAcofold"""
-    cmd = [RNACOFOLD] + options
-    output = run_command(cmd, seq)
-    brackets, dG = output_to_brackets_and_dG(output.splitlines()[1])
-    
-    out = {"dG": dG, "brackets": brackets}
-
-    if calc_basepairing:
-        out["strands"], out["bp_x"], out["bp_y"] = brackets_to_basepairing(brackets)
-
-    return out
-
 
 def mfe(seq):
     """Wrapper around RNAcofold, return only dG"""
-    return rnacofold(seq, calc_basepairing=False)["dG"]
-
-
-def output_to_brackets_and_dG(outputline):
-    """Single output line to brackets and dG"""
-    outputline = outputline.split()
-    brackets = outputline[0]
-    dG = float("".join(outputline[1:]).strip("()"))
-    return brackets, dG
+    return ViennaRNA().cofold(seq)[1]
 
 
 def brackets_to_basepairing(brackets):
+    """Convert a bracket string notation to numbered pairs
+
+    Returned is a list of length of strands, a list of x values and a list of
+    y_values:
+
+        >>> brackets_to_basepairing("((...))((.(....&.)))")
+        ([15, 4], [0, 1, 7, 8, 10], [6, 5, 18, 17, 16])
+
+    The function will test for missing brackets:
+
+        >>> brackets_to_basepairing("((...))((.(....&.))")
+        Traceback (most recent call last):
+         ...
+        ValueError: Missing "y" bracket in ((...))((.(....&.))
+
+    """
     bp_x = list()
     last = list()
     bp_y = [0] * brackets.count(")")
     strands = [len(s) for s in brackets.split("&")]
 
-    for i,letter in enumerate(brackets.replace("&",""), 1):
+    for i,letter in enumerate(brackets.replace("&","")):
         if letter == "(":
             bp_x.append(i)
             last.append(i)
@@ -70,264 +49,223 @@ def brackets_to_basepairing(brackets):
             except IndexError:
                 a = "x"
                 if brackets.count("(") > brackets.count(")"): a ="y"
-                raise Exception("Missing \"{}\" bracket in {}".format(a, brackets))
+                raise ValueError("Missing \"{}\" bracket in {}".format(a, brackets))
 
     return strands, bp_x, bp_y
 
 
-"""
-Modfied from Ribosome-Binding-Site-Calculator:
-<https://github.com/hsalis/ribosome-binding-site-calculator>
-<https://salis.psu.edu/software/>
+def basepairing_to_brackets(bp_x, bp_y, seq=None, strands=None):
+    """Convert two lists of matching basepair lists to bracket notation.
 
-Python wrapper for the Vienna RNA Package by Andreas R. Gruber, Ronny Lorenz, Stephan H. Bernhart, Richard Neubock,
-and Ivo L. Hofacker (NAR, 2008).
+    Either a strands-list must be supplied:
 
-This file is part of the Ribosome Binding Site Calculator.
+        >>> strands, x, y = ([15, 4], [0, 1, 7, 8, 10], [6, 5, 18, 17, 16])
+        >>> basepairing_to_brackets(x, y, strands=strands)
+        '((...))((.(....&.)))'
 
-The Ribosome Binding Site Calculator is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+    Or the original sequence:
 
-The Ribosome Binding Site Calculator is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+        >>> strands, x, y = brackets_to_basepairing(".(((....)))..")
+        >>> seq = "AUCGACUACGACU"
+        >>> basepairing_to_brackets(x, y, seq=seq)
+        '.(((....)))..'
 
-You should have received a copy of the GNU General Public License
-along with Ribosome Binding Site Calculator.  If not, see <http://www.gnu.org/licenses/>.
+    """
+    if strands is not None:
+        cut_points = [strands[i] + (strands[i-1] if i else 0) for i in range(len(strands)-1)]
+        l = sum(strands)
+    elif seq is not None:
+        cut_points = [m.start() for m in re.finditer(r"\&", seq)]
+        l = len(seq) - len(cut_points)
+    else:
+        raise AttributeError("Either seq or strands must be supplied.")
 
-This Python wrapper is written by Howard Salis. Copyright 2008-2009 is owned by the University of California Regents.
-All rights reserved. :) Use at your own risk.
-"""
+    brackets = ["."] * l
+    for x, y in zip(bp_x, bp_y):
+        brackets[x] = "("
+        brackets[y] = ")"
 
+    [brackets.insert(m, "&") for m in cut_points]
 
-debug = 0
-
-#Class that encapsulates all of the functions from NuPACK 2.0
-class ViennaRNA(dict):
-
-    RT = 0.61597 #gas constant times 310 Kelvin (in units of kcal/mol)
-
-    def __init__(self, sequence_list, material="rna37"):
-        self.ran = 0
-        nuc_regex = re.compile(r"^[ATGCU]+$", re.IGNORECASE)
-
-        for seq in sequence_list:
-            if not nuc_regex.match(seq):
-                error_string = "Invalid letters found in inputted sequences. Only ATGCU allowed. \n Sequence is \"" + str(seq) + "\"."
-                raise ValueError(error_string)
-
-        self["sequences"] = sequence_list
-        self["material"] = material
+    return "".join(brackets)
 
 
-    def mfe(self, strands, Temp=37.0, dangles="all", outputPS=False):
-        self["mfe_composition"] = strands
+class ViennaRNA:
 
-        if Temp <= 0: raise ValueError("The specified temperature must be greater than zero.")
+    RNAFOLD    = "RNAfold"
+    RNACOFOLD  = "RNAcofold"
+    RNASUBOPT  = "RNAsubopt"
+    RNAEVAL    = "RNAeval"
 
-        input_string = "&".join(self["sequences"])
+    def __init__(self, version="auto"):
+        """TODO"""
 
-        cmd = ["RNAcofold"]
+        self.versions = list()
+        #Try native version
+        try:
+            import RNA
+            structure, dG = RNA.fold("CCCCCAAAGGGGG")
+            #Extra output check
+            if len(structure) != 13:
+                raise Exception("Invalid RNAfold output")
 
-        if not outputPS:
-            cmd.append("--noPS")
+            self.RNA = RNA
+            self.versions.append("native")
+        except Exception:
+            pass
 
-        if dangles is "none":
-            cmd.append("-d0")
-        elif dangles is "some":
-            cmd.append("-d1")
-        elif dangles is "all":
-            cmd.append("-d2")
+        #Try version 2.X
+        try:
+            self.run_command([self.RNAFOLD, "--version"])
+            self.versions.append(2)
+        except Exception:
+            pass
+        
+        #Try version 1.X
+        try:
+            self.run_command([self.RNAFOLD, "-noPS"], "CCCCCAAAGGGGG")
+            self.versions.append(1)
+        except Exception:
+            pass
 
-        #Call ViennaRNA C programs
-        output = self._run_command(cmd, input_string)
+        if not self.versions:
+            raise Exception("No valid ViennaRNA installation found.")
 
-        if debug:
-            print input_string
-            print " ".join(cmd)
-            print output
-
-        output = output.split("\n")
-
-        words = output[1].split()
-        bracket_string = words[0]
-        (strands,bp_x, bp_y) = self.convert_bracket_to_numbered_pairs(bracket_string)
-
-        energy = float(words[len(words)-1].replace(")","").replace("(","").replace("\n",""))
-
-        self["program"] = "mfe"
-        self["mfe_basepairing_x"] = [bp_x]
-        self["mfe_basepairing_y"] = [bp_y]
-        self["mfe_energy"] = [energy]
-        self["totalnt"]=strands
-
-
-    def subopt(self, strands, energy_gap, Temp = 37.0, dangles="all", outputPS=False):
-        self["subopt_composition"] = strands
-
-        if Temp <= 0: raise ValueError("The specified temperature must be greater than zero.")
-
-        input_string = "&".join(self["sequences"])
-
-        cmd = ["RNAsubopt"]
-        cmd.extend(["-e", str(energy_gap)])
-
-        if dangles is "none":
-            cmd.append("-d0")
-        elif dangles is "some":
-            cmd.append("-d1")
-        elif dangles is "all":
-            cmd.append("-d2")
-
-        #Call ViennaRNA C programs
-        output = self._run_command(cmd, input_string)
-
-        if debug or outputPS:
-            print input_string
-            print " ".join(cmd)
-            print output
-
-        output = output.split("\n")
-
-        self["subopt_basepairing_x"] = []
-        self["subopt_basepairing_y"] = []
-        self["subopt_energy"] = []
-        self["totalnt"]=[]
-        counter=0
-
-        for line in output[1:]:
-            if len(line) > 0:
-                counter+=1
-                words = line.split(" ")
-                bracket_string = words[0]
-                energy = float(words[len(words)-1].replace("\n",""))
-
-                (strands,bp_x, bp_y) = self.convert_bracket_to_numbered_pairs(bracket_string)
-
-                self["subopt_energy"].append(energy)
-                self["subopt_basepairing_x"].append(bp_x)
-                self["subopt_basepairing_y"].append(bp_y)
-
-        self["subopt_NumStructs"] = counter
-        self["program"] = "subopt"
-
-
-    def energy(self, strands, base_pairing_x, base_pairing_y, Temp = 37.0, dangles = "all"):
-        self["energy_composition"] = strands
-
-        if Temp <= 0: raise ValueError("The specified temperature must be greater than zero.")
-
-        seq_string = "&".join(self["sequences"])
-        strands = [len(seq) for seq in self["sequences"]]
-        bracket_string = self.convert_numbered_pairs_to_bracket(strands,base_pairing_x,base_pairing_y)
-        input_string = seq_string + "\n" + bracket_string + "\n"
-
-        cmd = ["RNAeval"]
-
-        #Set arguments
-        if dangles is "none":
-            cmd.append("-d0")
-        elif dangles is "some":
-            cmd.append("-d1")
-        elif dangles is "all":
-            cmd.append("-d2")
-
-        #Call ViennaRNA C programs
-        output = self._run_command(cmd, input_string)
-
-        if debug:
-            print input_string
-            print " ".join(cmd)
-            print output
-
-        output = output.split("\n")
-
-        self["energy_energy"] = []
-
-        #Skip the unnecessary output lines
-        words = output[1].split()
-        energy = float(words[len(words)-1].replace("(","").replace(")","").replace("\n",""))
-
-        self["program"] = "energy"
-        self["energy_energy"].append(energy)
-        self["energy_basepairing_x"] = [base_pairing_x]
-        self["energy_basepairing_y"] = [base_pairing_y]
-
-        return energy
-
-
-    def convert_bracket_to_numbered_pairs(self,bracket_string):
-        #all_seq_len = len(bracket_string)
-        bp_x = []
-        bp_y = []
-        strands = []
-
-        for y in range(bracket_string.count(")")):
-            bp_y.append([])
-
-        last_nt_x_list = []
-        counter=0
-        num_strands=0
-        for (pos,letter) in enumerate(bracket_string[:]):
-            if letter is ".":
-                counter += 1
-
-            elif letter is "(":
-                bp_x.append(pos-num_strands)
-                last_nt_x_list.append(pos-num_strands)
-                counter += 1
-
-            elif letter is ")":
-                nt_x = last_nt_x_list.pop()
-                nt_x_pos = bp_x.index(nt_x)
-                bp_y[nt_x_pos] = pos-num_strands
-                counter += 1
-
-            elif letter is "&":
-                strands.append(counter)
-                counter=0
-                num_strands+=1
-
+        if version == "auto":
+            self.version = self.versions[0]
+            if len(self.version) > 1:
+                self.fallbackversion = self.versions[1]
             else:
-                raise Exception("Error! Invalid character in bracket notation.")
+                self.fallbackversion = False
+        else:
+            if not version in self.versions:
+                raise Exception("Specified ViennaRNA version {} is not availble. Found: {}".format(version, self.versions))
+            self.version = version
 
-        if len(last_nt_x_list) > 0:
-            raise Exception("Error! Leftover unpaired nucleotides when converting from bracket notation to numbered base pairs.")
+    def fold(self, seq, noPS=True, **kwargs):
+        """RNAfold"""
+        version = self.version
 
-        strands.append(counter)
-        bp_x = [pos+1 for pos in bp_x[:]] #Shift so that 1st position is 1
-        bp_y = [pos+1 for pos in bp_y[:]] #Shift so that 1st position is 1
+        if self.version == "native":
+            if not noPS or kwargs:
+                version = self.fallbackversion
+                if not self.fallbackversion:
+                    raise Exception("ViennaRNA native cannot take any arguments, and no fallback available")
+            else:
+                return self.RNA.fold(seq)
 
-        return (strands,bp_x, bp_y)
+        kwargs["noPS"] = noPS
+
+        options = self.versionize_kwargs(version, **kwargs)
+
+        output = self.run_command([self.RNAFOLD] + options, seq)
+        output = output.splitlines()
+        if len(output) > 1:
+            return self.output_to_brackets_and_dG(output[1])
+        else:
+            print seq
+            print " ".join([self.RNAFOLD] + options)
+            return None, None
+
+    def cofold(self, seq, noPS=True, **kwargs):
+        """RNAcofold"""
+        version = self.version
+
+        if self.version == "native":
+            if not noPS or kwargs:
+                version = self.fallbackversion
+                if not self.fallbackversion:
+                    raise Exception("ViennaRNA native cannot take any arguments, and no fallback available")
+            else:
+                return self.RNA.cofold(seq)
+
+        kwargs["noPS"] = noPS
+
+        options = self.versionize_kwargs(version, **kwargs)
+
+        output = self.run_command([self.RNACOFOLD] + options, seq)
+        output = output.splitlines()
+
+        if len(output) > 1:
+            return self.output_to_brackets_and_dG(output[1])
+        else:
+            return None, None
+
+    def subopt(self, seq1, seq2, **kwargs):
+        """RNAsubopt"""
+        version = self.version
+
+        if self.version == "native":
+            raise NotImplementedError("No native subopt yet")
+
+        options = self.versionize_kwargs(version, **kwargs)
+
+        seq = "&".join([seq1, seq2])
+        output = self.run_command([self.RNASUBOPT] + options, seq)
+        output = output.splitlines()
+
+        if len(output) > 1:
+            return [self.output_to_brackets_and_dG(line) for line in output[1:]]
+        else:
+            return []
+
+    
+    def energy(self, seq, brackets, **kwargs):
+        """RNAsubopt"""
+        version = self.version
+
+        if self.version == "native":
+            raise NotImplementedError("No native energy yet")
+
+        options = self.versionize_kwargs(version, **kwargs)
+
+        inp = "\n".join([seq, brackets])
+        output = self.run_command([self.RNAEVAL] + options, inp)
+        output = output.splitlines()
+
+        if len(output) > 1:
+            return self.output_to_brackets_and_dG(output[1])[1]
+        else:
+            return None
 
 
-    def convert_numbered_pairs_to_bracket(self,strands,bp_x,bp_y):
-        bp_x = [pos-1 for pos in bp_x[:]] #Shift so that 1st position is 0
-        bp_y = [pos-1 for pos in bp_y[:]] #Shift so that 1st position is 0
-
-        bracket_notation = []
-        counter=0
-        for (strand_number,seq_len) in enumerate(strands):
-            if strand_number > 0: bracket_notation.append("&")
-            for pos in range(counter,seq_len+counter):
-                if pos in bp_x:
-                    bracket_notation.append("(")
-                elif pos in bp_y:
-                    bracket_notation.append(")")
+    def versionize_kwargs(self, version, **kwargs):
+        """Turn kwargs into a list of options fitting current version"""
+        options = []
+        if version == 2:
+            for kw in kwargs:
+                if len(kw) == 1:
+                    options.append("-" + kw)
+                    if not (kwargs[kw] is True or kwargs[kw] is False):
+                        options[-1] += str(kwargs[kw])
                 else:
-                    bracket_notation.append(".")
-            counter+=seq_len
+                    options.append("--" + kw)
+                    if not (kwargs[kw] is True or kwargs[kw] is False):
+                        options.append(str(kwargs[kw]))
+        else:
+            for kw in kwargs:
+                options.append("-" + kw)
+                if not (kwargs[kw] is True or kwargs[kw] is False):
+                    options.append(str(kwargs[kw]))
 
-        return "".join(bracket_notation)
+        return options
 
-
-    def _run_command(self, cmd, input_string):
+    def run_command(self, cmd, input_string=""):
         """Run the specified command and return output"""
         p = Popen(cmd, stdout=PIPE, stdin=PIPE, stderr=PIPE, universal_newlines=True)
         out, stderr = p.communicate(input=input_string)
         if p.returncode:
             raise Exception("Cmd {} failed: {}".format(cmd[0], stderr))
         return out
+
+    def output_to_brackets_and_dG(self, outputline):
+        """Single output line to brackets and dG"""
+        outputline = outputline.split()
+        brackets = outputline[0]
+        dG = float("".join(outputline[1:]).strip("()"))
+        return brackets, dG
+
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()

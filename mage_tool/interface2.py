@@ -101,6 +101,28 @@ def run_adjustments(adjfilehandle, genes, genome, config, project, barcoding_lib
     return oligos, []
 
 
+def run_adjustments_unthreaded(adjfilehandle, genes, genome, config, project, barcoding_lib):
+    """Pass"""
+    parsed_operations, errors = parse_adjustments(adjfilehandle, genes)
+    if errors:
+        return [], errors
+
+    oligo_kwargs = {"genome": genome, "config": config, "project": project, "barcoding_lib": barcoding_lib}
+
+    results = list()
+
+    for run_op in parsed_operations:
+        op_kwargs = oligo_kwargs.copy()
+        op_kwargs.update(run_op)
+        results.append(create_oligos(**op_kwargs))
+
+    oligos = list()
+    for r in results:
+        oligos.extend(r)
+
+    return oligos, []
+
+
 def process_initializer():
     """Ignores all exceptions. Useful for subprocesses"""
     signal.signal(signal.SIGINT, signal.SIG_IGN)

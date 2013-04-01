@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 
 import unittest
+import doctest
+from mage_tool import ViennaRNA
+from mage_tool import translation
 
-from mage_tool.tests import oligo_design_tests
-from mage_tool.IO import Mutation
-from mage_tool import oligo_design
+# from mage_tool.tests import oligo_design_tests
+# from mage_tool.IO import Mutation
+# from mage_tool import oligo_design
 
 ref_genome = """GACTAGGGTCCCCGCTCATAAACGATATTAGTTGCAGTCACTAAGGTGCTAATTTTGCTATATT
                 GCAAAGGCGAAAACATTTAGTAATCCGCGAGAGGCATTCTGAAAGTTCCTGAATGGTAATCCGC
@@ -15,4 +18,8 @@ ref_genome = "".join(ref_genome.split())
 if __name__ == "__main__":
     suite = unittest.TestLoader().discover("./", pattern="*_tests.py")
     #suite = unittest.TestLoader().loadTestsFromTestCase(oligo_design_tests.TestOligoDesign)
+
+    suite.addTests(doctest.DocTestSuite(ViennaRNA))
+    suite.addTests(doctest.DocTestSuite(translation))
+
     unittest.TextTestRunner(verbosity=2).run(suite)

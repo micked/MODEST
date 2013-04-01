@@ -13,6 +13,7 @@ import yaml
 from Bio import SeqIO
 
 from mage_tool.interface2 import run_adjustments
+from mage_tool.interface2 import run_adjustments_unthreaded
 from mage_tool.IO import seqIO_to_genelist
 from mage_tool.IO import oligolist_to_tabfile
 from mage_tool.IO import parse_barcode_library
@@ -30,6 +31,7 @@ if __name__ == '__main__':
     parser.add_argument("--log", help="Logfile, default MODEST.log. Use STDOUT to log all messages to screen, use - to disable", default="MODEST.log")
     parser.add_argument("-p", "--project", help="Project name", default="Untitled")
     parser.add_argument("-o", "--output", help="Output file. Default <project>.out", default=False)
+    parser.add_argument("-T", help="Run unthreaded", action="store_true")
     args = parser.parse_args()
 
     #Set up logging
@@ -44,7 +46,7 @@ if __name__ == '__main__':
         #Log to file and warnings to screen
         logging.basicConfig(level=logging.DEBUG, format=format, datefmt='%Y-%m-%d %H:%M', filename=args.log, filemode='w')
         console = logging.StreamHandler()
-        console.setLevel(logging.DEBUG)
+        console.setLevel(logging.WARNING)
         formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
         console.setFormatter(formatter)
         logging.getLogger('').addHandler(console)
@@ -71,7 +73,12 @@ if __name__ == '__main__':
         barcoding_lib = parse_barcode_library(bcs)
 
     print("Making oligos..")
-    oligos, errors = run_adjustments(adjustlist, genes, genome.seq, config, args.project, barcoding_lib)
+    if not args.T:
+        oligos, errors = run_adjustments(adjustlist, genes, genome.seq, config,
+                                         args.project, barcoding_lib)
+    else:
+        oligos, errors = run_adjustments_unthreaded(adjustlist, genes,
+                                genome.seq, config, args.project, barcoding_lib)
     if errors:
         print("Computation not started, errors in adjustments file:")
         print("\n".join(errors))

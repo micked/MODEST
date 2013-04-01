@@ -22,7 +22,7 @@ import re
 import math
 
 #from NuPACK import NuPACK as RNA_folding
-from ..ViennaRNA import ViennaRNA as RNA_folding
+from ViennaRNA import ViennaRNA as RNA_folding
 
 
 class CalcError(Exception):
@@ -134,7 +134,6 @@ class RBS_Calculator:
         Ok = False
         seq_len = len(mRNA) + self.rRNA_len
         for (rRNA_nt) in range(seq_len,seq_len - self.rRNA_len,-1):
-
             if rRNA_nt in bp_y:
                 rRNA_pos = bp_y.index(rRNA_nt)
                 if bp_x[rRNA_pos] < start_pos:
@@ -153,6 +152,8 @@ class RBS_Calculator:
         else:
             aligned_spacing = self.infinity
 
+        #print aligned_spacing
+        #exit(0)
         return aligned_spacing
 
 
@@ -210,17 +211,21 @@ class RBS_Calculator:
         dG_mRNA_rRNA = []
         dG_mRNA_rRNA_withspacing = []
 
+        #print mRNA, "&", self.rRNA
+
         #Calculate dG_spacing using aligned spacing value. Add it to dG_mRNA_rRNA.
         for (counter) in range(len(fold["subopt_basepairing_x"])):
-
             dG_mRNA_rRNA.append(fold["subopt_energy"][counter])
             val = self.calc_dG_spacing(aligned_spacing[counter])
             dG_spacing_list.append(val)
             dG_mRNA_rRNA_withspacing.append(val + fold["subopt_energy"][counter])
+            #print fold["brackets"][counter], aligned_spacing[counter], val + fold["subopt_energy"][counter]
 
         #3. Find 16S rRNA binding site that minimizes dG_spacing+dG_mRNA_rRNA.
         [dG_mRNA_rRNA_folding, index] = self.find_min(dG_mRNA_rRNA_withspacing)
         dG_spacing_final = dG_spacing_list[index]
+        #print dG_spacing_final
+        # print fold["brackets"][index]
 
         # dG_mRNA_rRNA_nospacing = dG_mRNA_rRNA[index]
 
@@ -250,6 +255,8 @@ class RBS_Calculator:
                 bp_x_target.append(nt_x)
                 bp_y_target.append(nt_y)
 
+        #print bp_x_target
+
         #print most_5p_mRNA, bp_x, bp_y, len(mRNA)
 
         #The rRNA-binding site is between the nucleotides at positions most_5p_mRNA and most_3p_mRNA
@@ -262,6 +269,9 @@ class RBS_Calculator:
         post_window_begin = min(start_pos + self.footprint,post_window_end) #Footprint
         post_window_end = mRNA_len + 1
         mRNA_post = self.mRNA_input[post_window_begin:post_window_end]
+
+        #print mRNA_pre
+        #print mRNA_post
 
         # mRNA_pre_len = len(mRNA_pre)
         # mRNA_post_len = len(mRNA_post)
@@ -319,8 +329,12 @@ class RBS_Calculator:
 
         total_energy = fold.energy([1, 2], total_bp_x, total_bp_y, Temp = self.temp, dangles = self.dangles)
 
+        # 
+        # print total_energy
+
         # energy_nowindows = dG_mRNA_rRNA_nospacing
         total_energy_withspacing = total_energy + dG_spacing_final
+        # print total_energy_withspacing
 
         structure = fold
         structure["program"] = "subopt"
@@ -406,6 +420,8 @@ class RBS_Calculator:
         structure["subopt_basepairing_y"][index] = bp_y_after
         structure["subopt_energy"][index] = energy_after
         structure["dG_mRNA_rRNA_corrected"] = energy_after
+
+        # print dG_standby_site
 
         return (dG_standby_site, structure)
 
@@ -743,6 +759,7 @@ class RBS_Calculator:
                 #Energy of mRNA folding
                 [dG_mRNA,mRNA_structure] = self.calc_dG_mRNA(start_pos)
 
+
                 #Energy of mRNA:rRNA hybridization & folding
                 [dG_mRNA_rRNA_withspacing,mRNA_rRNA_structure] = self.calc_dG_mRNA_rRNA(start_pos)
 
@@ -905,7 +922,8 @@ class RBS_Calculator:
 
                 if return_string: return print_string
         else:
-            raise RuntimeError("The RBS Calculator has not been run yet. Call the 'calc_dG' method.")
+            #raise RuntimeError("The RBS Calculator has not been run yet. Call the 'calc_dG' method.")
+            print("The RBS Calculator has not been run yet. Call the 'calc_dG' method.")
 
     def save_data(self, handle, header = False):
 

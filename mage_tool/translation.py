@@ -11,10 +11,12 @@ import math
 
 from mutation_tools import find_mutation_box
 from mutation_tools import compare_seqs
-from RBS.RBS_Calculator import RBS_Calculator
-from RBS.RBS_Calculator import NoRBSError
 from oligo_design import Mutation
 from helpers import degenerate_nucleotides
+from helpers import valid_rna
+from ViennaRNA import ViennaRNA
+from ViennaRNA import brackets_to_basepairing
+from ViennaRNA import basepairing_to_brackets
 
 
 def replace_start_codon(gene, start_codon="ATG"):
@@ -66,10 +68,7 @@ def RBS_single_mutation(gene, maximise=True, insert=False, delete=False, top=3):
     """Maxi/minimise RBS binding with single mutations (Bruteforce approach)"""
     mutation_list = list()
     
-    seq = gene.leader + gene.cds
-    RBS_calc = RBS_Calculator(str(seq), [35, 35], "")
-    RBS_calc.calc_dG()
-    old_value = RBS_calc.calc_expression_level(RBS_calc.dG_total_list[0])
+    old_value = RBS_predict(gene.leader, gene.cds)
     mutation_list.append((old_value, 0, ""))
 
     mutations = {"A": ["T", "G", "C"],
@@ -91,13 +90,14 @@ def RBS_single_mutation(gene, maximise=True, insert=False, delete=False, top=3):
     for i,n in enumerate(leader.upper()):
         for m in mutations[n]:
             new_leader = leader[:i] + m + leader[i+1:]
-            new_seq = new_leader + str(gene.cds)
-            RBS_calc = RBS_Calculator(new_seq, [34+len(m), 34+len(m)], "")
-            RBS_calc.calc_dG()
+            # new_seq = new_leader + str(gene.cds)
+            # RBS_calc = RBS_Calculator(new_seq, [34+len(m), 34+len(m)], "")
+            # RBS_calc.calc_dG()
+
             tmp_mut = "{}={}".format(n, m.lower())
-            if not len(RBS_calc.dG_total_list):
-                continue
-            new_value = RBS_calc.calc_expression_level(RBS_calc.dG_total_list[0])
+            # if not len(RBS_calc.dG_total_list):
+            #     continue
+            new_value = RBS_predict(new_leader, gene.cds)
             mutation_list.append((new_value, i, tmp_mut))
 
     muts = list()
@@ -223,7 +223,7 @@ class RBSMonteCarlo:
             except ValueError:
                 raise ValueError("Could not parse: {} as target dG (use only lower-case for high/low)".format(target))
 
-        self.original_dG = RBSPredict(self.original_leader, self.cds)["dG"]
+        self.original_dG = RBS_predict(self.original_leader, self.cds)
 
         self.wobble = list()
         #Wobble sequences
@@ -364,7 +364,7 @@ class RBSMonteCarlo:
                     raise Exception("Too many attempted moves.")
 
                 #Calculate new total free energy
-                new_dG = RBSPredict("".join(candidate), self.cds)["dG"]
+                new_dG = RBS_predict("".join(candidate), self.cds)
 
                 #Calculate simulation energy
                 new_energy = abs(new_dG - self.target)
@@ -475,18 +475,279 @@ def dG_to_AU(dG):
 RBS Calculator
 """
 
-def RBSPredict(leader, cds):
+def RBS_predict(leader, cds, nt_cutoff=35, verbose=False):
     """TODO: Create a more solid RBS calculator"""
-    start_range = [len(leader), len(leader)]
-    mRNA = leader.upper() + cds.upper()
-    tmp_calc = RBS_Calculator(mRNA, start_range, "")
-    try:
-        tmp_calc.calc_dG()
-    except NoRBSError:
-        tmp_calc.dG_total_list.append(1e20)
+    #TODO: Calculate these energies based on start tRNA
+    start_codon_energies = {"AUG": -1.194,
+                            "GUG": -0.0748,
+                            "UUG": -0.0435,
+                            "CUG": -0.03406} #hybridization to CAT
+    dG_push = (12.2, 2.5, 2.0, 3.0)
+    dG_pull = (0.048, 0.24, 0.0)
+    # auto_dangles = True
+    # dangles_default = "all"
+    # temp = 37.0
+    optimal_spacing = 5
+    energy_cutoff = 3.0
+    len_standby_site = 4
 
-    if not tmp_calc.dG_total_list:
-        tmp_calc.dG_total_list.append(1e20)
+    #Footprint of the 30S complex that prevents formation of secondary
+    #structures downstream of the start codon. Here, we assume that the entire
+    #post-start RNA sequence does not form secondary structures once the 30S
+    #complex has bound.
+    footprint = 1000
 
-    expr_lvl = tmp_calc.calc_expression_level(tmp_calc.dG_total_list[0])
-    return {"expr_lvl": expr_lvl, "dG": tmp_calc.dG_total_list[0]}
+    rRNA = "ACCUCCUUA"
+
+    #TODO:
+    #Figure out dangles
+
+    #Convert to Uppercase RNA
+    leader = str(leader).upper().replace("T", "U")
+    cds = str(cds).upper().replace("T", "U")
+
+    if nt_cutoff:
+        cds    = cds[0:nt_cutoff]
+        leader = leader[-nt_cutoff:]
+
+    if not leader or not cds:
+        raise ValueError("No leader or cds supplied.")
+
+    if not valid_rna(leader) or not valid_rna(cds):
+        raise ValueError("Invalid leader or cds input.")
+
+    if cds[0:3] not in start_codon_energies:
+        raise ValueError("Invalid start codon in cds: {}".format(cds[0:3]))
+
+    RNAfold = ViennaRNA(2)
+
+    """
+    Start codon energy
+    """
+    dG_start_codon = start_codon_energies[cds[0:3]]
+
+    """
+    Energy of mRNA folding
+    """
+    mRNA = leader + cds
+    structure_mRNA, dG_mRNA = RNAfold.fold(mRNA)
+
+    """
+    Energy of mRNA:rRNA hybridization & folding
+    """
+    mRNA_rRNA_list = RNAfold.subopt(leader, rRNA, e=energy_cutoff, d=2)
+    calc_dG_spacing = (mRNA_rRNA_list, optimal_spacing, dG_push, dG_pull)
+    dG_spacing, bps_mRNA_rRNA = RBS_predict_calc_dG_spacing(*calc_dG_spacing)  
+    if not bps_mRNA_rRNA:
+        return 1e12 
+    
+
+    # The rRNA-binding site is between the nucleotides at positions most_5p_mRNA
+    # and most_3p_mRNA
+
+    # Now, fold the pre-sequence, rRNA-binding-sequence and post-sequence
+    # separately. Take their base pairings and combine them together. Calculate
+    # the total energy. For secondary structures, this splitting operation is
+    # allowed.
+
+    # We postulate that not all of the post-sequence can form secondary
+    # structures. Once the 30S complex binds to the mRNA, it prevents the
+    # formation of secondary structures that are mutually exclusive with
+    # ribosome binding. We define self.footprint to be the length of the 30S
+    # complex footprint. Here, we assume that the entire mRNA sequence
+    # downstream of the 16S rRNA binding site can not form secondary structures.
+
+    #Add rRNA:mRNA basepairings
+    bp_mRNA, bp_rRNA = zip(*bps_mRNA_rRNA)
+    total_bp_x = list(bp_mRNA[:])
+    total_bp_y = [y+len(leader)+len(cds) for y in bp_rRNA]
+
+    #Calculate pre_mRNA sequence folding
+    pre_mRNA = mRNA[0:min(bp_mRNA)]
+    if pre_mRNA:
+        pre_mRNA_structure, pre_mRNA_dG = RNAfold.fold(pre_mRNA, d=2)
+        strands, bp_x, bp_y = brackets_to_basepairing(pre_mRNA_structure)
+        total_bp_x.extend(bp_x)
+        total_bp_y.extend(bp_y)
+
+    post_mRNA = cds[footprint:]
+    if post_mRNA:
+        post_mRNA_structure, post_mRNA_dG = RNAfold.fold(post_mRNA, d=2)
+        strands, bp_x, bp_y = brackets_to_basepairing(post_mRNA_structure)
+        #TODO: TEST
+        offset = len(leader) + footprint
+        total_bp_x.extend([x + offset for x in bp_x])
+        total_bp_y.extend([y + offset for y in bp_y])
+
+    bpseq = "&".join([mRNA, rRNA])
+    brackets = basepairing_to_brackets(total_bp_x, total_bp_y, bpseq)
+    dG_mRNA_rRNA = RNAfold.energy(bpseq, brackets, d=2)
+    # print("me", brackets)
+
+    #dG with spacing
+    dG_mRNA_rRNA_w_spacing = dG_spacing + dG_mRNA_rRNA
+
+    """
+    Calculate standby site energy
+    """
+
+    # To calculate the mfe structure while disallowing base pairing at the
+    # standby site, we split the folded mRNA sequence into three parts:
+    # (i) a pre-sequence (before the standby site) that can fold;
+    # (ii) the standby site, which can not fold;
+    # (iii) the 16S rRNA binding site and downstream sequence, which has been
+    # previously folded.
+    pre_standby = leader[0:max(0, min(bp_mRNA) - len_standby_site)]
+    if not pre_standby:
+        strands, standby_bp_x, standby_bp_y = [], [], []
+    else:
+        #Fold it
+        brackets, dG = RNAfold.fold(pre_standby, d=2)
+        strands, standby_bp_x, standby_bp_y = brackets_to_basepairing(brackets)
+
+    #Append all basepairing where x > the farthest 5p NT in mRNA:rRNA.
+    for x, y in zip(total_bp_x, total_bp_y):
+        if x >= min(bp_mRNA):
+            standby_bp_x.append(x)
+            standby_bp_y.append(y)
+
+    brackets = basepairing_to_brackets(standby_bp_x, standby_bp_y, bpseq)
+    dG_standby_after = RNAfold.energy(bpseq, brackets, d=2)
+    #print(brackets)
+
+    dG_standby = dG_mRNA_rRNA - dG_standby_after
+
+    #Total energy is mRNA:rRNA + start - rRNA - mRNA - standby_site
+    dG_total = dG_mRNA_rRNA_w_spacing + dG_start_codon - dG_mRNA - dG_standby
+
+    if verbose:
+        print("{:>15}{:>15}{:>15}{:>15}{:>15}".format("dG(total)", "dG(mRNA:rRNA)", "dG(mRNA)", "dG(spacing", "dG(standby)"))
+        print("{:>15}{:>15}{:>15}{:>15}{:>15}".format(dG_total, dG_mRNA_rRNA, dG_mRNA, dG_spacing, dG_standby))
+
+    return dG_total
+
+
+def RBS_predict_calc_dG_spacing(mRNA_rRNA_list, optimal_spacing, dG_push, dG_pull):
+    """Calculate dG spacing.
+
+    Returns dG_spacing and a list of pairs binding mRNA:rRNA:
+
+        >>> # List from RNAsubopt
+        >>> l = [('..................(((.((((.........&.)))).)))', -5.9),
+        ... ('.....................(.((((((......&..)))))))', -4.8),
+        ... ('.....................(((.((((......&..)))))))', -5.2),
+        ... ('.........................((((......&..))))...', -6.3),
+        ... ('.........................((((.(....&.)))))...', -6.2),
+        ... ('......................((((.........&.))))....', -6.1)]
+
+        >>> # Calculate dG spacing penalty
+        >>> from mage_tool.translation import RBS_predict_calc_dG_spacing
+        >>> RBS_predict_calc_dG_spacing(l, 4, (12.2, 2.5, 2.0, 3.0), (0.048, 0.24, 0.0))
+        (0.0, [(25, 5), (26, 4), (27, 3), (28, 2)])
+
+    """
+    dG_mRNA_rRNA_spc = 1e12
+    dG_mRNA_rRNA     = 1e12
+    bps_mRNA_rRNA    = []
+    for brackets, dG in mRNA_rRNA_list:
+        #Calculate spacing penalty
+        spacing, bps = RBS_predict_calc_spacing(brackets)
+
+        #See article for help with these equations
+        if spacing < optimal_spacing:
+            ds = spacing - optimal_spacing
+            c1, c2, c3, c4 = dG_push
+            dG_spacing_penalty = c1 / (1.0 + math.exp(c2 * (ds + c3)))**c4
+        else:
+            ds = spacing - optimal_spacing
+            c1, c2, c3 = dG_pull
+            dG_spacing_penalty = c1 * ds**2 + c2 * ds + c3
+
+        #Proceed with smallest penalty
+        if (dG_spacing_penalty + dG) < (dG_mRNA_rRNA_spc + dG_mRNA_rRNA):
+            dG_mRNA_rRNA_spc = dG_spacing_penalty
+            dG_mRNA_rRNA = dG
+            bps_mRNA_rRNA = bps
+            # print("mu", brackets, dG_mRNA_rRNA_spc, dG_mRNA_rRNA, spacing)
+
+    return dG_mRNA_rRNA_spc, bps_mRNA_rRNA
+
+
+def RBS_predict_calc_spacing(brackets):
+    """Calculate spacing (NTs from rRNA to start codon).
+
+    Returns the spacing plus a list of basepairings involved in mRNA:rRNA:
+
+        >>> RBS_predict_calc_spacing("....(((............)))((((((((.....&)).))))))")
+        (5, [(22, 8), (23, 7), (24, 6), (25, 5), (26, 4), (27, 3), (28, 1)])
+
+    Consider the following sequence with folded rRNA:
+
+                             AAU CCUCCA
+                             ||| ||||
+        GATACACCAAAGAGAAAATAATGAGGGAGCGAAGG
+
+    This folding has the bracket notation:
+
+        .....................(((.((((......&..)))))))
+
+    Aligning the bracket notation gives:
+
+                                         oo<<<<
+                                 ((( ((((..
+            .....................(((.((((......
+
+    Thus spacing is 4 (where the <'s are). To calculate this spacing, the
+    nt pairs that are mRNA:rRNA are isolated and the "overhang" (two o's) are
+    calculated as the rRNA NT closest to the 5' end, while the spacing minus
+    overhang is calculated as the mRNA NT closest to the 3' end.
+
+    """
+    #Convert to basepairing
+    strands, bp_x, bp_y = brackets_to_basepairing(brackets)
+    len_leader = strands[0]
+
+    #Pick only pairs binding mRNA:rRNA
+    bps = [(x, y-len_leader) for x,y in zip(bp_x,bp_y) if y >= len_leader]
+    if not bps: return 1e12, None
+
+    #Unzip basepairing
+    bp_mRNA, bp_rRNA = zip(*bps)
+    spacing = len_leader - max(bp_mRNA) - min(bp_rRNA) - 1
+
+    return spacing, bps
+
+
+def RBS_predict_calc_spacing_old(brackets):
+    """Old version from RBScalc, possibly broken.
+
+    Returns the spacing plus a list of basepairings involved in mRNA:rRNA:
+
+        >>> RBS_predict_calc_spacing_old("....(((............)))((((((((.....&)).))))))")
+        (4, [(22, 8), (23, 7), (24, 6), (25, 5), (26, 4), (27, 3), (28, 1)])
+
+    """
+    #Convert to basepairing
+    strands, bp_x, bp_y = brackets_to_basepairing(brackets)
+    len_leader = strands[0]
+
+    bps = [(x, y-len_leader) for x,y in zip(bp_x,bp_y) if y >= len_leader]
+    if not bp_y or not bps: return 1e12, None
+
+    rRNA_nt = max(bp_y)
+    rRNA_pos = bp_y.index(rRNA_nt)
+    if bp_x[rRNA_pos] < len_leader:
+        farthest_3_prime_rRNA = rRNA_nt - len_leader
+
+        mRNA_nt = bp_x[rRNA_pos]
+        distance_to_start = len_leader - mRNA_nt
+
+    spacing = distance_to_start - farthest_3_prime_rRNA -1
+
+    
+    return spacing, bps
+
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
