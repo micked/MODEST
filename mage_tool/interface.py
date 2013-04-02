@@ -168,7 +168,8 @@ def create_oligos(genome, op, gene, config, options, op_str, project, barcodes, 
         oligo.operation = operation
         oligo.operation_values = values
         #Add to log
-        log.info(" ".join([operation, str(mut), ">>", oligo.id()]))
+        log.info(" ".join([operation, ">>", oligo.short_id()]))
+        log.info(oligo.id())
         #Add barcodes
         for barcode_ids in barcodes:
             temp_oligo = oligo.copy()

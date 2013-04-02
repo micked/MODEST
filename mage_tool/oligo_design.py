@@ -27,7 +27,7 @@ class Oligo:
         self.optimised = 0
         self.dG_fold = 0
         self.replichore = None
-        self.project = project
+        self.project = project.replace(" ", "_")
         self.number = number
 
         self.barcodes_forward = list()
@@ -110,11 +110,11 @@ class Oligo:
         #Check whether pos is not inside oriC or Ter
         if ori[0] <= self.pos <= ori[1]:
             self.replichore = 0
-            log.warning("Oligo: {} inside oriC".format(self.id()))
+            log.warning("Oligo: {} inside oriC".format(self.short_id()))
             return False
         elif ter[0] <= self.pos <= ter[1]:
             self.replichore = 0
-            log.warning("Oligo: {} inside termination region".format(self.id()))
+            log.warning("Oligo: {} inside termination region".format(self.short_id()))
             return False
 
         #OriC is on the second half of the genome
@@ -171,11 +171,10 @@ class Oligo:
 
     def id(self):
         """Calculate an ID based the various self-contained variables"""
-        return "{prj}{i:0>4}{barcodes}_{mut}_{gene}_{code}_RP{rp}{opt}".format(
-            prj = self.project if self.project else "",
-            i = self.number,
+        return "{s_id}{barcodes}_{mut}_{gene}_{code}_RP{rp}{opt}".format(
+            s_id = self.short_id(),
             barcodes = "_BC:" + "+".join(self.barcode_ids) if self.barcode_ids else "",
-            mut = self.mut.small_str(),
+            mut = str(self.mut),
             gene = str(self.gene),
             code = self.code,
             rp = self.replichore,

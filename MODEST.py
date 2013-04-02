@@ -8,6 +8,7 @@ Yadda yadda yadda
 from __future__ import print_function
 import logging
 import argparse
+import os.path
 
 import yaml
 from Bio import SeqIO
@@ -25,9 +26,9 @@ from mage_tool.IO import OligoLibraryReport
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("adjustments", help="Adjustment list")
-    parser.add_argument("genome", help="Annotated genome")   
     parser.add_argument("barcodes", help="Barcode library")    
     parser.add_argument("config", help="Genome configuration")
+    parser.add_argument("--genome", help="Annotated genome. Leave empty to locate automatically.", default=None)
     parser.add_argument("--log", help="Logfile, default MODEST.log. Use STDOUT to log all messages to screen, use - to disable", default="MODEST.log")
     parser.add_argument("-p", "--project", help="Project name", default="Untitled")
     parser.add_argument("-o", "--output", help="Output file. Default <project>.out", default=False)
@@ -62,8 +63,31 @@ if __name__ == '__main__':
         config = yaml.safe_load(cfg)
         config = create_config_tables(config)
 
-    print("Parsing genome..")
-    genome = SeqIO.read(args.genome, "genbank")
+    if not args.genome:
+        genome_locations = [os.path.splitext(args.config)[0] + ".gb",
+                            os.path.splitext(args.config)[0] + ".genbank",
+                            config["Locus"],
+                            config["Locus"] + ".gb",
+                            config["Locus"] + ".genbank",
+                            os.path.join(os.path.dirname(args.config), config["Locus"]),
+                            os.path.join(os.path.dirname(args.config), config["Locus"] + ".gb"),
+                            os.path.join(os.path.dirname(args.config), config["Locus"] + ".genbank")
+        ]
+        for loc in genome_locations:
+            if os.path.isfile(loc):
+                genome_loc = loc
+                break
+        else:
+            print("Genome not found, searched the following locations:")
+            for loc in genome_locations:
+                print(" *", loc)
+            print("Use --genome to manually supply a genome")
+            exit(1)
+    else:
+        genome_loc = args.genome
+
+    print("Parsing genome ({})..".format(genome_loc))
+    genome = SeqIO.read(genome_loc, "genbank")
 
     print("Collecting gene list..")
     genes = seqIO_to_genelist(genome, config, include_genes)
