@@ -133,7 +133,7 @@ class ViennaRNA:
 
         if version == "auto":
             self.version = self.versions[0]
-            if len(self.version) > 1:
+            if len(self.versions) > 1:
                 self.fallbackversion = self.versions[1]
             else:
                 self.fallbackversion = False
