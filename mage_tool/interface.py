@@ -137,7 +137,7 @@ def create_oligos_decorator(kwargs):
         return create_oligos(**kwargs)
     except KeyboardInterrupt:
         raise
-    except Exception as exception:
+    except Exception:
         import traceback
         print
         traceback.print_exc()
