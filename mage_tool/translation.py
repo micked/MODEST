@@ -632,7 +632,7 @@ def RBS_predict_calc_dG_spacing(mRNA_rRNA_list, optimal_spacing, dG_push, dG_pul
 
     Returns dG_spacing and a list of pairs binding mRNA:rRNA:
 
-        >>> # List from RNAsubopt
+        # List from RNAsubopt
         >>> l = [('..................(((.((((.........&.)))).)))', -5.9),
         ... ('.....................(.((((((......&..)))))))', -4.8),
         ... ('.....................(((.((((......&..)))))))', -5.2),
@@ -640,8 +640,6 @@ def RBS_predict_calc_dG_spacing(mRNA_rRNA_list, optimal_spacing, dG_push, dG_pul
         ... ('.........................((((.(....&.)))))...', -6.2),
         ... ('......................((((.........&.))))....', -6.1)]
 
-        >>> # Calculate dG spacing penalty
-        >>> from mage_tool.translation import RBS_predict_calc_dG_spacing
         >>> RBS_predict_calc_dG_spacing(l, 4, (12.2, 2.5, 2.0, 3.0), (0.048, 0.24, 0.0))
         (0.0, [(25, 5), (26, 4), (27, 3), (28, 2)])
 
