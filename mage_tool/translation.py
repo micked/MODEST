@@ -679,7 +679,7 @@ def RBS_predict_calc_spacing(brackets):
     Returns the spacing plus a list of basepairings involved in mRNA:rRNA:
 
         >>> RBS_predict_calc_spacing("....(((............)))((((((((.....&)).))))))")
-        (5, [(22, 8), (23, 7), (24, 6), (25, 5), (26, 4), (27, 3), (28, 1)])
+        (5, [(22, 8), (23, 7), (24, 6), (25, 5), (26, 4), (27, 3), (28, 1), (29, 0)])
 
     Consider the following sequence with folded rRNA:
 
@@ -724,7 +724,7 @@ def RBS_predict_calc_spacing_old(brackets):
     Returns the spacing plus a list of basepairings involved in mRNA:rRNA:
 
         >>> RBS_predict_calc_spacing_old("....(((............)))((((((((.....&)).))))))")
-        (4, [(22, 8), (23, 7), (24, 6), (25, 5), (26, 4), (27, 3), (28, 1)])
+        (4, [(22, 8), (23, 7), (24, 6), (25, 5), (26, 4), (27, 3), (28, 1), (29, 0)])
 
     """
     #Convert to basepairing

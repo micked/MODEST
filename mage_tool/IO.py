@@ -19,7 +19,7 @@ log = logging.getLogger("MODEST.IO")
 log.addHandler(logging.NullHandler())
 
 
-def seqIO_to_genelist(genome, options, include_genes=None, leader_len=35):
+def seqIO_to_genelist(genome, config, include_genes=None, leader_len=35):
     """TODO"""
 
     genes = dict()
@@ -36,51 +36,19 @@ def seqIO_to_genelist(genome, options, include_genes=None, leader_len=35):
             #This is mostly a good thing
             strand = g.location.strand
             cds = g.extract(genome).seq
-            if strand == 1:
-                pos = g.location.start
-                #leader = genome.seq[pos-leader_len:pos]
-            else:
-                pos = g.location.end
-                #leader = reverse_complement(genome.seq[pos:pos+leader_len])
+            #Gene start in genome context (+1)
+            pos = min(g.location.start, g.location.end)
 
+            #Leader start/end
             l_start = min(pos, pos-leader_len*strand)
             l_end = max(pos, pos-leader_len*strand)
 
             #Leader in genome context (+1)
             leader = genome.seq[l_start:l_end]
 
-            leader_wobble = None
-            #Look for CDS in leader
-            for c in genome.features:
-                    if c.type == "CDS":
-                        if c.location.start < l_start < c.location.end or \
-                           c.location.start < l_end < c.location.end or \
-                           (c.location.start > l_start and c.location.end < l_end):
-                            w_cds = c.extract(genome).seq
-                            # w_seq = w_cds
-                            w_seq = cds_to_wobble(w_cds, options)
-
-                            #Wobble sequence in genome context (+1)
-                            if c.location.strand == -1:
-                                w_seq = reverse_complement_dgn(w_seq)
-
-                            start_offset = l_start - c.location.start
-                            end_offset = l_end - c.location.start
-
-                            st = ""
-                            ed = ""
-                            if start_offset < 0:
-                                # st = str(genome.seq[l_start:l_start-start_offset])
-                                st = "N"*-start_offset
-                                start_offset = 0
-                            if end_offset > len(w_seq):
-                                #DOUBLE CHECK!!!
-                                # ed = str(genome.seq[l_start+start_offset+len(w_seq):l_end])
-                                ed = "N"*(end_offset-len(w_seq))
-                                end_offset = len(w_seq)
-
-                            leader_wobble = st + str(w_seq[start_offset:end_offset]) + ed
-
+            leader_wobble = find_wobble_seq(genome, l_start, l_end,
+                                            config["codon_table"],
+                                            config["dgn_table"])
             if strand == -1:
                 leader = reverse_complement(leader)
                 if leader_wobble:
@@ -94,19 +62,96 @@ def seqIO_to_genelist(genome, options, include_genes=None, leader_len=35):
                 log.warn("Gene {} found more than once.".format(name))
                 #raise Exception("Gene {} found twice!".format(name))
             else:
-                genes[name] = Gene(name, pos, strand, cds, leader, leader_wobble, promoter, promoter_pos)
-
+                genes[name] = Gene(name, pos, strand, cds, leader,
+                                   leader_wobble, promoter, promoter_pos)
     return genes
+
+
+def find_wobble_seq(genome, l_start, l_end, codon_table, dgn_table):
+    """Find a wobble sequence between l_start and l_end.
+
+    Returns None if no wobble sequence if found
+
+    """
+    leader_wobble = None
+    #Look for CDS in leader
+    for c in genome.features:
+        if c.type == "CDS":
+            if c.location.start < l_start < c.location.end or \
+               c.location.start < l_end < c.location.end or \
+               (c.location.start > l_start and c.location.end < l_end):
+                w_cds = c.extract(genome).seq
+                # w_seq = w_cds
+                w_seq = cds_to_wobble(w_cds, codon_table, dgn_table)
+
+                #Wobble sequence in genome context (+1)
+                if c.location.strand == -1:
+                    w_seq = reverse_complement_dgn(w_seq)
+
+                start_offset = l_start - c.location.start
+                end_offset = l_end - c.location.start
+
+                st = ""
+                ed = ""
+                if start_offset < 0:
+                    # st = str(genome.seq[l_start:l_start-start_offset])
+                    st = "N"*-start_offset
+                    start_offset = 0
+                if end_offset > len(w_seq):
+                    #DOUBLE CHECK!!!
+                    # ed = str(genome.seq[l_start+start_offset+len(w_seq):l_end])
+                    ed = "N"*(end_offset-len(w_seq))
+                    end_offset = len(w_seq)
+
+                leader_wobble = st + str(w_seq[start_offset:end_offset]) + ed
+
+    return leader_wobble
 
 
 def parse_barcode_library(barcode_filehandle):
     """Parse an open barcoding library file.
 
     Barcoding library file has the following syntax:
-    ..
+    
+        >>> barcode_file = '''#Comments
+        ... #Comments must always begin
+        ... #at the beginning of a line.
+        ... 
+        ... #Empty lines are allowed
+        ... #First header is for primers:
+        ... >PRIMERS
+        ... #ID SEQUENCE
+        ... F1 CTACCTTGCA
+        ... F2 GGAATTGAGA
+        ... R1 CCGTCCGTTA
+        ... R2 ATTTCCCTTG
+        ... 
+        ... #Second header is for the library
+        ... >LIBRARY
+        ... #ID FWD REV
+        ... ID1 F1 R1
+        ... ID2 F2 R2
+        ... #Primers can be mixed
+        ... ID3 F1 R2'''.splitlines()
+
+
+    barcode_file must be open file-like iterable:
+
+        >>> barcodes = parse_barcode_library(barcode_file)
+
+
+    Barcodes are returned as a dictionary:
+
+        >>> for id in sorted(barcodes):
+        ...     (id,
+        ...     barcodes[id]["forward"],
+        ...     barcodes[id]["reverse"])
+        ...
+        ('ID1', 'CTACCTTGCA', 'TAACGGACGG')
+        ('ID2', 'GGAATTGAGA', 'CAAGGGAAAT')
+        ('ID3', 'CTACCTTGCA', 'CAAGGGAAAT')
 
     """
-
     primers = dict()
     barcodes = dict()
 
@@ -114,7 +159,7 @@ def parse_barcode_library(barcode_filehandle):
     barcodes_flag = False
 
     for line in barcode_filehandle:
-        if line[0] == "#" or not line.strip():
+        if not line.strip() or line[0] == "#":
             continue
         elif line.strip() == ">PRIMERS":
             primer_flag = True
@@ -164,7 +209,7 @@ Oligolist functions
 """
 
 def oligolist_to_tabfile(oligolist, output):
-    """Writeout oligolist to a tab separeted file.
+    """Writeout oligolist to a tab separated file.
 
     Supply string filename or open file
     
@@ -295,11 +340,16 @@ class OligoLibraryReport:
         elements = [("p", "Ribosome binding sites libraries.")]
 
         bar_width = 0.3
-        #Genes per plot
-        gpp = 8
         #sort by altered
         sba = lambda gene: max([float(oligo["altered"]) for oligo in self.oplib["RBS_library"][gene]])
         genes = sorted(self.oplib["RBS_library"].keys(), key=sba, reverse=True)
+
+        #Genes per plot
+        gpp = min(range(6,11), key=lambda i: i % len(genes))
+        fig_w = 8.
+        fig_h = 3.
+        gw = fig_w/gpp
+
         for i in range(0, len(genes), gpp):
             curr_genes = genes[i:i+gpp]
             x = [0]
@@ -316,13 +366,15 @@ class OligoLibraryReport:
 
             del(x[0])
 
-            fig = plt.figure(figsize=(8, 3))
+            fig = plt.figure(figsize=(fig_w, fig_h))
             ax = fig.add_subplot(111)
-            plt.bar(x, y1, bar_width, color="#9FF33D", linewidth=0, log=plot_log)
-            plt.bar([x1+bar_width for x1 in x], y2, bar_width, color="#007633", linewidth=0, log=plot_log)
+            bar_wt = plt.bar(x, y1, bar_width, color="#9FF33D", linewidth=0, log=plot_log)
+            bar_lib = plt.bar([x1+bar_width for x1 in x], y2, bar_width, color="#007633", linewidth=0, log=plot_log)
 
             ax.set_xticklabels(labels)
             ax.set_xticks([x1+bar_width for x1 in x])
+
+
 
             if plot_log:
                 ma = round(max(y2), len(str(max(y2))))
@@ -340,6 +392,23 @@ class OligoLibraryReport:
                                             "color": color})
                     clr -= step
 
+            plt.subplots_adjust(top=0.85, left=0.08, right=0.95*len(curr_genes)/gpp)
+
+            plt.ylabel("log(expression [AU])" if plot_log else "expression [AU]")
+            t = fig.text(0.08, 0.90, "RBS library expression levels",
+                         horizontalalignment='left', fontsize=13)
+            #plt.title("RBS library expression levels")
+
+            prx_arr = plt.Rectangle((0, 0), 1, 1, fc="0.5", linewidth=0)
+
+            if 0.99 < len(curr_genes)/gpp < 1.01:
+                plt.legend([bar_wt, bar_lib, prx_arr], ["wt", "lib", "oligos"],
+                    bbox_to_anchor=(0., 1.02, 1., .102), loc=4,
+                    ncol=3, borderaxespad=0., frameon=False)
+            else:
+                plt.legend([bar_wt, bar_lib, prx_arr], ["wt", "lib", "oligos"],
+                    bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., frameon=False)
+
             imgdata_png = strIO.StringIO()
             imgdata_pdf = strIO.StringIO()
             fig.savefig(imgdata_png, format="PNG", dpi=300)
@@ -347,7 +416,7 @@ class OligoLibraryReport:
             imgdata_png.seek(0)
             imgdata_pdf.seek(0)
 
-            elements.append(("png/pdf", imgdata_png, imgdata_pdf, "page", 3./8))
+            elements.append(("png/pdf", imgdata_png, imgdata_pdf, "page", fig_h/fig_w))
 
         self.sections[prefix + "RBS_library"] = elements
  
@@ -476,3 +545,8 @@ class OligoLibraryReport:
                 canv.restoreState()
 
         return PdfImageInner
+
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()

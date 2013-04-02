@@ -12,7 +12,8 @@ from Bio import SeqIO
 
 from mage_tool.IO import seqIO_to_genelist
 from mage_tool.IO import create_config_tables
-from mage_tool.translation import RBSPredict
+from mage_tool.translation import RBS_predict
+from mage_tool.translation import dG_to_AU
 
 
 if __name__ == '__main__':
@@ -37,7 +38,8 @@ if __name__ == '__main__':
             print(gene, "not found..")
 
     for gene in genes.values():
-        expr_lvl = RBSPredict(str(gene.leader), str(gene.cds))["expr_lvl"]
+        expr_lvl = RBS_predict(str(gene.leader), str(gene.cds))
+        expr_lvl = dG_to_AU(expr_lvl)
         print(">>{}".format(gene))
         print("Strand:    ", gene.strand)
         print("Pos:       ", gene.pos)

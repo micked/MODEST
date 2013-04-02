@@ -96,14 +96,14 @@ def reverse_translate(seq, dgn_table):
     return "".join(dgn)
 
 
-def cds_to_wobble(seq, options):
+def cds_to_wobble(seq, codon_table, dgn_table):
     """Convert a DNA sequence to a wobble (degenerate) DNA sequence."""
     seq = str(seq).upper().replace("U", "T")
     if not valid_dna(seq):
         raise ValueError("Not valid DNA/RNA: {}".format(seq))
 
-    codon_table = options["codon_table"]
-    dgn_table = options["dgn_table"]
+    #codon_table = options["codon_table"]
+    #dgn_table = options["dgn_table"]
 
     dgn = list()
     for i in range(0, len(seq), 3):

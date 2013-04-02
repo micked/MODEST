@@ -4,6 +4,8 @@ import unittest
 import doctest
 from mage_tool import ViennaRNA
 from mage_tool import translation
+from mage_tool import IO
+from mage_tool import oligo_design
 
 # from mage_tool.tests import oligo_design_tests
 # from mage_tool.IO import Mutation
@@ -21,5 +23,7 @@ if __name__ == "__main__":
 
     suite.addTests(doctest.DocTestSuite(ViennaRNA))
     suite.addTests(doctest.DocTestSuite(translation))
+    suite.addTests(doctest.DocTestSuite(IO))
+    suite.addTests(doctest.DocTestSuite(oligo_design))
 
     unittest.TextTestRunner(verbosity=2).run(suite)

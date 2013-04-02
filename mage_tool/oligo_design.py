@@ -137,17 +137,6 @@ class Oligo:
             else:
                 self.replichore = 2
                 return True
-    
-    #OLD
-    #def add_barcode(self, barcode, barcoding_lib):
-    #    """TODO"""
-    #    #Add a barcode ID to self.barcode_ids
-    #    #and add barcode sequences to self.barcodes_*
-    #    #forward should be prepended, and backward should be appended
-    #    #Maybe add some primer checking too (maybe second function)
-    #    self.barcodes_forward.insert(0, barcoding_lib[barcode]["forward"].lower())
-    #    self.barcodes_reverse.append(barcoding_lib[barcode]["reverse"].lower())
-    #    self.barcode_ids.insert(0, barcode)
         
     def add_barcodes(self, barcode_ids, barcoding_lib):
         """TODO"""
@@ -161,7 +150,6 @@ class Oligo:
             self.barcodes_forward.insert(0, barcoding_lib[barcode]["forward"].lower())
             self.barcodes_reverse.append(barcoding_lib[barcode]["reverse"].lower())
             self.barcode_ids.insert(0, barcode)
-
 
     def output(self):
         """Return the oligo with barcodes"""
@@ -182,6 +170,7 @@ class Oligo:
             )
 
     def short_id(self):
+        """Return id in the form of projectXXX"""
         return "{prj}{i:0>4}".format(
             prj = self.project if self.project else "",
             i = self.number
@@ -195,6 +184,8 @@ class Oligo:
 class Mutation:
     def __init__(self, mut_format, mut, pos=0, mut_type="", ref_genome=False):
         """Mutation
+
+        IMPORTANT: position must be 0-indexed!
         
         mut_format can be:
         arrow: position required
@@ -277,9 +268,24 @@ class Mutation:
 
 
 class Gene:
-    """Defines a single gene and all relevant information"""
+    """Defines a single gene and all relevant information
 
-    def __init__(self, name, pos, strand, cds, leader, leader_wobble=None, promoter=None, promoter_pos=None):
+    Instantiation is straightforward:
+
+        >>> gene = Gene("ficX", 20, 1, "ATGTCTGCAACAAAACTG", "TTTTTGGAATGAGCT")
+        >>> gene
+        ficX
+
+
+    If wobble sequence is not supplied it is generated automatically:
+
+        >>> gene.leader_wobble
+        'NNNNNNNNNNNNNNN'
+
+    """
+
+    def __init__(self, name, pos, strand, cds, leader, leader_wobble=None,
+                 promoter=None, promoter_pos=None):
         self.name = name
         self.pos = pos
         self.strand = strand
@@ -315,3 +321,8 @@ class Gene:
     def copy(self):
         """Return a copy"""
         return deepcopy(self)
+
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
