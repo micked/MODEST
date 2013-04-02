@@ -12,8 +12,8 @@ import argparse
 import yaml
 from Bio import SeqIO
 
-from mage_tool.interface2 import run_adjustments
-from mage_tool.interface2 import run_adjustments_unthreaded
+from mage_tool.interface import run_adjustments
+from mage_tool.interface import run_adjustments_unthreaded
 from mage_tool.IO import seqIO_to_genelist
 from mage_tool.IO import oligolist_to_tabfile
 from mage_tool.IO import parse_barcode_library

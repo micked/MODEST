@@ -81,22 +81,28 @@ def run_adjustments(adjfilehandle, genes, genome, config, project, barcoding_lib
 
     oligo_kwargs = {"genome": genome, "config": config, "project": project, "barcoding_lib": barcoding_lib}
 
-    pool = Pool(NUM_PROCESSES, process_initializer)
+    pool = Pool(NUM_PROCESSES)
     results = list()
 
     for run_op in parsed_operations:
         op_kwargs = oligo_kwargs.copy()
         op_kwargs.update(run_op)
-        results.append(pool.apply_async(create_oligos, [], op_kwargs))
+        results.append(pool.apply_async(create_oligos_decorator, (op_kwargs,)))
 
     oligos = list()
     for r in results:
         try:
-            oligos.extend(r.get(999999))
+            res = r.get(999999)
+            if res is None:
+                log.error("Caught exception doing operation. Exception printed to stdout.")
+            else:
+                oligos.extend(res)
         except KeyboardInterrupt:
-            print()
+            print
             log.error("Computation manually stopped.")
             return oligos, []
+        except Exception:
+            raise 
 
     return oligos, []
 
@@ -123,9 +129,20 @@ def run_adjustments_unthreaded(adjfilehandle, genes, genome, config, project, ba
     return oligos, []
 
 
-def process_initializer():
-    """Ignores all exceptions. Useful for subprocesses"""
+def create_oligos_decorator(kwargs):
+    """TODO"""
     signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+    try:
+        return create_oligos(**kwargs)
+    except KeyboardInterrupt:
+        raise
+    except Exception as exception:
+        import traceback
+        print
+        traceback.print_exc()
+        return None
+
 
 def create_oligos(genome, op, gene, config, options, op_str, project, barcodes, barcoding_lib):
     """Run an operation and create oligos"""
