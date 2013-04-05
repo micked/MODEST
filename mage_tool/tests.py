@@ -11,6 +11,7 @@ import ViennaRNA
 import translation
 import IO
 import oligo_design
+import helpers
 
 from IO import seqIO_to_genelist
 from IO import create_config_tables
@@ -51,6 +52,12 @@ FEATURES             Location/Qualifiers
                      /locus_tag="b0003"
                      /codon_start=1
                      /gene_synonym="fak003"
+                     /transl_table=11
+     CDS             complement(1053..1073)
+                     /gene="fakZ"
+                     /locus_tag="b0010"
+                     /codon_start=1
+                     /gene_synonym="fak010"
                      /transl_table=11
 ORIGIN
         1 agcttttcat tctgactgca acgggcaata tgtctctgtg tggattaaaa aaagagtgtc
@@ -105,9 +112,15 @@ config = {'Definition': 'Escherichia coli str. K-12 substr. MG1655',
 
 
 def testest():
-    selfgenome = SeqIO.read(cStringIO.StringIO(genome), "genbank")
-    selfconfig = create_config_tables(config)
-    selfgenes = seqIO_to_genelist(selfgenome, config)
+    class Self: pass
+    self = Self()
+    self.genome = SeqIO.read(cStringIO.StringIO(genome), "genbank")
+    self.config = create_config_tables(config)
+    self.genes = seqIO_to_genelist(self.genome, config)
+
+    print self.genes["fakZ"].leader
+    print self.genes["fakZ"].leader_wobble
+    print helpers.reverse_complement(self.genes["fakZ"].leader)
 
     exit(0)
 
@@ -140,13 +153,18 @@ class TestMageTool(unittest.TestCase):
     def test_sequences(self):
         self.assertEqual(str(self.genes["fakA"].cds), "GACTGCAACGGGCAATATGTCTCT")
         self.assertEqual(str(self.genes["fakD"].cds), "TTCAGAAGCTGCTATCAGACACTC")
+        self.assertEqual(self.genes["fakA"].pos, 13)
+        self.assertEqual(self.genes["fakD"].pos, 77)
 
     def test_leaders(self):
         #Standard leader
         self.assertEqual(str(self.genes["fakB"].leader), "ACCTGCCGTGAGTAAATTAAAATTTTATTGACTTA")
         #Extends beyond 0:
         self.assertEqual(str(self.genes["fakA"].leader), "CGATGCGAGGTTGTTGAAGTCGAGCTTTTCATTCT")
-        #TODO: reverse leaders
+        #Reverse leader
+        self.assertEqual(str(self.genes["fakD"].leader), "AATAAAATTTTAATTTACTCACGGCAGGTAACCAG")
+        #Reverse leader extends beyond length
+        self.assertEqual(str(self.genes["fakZ"].leader), "TTGCCCGTTGCAGTCAGAATGAAAAGCTCGACTTC")
 
     def test_wobbles(self):
         #No wobble
@@ -158,6 +176,17 @@ class TestMageTool(unittest.TestCase):
         #TODO:
         # test wobble on right side, both sides, and everywhere
         # test same on -1 strand
+        # test wobbles extending beyond limits
+        # test multiple wobble
+
+    def test_do_mutation(self):
+        mut1 = oligo_design.Mutation("eq", "[TG=GT]", 3)
+        mut1 = self.genes["fakA"].do_mutation(mut1)
+        self.assertEqual(str(mut1), "[TG=gt].16")
+
+        mut2 = oligo_design.Mutation("eq", "[CA=GG]", 2)
+        mut2 = self.genes["fakD"].do_mutation(mut2)
+        self.assertEqual(str(mut2), "[TG=cc].73")
 
 
 if __name__ == "__main__":
@@ -171,5 +200,6 @@ if __name__ == "__main__":
     suite.addTests(doctest.DocTestSuite(translation))
     suite.addTests(doctest.DocTestSuite(IO))
     suite.addTests(doctest.DocTestSuite(oligo_design))
+    suite.addTests(doctest.DocTestSuite(helpers))
 
     unittest.TextTestRunner(verbosity=2).run(suite)

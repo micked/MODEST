@@ -37,7 +37,10 @@ def seqIO_to_genelist(genome, config, include_genes=None, leader_len=35):
             strand = g.location.strand
             cds = g.extract(genome).seq
             #Gene start in genome context (+1)
-            pos = min(g.location.start, g.location.end)
+            if strand == -1:
+                pos = g.location.end
+            else:
+                pos = g.location.start
 
             #Leader start/end
             l_start = min(pos, pos-leader_len*strand)
@@ -50,11 +53,15 @@ def seqIO_to_genelist(genome, config, include_genes=None, leader_len=35):
                 #In the very unlikely coincidence that leader extends beyond 0
                 leader = genome.seq[l_start:] + genome.seq[:l_end]
 
+            if l_end > len(genome.seq):
+                leader += genome.seq[:l_end-len(genome.seq)]
+
             leader_wobble = find_wobble_seq(genome, l_start, l_end,
                                             config["codon_table"],
                                             config["dgn_table"])
             if strand == -1:
                 leader = reverse_complement(leader)
+                pos = g.location.end
                 if leader_wobble:
                     leader_wobble = reverse_complement_dgn(leader_wobble)
 
@@ -412,7 +419,9 @@ class OligoLibraryReport:
         genes = sorted(self.oplib["RBS_library"].keys(), key=sba, reverse=True)
 
         #Genes per plot
-        gpp = min(range(6,11), key=lambda i: i % len(genes))
+        gpp = min(range(6,11), key=lambda i: len(genes) % i)
+        if len(genes) % gpp != 0:
+            gpp = max(range(6,11), key=lambda i: len(genes) % i)
         fig_w = 8.
         fig_h = 3.
         gw = fig_w/gpp
@@ -446,7 +455,8 @@ class OligoLibraryReport:
             if plot_log:
                 ma = round(max(y2), len(str(max(y2))))
                 ax.set_ylim(1, ma*2)
-            #ax.set_xlim(bar_width, len(curr_genes)+1)
+            
+            ax.set_xlim(1, len(curr_genes)+1)
 
             for gene, j in zip(curr_genes, x):
                 step = 0.5 / (len(self.oplib["RBS_library"][gene]))

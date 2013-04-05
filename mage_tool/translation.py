@@ -57,7 +57,8 @@ def translational_KO(gene, stop_codons=["TAG", "TAA", "TGA"], KO_frame=10):
                 if tm <= m and tg <= g:
                     #Do mutation
                     mutation = find_mutation_box(parent, child)
-                    mutation.pos += i+start_offset
+                    #print(start_offset, i, parent, child, mutation, gene.cds[0:50])
+                    mutation.pos += i + start_offset
                     #Apply mutation
                     new_mut = gene.do_mutation(mutation)
                     new_mut._codon_offset = (i+start_offset)/3
@@ -134,7 +135,7 @@ def generate_RBS_library(gene, target, n, max_mutations, passes):
     org_expr = dG_to_AU(MC.original_dG)
 
     muts_out = list()
-    for expr, muts, seq in lib:
+    for expr, muts, seq, prox in lib:
         muts = sorted(muts)
         before = org_leader[muts[0]:muts[-1]+1]
         after = list()
@@ -239,21 +240,20 @@ class RBSMonteCarlo:
     def create_library(self, n=7, max_mutations=10, passes=1, prioritise_low_count=True):
         """Create an RBS library from start to target with n candidates"""
         self.mutation_lib = list()
+
+        target_expr_lvl = dG_to_AU(self.target)
+        #fitness/proximity to target
+        f = lambda x: abs(x - target_expr_lvl)
         
         for pas in range(passes):
             self.run(max_mutations=max_mutations, make_library=True)
 
-        mut_lib = [(dG_to_AU(dG), sorted(muts), seq) for dG, muts, seq in self.mutation_lib]
+        mut_lib = [(dG_to_AU(dG), sorted(muts), seq, f(dG_to_AU(dG))) for dG, muts, seq in self.mutation_lib]
 
         if not mut_lib:
             return False
 
-        target_expr_lvl = dG_to_AU(self.target)   
-
-        min_expr = min(mut_lib, key=lambda x: x[0])
-        max_expr = max(mut_lib, key=lambda x: x[0])
-
-        selected_library = [max_expr]
+        selected_library = [min(mut_lib, key=lambda x: x[3])]
 
         #Loop through each leader with m mutations
         #And pickup the one closest to the target
@@ -261,27 +261,30 @@ class RBSMonteCarlo:
             for m in range(1, max_mutations+1):
                 best_n = [l for l in mut_lib if len(l[1]) == m]
                 if best_n:
-                    best_n = min(best_n, key=lambda l: abs(l[0]-target_expr_lvl))
+                    best_n = min(best_n, key=lambda l: l[3])
                     if best_n[2] not in [l[2] for l in selected_library]:
                         selected_library.append(best_n)
 
+        if len(selected_library) >= n:
+            return selected_library[0:n]
+
         n -= len(selected_library) - 1
 
-        if n <= 0:
-            return selected_library
+        best  = min(mut_lib, key=lambda x: x[3])
+        worst = max(mut_lib, key=lambda x: x[3])
 
-        stepsize = (max_expr[0] - min_expr[0]) / n
+        stepsize = (best[3] - worst[3]) / n
 
         #Go through each leader in library and select one closest to target
         for i in range(1, n):
-            step = max_expr[0] - (stepsize * i)
-            closest = sorted(mut_lib, key=lambda l: abs(l[0] - step))
+            step = best[3] - (stepsize * i)
+            closest = sorted(mut_lib, key=lambda l: abs(l[3] - step))
             for close in closest:
                 if close[2] not in [l[2] for l in selected_library]:
                     selected_library.append(close)
                     break
 
-        selected_library.sort(key=lambda l: abs(l[0]-target_expr_lvl))
+        selected_library.sort(key=lambda l: l[3])
 
         return selected_library
 
@@ -464,6 +467,8 @@ class RBSMonteCarlo:
 
 def AU_to_dG(AU):
     """Convert a dG value to expression level (AU)"""
+    if AU == 0:
+        return 1e12
     return RBS_RT_EFF * (RBS_LOG_K - math.log(AU))
 
 

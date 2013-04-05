@@ -29,11 +29,14 @@ if __name__ == '__main__':
     parser.add_argument("barcodes", help="Barcode library")    
     parser.add_argument("config", help="Genome configuration")
     parser.add_argument("--genome", help="Annotated genome. Leave empty to locate automatically.", default=None)
-    parser.add_argument("--log", help="Logfile, default MODEST.log. Use STDOUT to log all messages to screen, use - to disable", default="MODEST.log")
+    parser.add_argument("--log", help="Logfile, default <project>.log. Use STDOUT to log all messages to screen, use - to disable", default="--")
     parser.add_argument("-p", "--project", help="Project name", default="Untitled")
     parser.add_argument("-o", "--output", help="Output file. Default <project>.out", default=False)
     parser.add_argument("-T", help="Run unthreaded", action="store_true")
     args = parser.parse_args()
+
+    if args.log == "--":
+        args.log = args.project +".log"
 
     #Set up logging
     format = "%(asctime)s %(name)-12s: %(levelname)-8s %(message)s"

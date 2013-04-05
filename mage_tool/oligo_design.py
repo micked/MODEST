@@ -46,11 +46,16 @@ class Oligo:
 
     def make_oligo(self, genome, offset=0):
         """Make oligo from mutation"""
+
         #Make sure what is being mutated is actually being mutated
         if str(genome[self.mut.pos:self.mut.pos+len(self.mut.before)]) != str(self.mut.before):
             found = genome[self.mut.pos:self.mut.pos+len(self.mut.before)]
-            extended = genome[self.mut.pos-5:self.mut.pos+len(self.mut.before)+5]
-            raise Exception("Trying to mutate {}, but found {} in genome. [{}]".format(self.mut.before, found, extended))
+            mutpos = self.mut.pos
+            len_bef = len(self.mut.before)
+            extended = "{}({}){}".format(genome[mutpos-5:mutpos],
+                                         found,
+                                         genome[mutpos+len_bef:mutpos+len_bef+5])
+            raise Exception("Trying to mutate {}, but found {} in genome. {}".format(self.mut.before, found, extended))
 
         #Calculate flanking sequence lengths
         post_seq_len = (self.oligo_len - len(self.mut.after))/2
@@ -58,7 +63,7 @@ class Oligo:
         post_seq_len -= offset
 
         #Fetch pre sequence
-        pre_seq = genome[self.mut.pos-pre_seq_len : self.mut.pos]
+        pre_seq = genome[self.mut.pos-pre_seq_len:self.mut.pos]
 
         #Fetch post sequence
         post_seq_start = self.mut.pos+len(self.mut.before)
@@ -182,25 +187,24 @@ class Oligo:
 
 
 class Mutation:
-    def __init__(self, mut_format, mut, pos=0, mut_type="", ref_genome=False):
-        """Mutation
+    """Mutation object
 
-        IMPORTANT: position must be 0-indexed!
+    IMPORTANT: Position must be 0-indexed!
+    
+    mut_format can be:
+    arrow: position required
+        point mutation: A->T, pos, mut_change="Point_Mutation"
+        insertion:      A, pos, mut_change="Insertion"
+        deletion        3, pos, mut_change="Deletion"
+    eq: position required
+        point mutation: A=T, pos
+        insertion:      =AT, pos
+        deletion:       A=, pos
+    genome: search genome for mutation (eq format)
+        AATGATA[ATG=GT]ATGATA
         
-        mut_format can be:
-        arrow: position required
-            point mutation: A->T, pos, mut_change="Point_Mutation"
-            insertion:      A, pos, mut_change="Insertion"
-            deletion        3, pos, mut_change="Deletion"
-        eq: position required
-            point mutation: A=T, pos
-            insertion:      =AT, pos
-            deletion:       A=, pos
-        genome: search genome for mutation (eq format)
-            AATGATA[ATG=GT]ATGATA
-            
-        """
-        
+    """
+    def __init__(self, mut_format, mut, pos=0, mut_type="", ref_genome=False):
         if mut_format.lower() == "arrow":
             self._parse_arrow(mut, int(pos), mut_type, ref_genome)
         elif mut_format.lower() == "eq":
@@ -212,10 +216,6 @@ class Mutation:
             if n in self.after:
                 return
         self.after = self.after.lower()
-    
-    #
-    # Printing
-    #
     
     def __repr__(self):
         return "Mutation: [{}={}] at pos {}".format(
@@ -235,10 +235,6 @@ class Mutation:
             after = after[0:2] + ".." + after[-2:]
 
         return "[{}={}].{}".format(before, after, self.pos+idx)
-
-    #
-    # Parsers
-    #
     
     def _parse_arrow(self, mut, pos, mut_type, ref_genome=False):
         """Parse arrow format"""
@@ -276,11 +272,37 @@ class Gene:
         >>> gene
         ficX
 
-
     If wobble sequence is not supplied it is generated automatically:
 
         >>> gene.leader_wobble
         'NNNNNNNNNNNNNNN'
+
+    Getting a part of a gene sequence can be done in a couple of ways. Using the
+    normal int or slice to get a genes cds:
+
+        >>> gene[0:3]
+        'ATG'
+        >>> gene[0]
+        'A'
+
+    However, a part of a gene can also be obtained by using a tuple instead of a
+    slice, which can include the leader:
+
+        >>> gene[0,3]
+        'ATG'
+        >>> gene[-3,0]
+        'GCT'
+        >>> gene[-6,-2]
+        'TGAG'
+        >>> gene[-3,3]
+        'GCTATG'
+
+    None can be used to get the 'rest':
+
+        >>> gene[0,]
+        'ATGTCTGCAACAAAACTG'
+        >>> gene[None, 3]
+        'TTTTTGGAATGAGCTATG'
 
     """
 
@@ -308,6 +330,13 @@ class Gene:
     def do_mutation(self, mut):
         """Return Mutation in genome context (positive strand)"""
         mut = mut.copy()
+
+        if str(mut.before) != str(self[mut.pos,mut.pos+len(mut.before)]):
+            extended = "{}({}){}".format(self[mut.pos-3,mut.pos],
+                                         self[mut.pos,mut.pos+len(mut.before)],
+                                         self[mut.pos+len(mut.before), mut.pos+len(mut.before)+3])
+            raise MutationError("Trying to mutate {} but found in gene: {}".format(str(mut.before), extended))
+
         if self.strand == 1:
             mut.pos = mut.pos+self.pos
             return mut
@@ -318,9 +347,43 @@ class Gene:
 
         return mut
 
+    def __getitem__(self, slc):
+        """Get a part of the gene sequence"""
+        if type(slc) is slice or type(slc) is int:
+            return self.cds[slc]
+        elif type(slc) is tuple:
+            #Parse tuple
+            if len(slc) == 1:
+                st, end = slc[0], len(self.cds)
+            elif len(slc) == 2:
+                st, end = slc
+                if st is None: st = -len(self.leader)
+            else:
+                raise ValueError("Invalid tuple for Gene: {}".format(slc))
+
+            #Aquire leader/cds
+            if st < 0 and end <= 0:
+                if end == 0:
+                    return self.leader[st:]
+                return self.leader[st:end]
+            elif st < 0 < end:
+                return self.leader[st:] + self.cds[:end]
+            elif st >= 0 and end > 0:
+                return self.cds[st:end]
+            else:
+                raise ValueError("Invalid tuple for Gene: {}".format(slc))
+        else:
+            raise TypeError("Getting a sequence from a gene can be a slice, int or tuple.")
+
+    def __len__(self):
+        return len(self.leader) + len(self.cds)
+
     def copy(self):
         """Return a copy"""
         return deepcopy(self)
+
+
+class MutationError(ValueError): pass
 
 
 if __name__ == "__main__":

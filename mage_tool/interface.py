@@ -79,15 +79,17 @@ def run_adjustments(adjfilehandle, genes, genome, config, project, barcoding_lib
     if errors:
         return [], errors
 
-    oligo_kwargs = {"genome": genome, "config": config, "project": project, "barcoding_lib": barcoding_lib}
+    oligo_kwargs = {"genome": genome, "config": config, "project": project,
+                    "barcoding_lib": barcoding_lib}
 
-    pool = Pool(NUM_PROCESSES)
+    pool = Pool(NUM_PROCESSES, process_initializer)
     results = list()
 
     for run_op in parsed_operations:
         op_kwargs = oligo_kwargs.copy()
         op_kwargs.update(run_op)
         results.append(pool.apply_async(create_oligos_decorator, (op_kwargs,)))
+        # results.append(pool.apply_async(create_oligos, [], op_kwargs))
 
     oligos = list()
     for r in results:
@@ -101,8 +103,6 @@ def run_adjustments(adjfilehandle, genes, genome, config, project, barcoding_lib
             print
             log.error("Computation manually stopped.")
             return oligos, []
-        except Exception:
-            raise 
 
     return oligos, []
 
@@ -113,7 +113,8 @@ def run_adjustments_unthreaded(adjfilehandle, genes, genome, config, project, ba
     if errors:
         return [], errors
 
-    oligo_kwargs = {"genome": genome, "config": config, "project": project, "barcoding_lib": barcoding_lib}
+    oligo_kwargs = {"genome": genome, "config": config, "project": project,
+                    "barcoding_lib": barcoding_lib}
 
     results = list()
 
@@ -129,20 +130,19 @@ def run_adjustments_unthreaded(adjfilehandle, genes, genome, config, project, ba
     return oligos, []
 
 
-def create_oligos_decorator(kwargs):
-    """TODO"""
+def process_initializer():
+    """Ignores all exceptions. Useful for subprocesses"""
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
+def create_oligos_decorator(kwargs):
+    """TODO"""
     try:
         return create_oligos(**kwargs)
-    except KeyboardInterrupt:
-        raise
     except Exception:
         import traceback
         print
         traceback.print_exc()
         return None
-
 
 def create_oligos(genome, op, gene, config, options, op_str, project, barcodes, barcoding_lib):
     """Run an operation and create oligos"""
