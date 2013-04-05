@@ -621,8 +621,8 @@ def RBS_predict(leader, cds, nt_cutoff=35, verbose=False):
     dG_total = dG_mRNA_rRNA_w_spacing + dG_start_codon - dG_mRNA - dG_standby
 
     if verbose:
-        print("{:>15}{:>15}{:>15}{:>15}{:>15}".format("dG(total)", "dG(mRNA:rRNA)", "dG(mRNA)", "dG(spacing", "dG(standby)"))
-        print("{:>15}{:>15}{:>15}{:>15}{:>15}".format(dG_total, dG_mRNA_rRNA, dG_mRNA, dG_spacing, dG_standby))
+        print("{:>15}{:>15}{:>15}{:>15}{:>15}".format("dG(total)", "dG(mRNA:rRNA)", "dG(mRNA)", "dG(spacing)", "dG(standby)"))
+        print("{:>15.4f}{:>15.4f}{:>15.4f}{:>15.4f}{:>15.4f}".format(dG_total, dG_mRNA_rRNA, dG_mRNA, dG_spacing, dG_standby))
 
     return dG_total
 
