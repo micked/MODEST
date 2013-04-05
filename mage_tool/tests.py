@@ -3,6 +3,7 @@
 import unittest
 import doctest
 import cStringIO
+import sys
 
 from Bio import SeqIO
 
@@ -13,6 +14,7 @@ import oligo_design
 
 from IO import seqIO_to_genelist
 from IO import create_config_tables
+from IO import find_wobble_seq
 
 genome = """LOCUS       FK_000001               1080 bp    DNA              BCT 11-JAN-2012
 DEFINITION  Escherichia coli str. K-12 substr. MG1655 chromosome, complete
@@ -26,11 +28,17 @@ SOURCE      .
             .
 COMMENT     Completely fake genome for testing purposes
 FEATURES             Location/Qualifiers
-     CDS             14..36
+     CDS             14..37
                      /gene="fakA"
                      /locus_tag="b0001"
                      /codon_start=1
                      /gene_synonym="fak001"
+                     /transl_table=11
+     CDS             complement(54..77)
+                     /gene="fakD"
+                     /locus_tag="b0004"
+                     /codon_start=1
+                     /gene_synonym="fak004"
                      /transl_table=11
      CDS             119..148
                      /gene="fakB"
@@ -96,15 +104,13 @@ config = {'Definition': 'Escherichia coli str. K-12 substr. MG1655',
 'start_codons': ['ATG', 'GTG', 'TTG', 'ATT', 'CTG']}
 
 
-# p_genome = SeqIO.read(cStringIO.StringIO(genome), "genbank")
+def testest():
+    selfgenome = SeqIO.read(cStringIO.StringIO(genome), "genbank")
+    selfconfig = create_config_tables(config)
+    selfgenes = seqIO_to_genelist(selfgenome, config)
 
-# config = create_config_tables(config)
-# genes = seqIO_to_genelist(p_genome, config)
+    exit(0)
 
-# for gene in genes.values():
-#     print gene, gene.leader
-
-# exit(0)
 
 
 class TestMageTool(unittest.TestCase):
@@ -114,8 +120,26 @@ class TestMageTool(unittest.TestCase):
         self.config = create_config_tables(config)
         self.genes = seqIO_to_genelist(self.genome, self.config)
 
-    #TODO:
-    # test sequences
+    def test_find_wobble(self):
+        #No wobble
+        self.assertEqual(find_wobble_seq(self.genome, 10, 13, self.config["codon_table"], self.config["dgn_table"]), None)
+        #Right-side wobble
+        self.assertEqual(find_wobble_seq(self.genome, 10, 19, self.config["codon_table"], self.config["dgn_table"]), "NNNGAYTGY")
+        #Left-side wobble
+        self.assertEqual(find_wobble_seq(self.genome, 30, 40, self.config["codon_table"], self.config["dgn_table"]), "YGTNWSNNNN")
+        #Both-side wobble
+        self.assertEqual(find_wobble_seq(self.genome, 10, 40, self.config["codon_table"], self.config["dgn_table"]), "NNNGAYTGYAAYGGNCARTAYGTNWSNNNN")
+        #Inside wobble
+        self.assertEqual(find_wobble_seq(self.genome, 13, 16, self.config["codon_table"], self.config["dgn_table"]), "GAY")
+        #Right-side wobble (complement gene)
+        self.assertEqual(find_wobble_seq(self.genome, 50, 60, self.config["codon_table"], self.config["dgn_table"]), "NNNNARNGTY")
+        #Left side wobble (complement gene)
+        self.assertEqual(find_wobble_seq(self.genome, 74, 80, self.config["codon_table"], self.config["dgn_table"]), "RAANNN")
+        #TODO: Test wobble exceeding genome
+
+    def test_sequences(self):
+        self.assertEqual(str(self.genes["fakA"].cds), "GACTGCAACGGGCAATATGTCTCT")
+        self.assertEqual(str(self.genes["fakD"].cds), "TTCAGAAGCTGCTATCAGACACTC")
 
     def test_leaders(self):
         #Standard leader
@@ -137,6 +161,9 @@ class TestMageTool(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    if "t" in sys.argv:
+        testest()
+
     #suite = unittest.TestLoader().discover("./", pattern="*_tests.py")
     suite = unittest.TestLoader().loadTestsFromTestCase(TestMageTool)
 
