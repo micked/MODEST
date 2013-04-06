@@ -209,6 +209,8 @@ class RBSMonteCarlo:
         Supply target in dG, or "high" to maximise, "low" to minimise
 
         """
+        self.RNAfold = ViennaRNA()
+
         self.original_leader = str(gene.leader).upper()
         self.leader_len = len(gene.leader)
         self.cds = str(gene.cds).upper()
@@ -224,7 +226,7 @@ class RBSMonteCarlo:
             except ValueError:
                 raise ValueError("Could not parse: {} as target dG (use only lower-case for high/low)".format(target))
 
-        self.original_dG = RBS_predict(self.original_leader, self.cds)
+        self.original_dG = RBS_predict(self.original_leader, self.cds, RNAfold=self.RNAfold)
 
         self.wobble = list()
         #Wobble sequences
@@ -367,7 +369,7 @@ class RBSMonteCarlo:
                     raise Exception("Too many attempted moves.")
 
                 #Calculate new total free energy
-                new_dG = RBS_predict("".join(candidate), self.cds)
+                new_dG = RBS_predict("".join(candidate), self.cds, RNAfold=self.RNAfold)
 
                 #Calculate simulation energy
                 new_energy = abs(new_dG - self.target)
@@ -480,7 +482,7 @@ def dG_to_AU(dG):
 RBS Calculator
 """
 
-def RBS_predict(leader, cds, nt_cutoff=35, verbose=False):
+def RBS_predict(leader, cds, nt_cutoff=35, RNAfold=ViennaRNA(), verbose=False):
     """TODO: Create a more solid RBS calculator"""
     #TODO: Calculate these energies based on start tRNA
     start_codon_energies = {"AUG": -1.194,
@@ -524,7 +526,7 @@ def RBS_predict(leader, cds, nt_cutoff=35, verbose=False):
     if cds[0:3] not in start_codon_energies:
         raise ValueError("Invalid start codon in cds: {}".format(cds[0:3]))
 
-    RNAfold = ViennaRNA(2)
+    #RNAfold = ViennaRNA()
 
     """
     Start codon energy
@@ -535,16 +537,16 @@ def RBS_predict(leader, cds, nt_cutoff=35, verbose=False):
     Energy of mRNA folding
     """
     mRNA = leader + cds
-    structure_mRNA, dG_mRNA = RNAfold.fold(mRNA)
+    structure_mRNA, dG_mRNA = RNAfold.fold(mRNA, d=2)
 
     """
     Energy of mRNA:rRNA hybridization & folding
     """
-    mRNA_rRNA_list = RNAfold.subopt(leader, rRNA, e=energy_cutoff, d=2)
+    mRNA_rRNA_list = RNAfold.subopt([leader, rRNA], e=energy_cutoff, d=2)
     calc_dG_spacing = (mRNA_rRNA_list, optimal_spacing, dG_push, dG_pull)
     dG_spacing, bps_mRNA_rRNA = RBS_predict_calc_dG_spacing(*calc_dG_spacing)  
     if not bps_mRNA_rRNA:
-        return 1e12 
+        return 1e12
     
 
     # The rRNA-binding site is between the nucleotides at positions most_5p_mRNA

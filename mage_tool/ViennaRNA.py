@@ -7,6 +7,7 @@ Stephan H. Bernhart, Richard Neubock, and Ivo L. Hofacker (NAR, 2008).
 """
 
 import re
+import os
 from subprocess import Popen, PIPE
 
 
@@ -92,13 +93,13 @@ def basepairing_to_brackets(bp_x, bp_y, seq=None, strands=None):
 
 class ViennaRNA:
 
-    RNAFOLD    = "RNAfold"
-    RNACOFOLD  = "RNAcofold"
-    RNASUBOPT  = "RNAsubopt"
-    RNAEVAL    = "RNAeval"
-
-    def __init__(self, version="auto"):
+    def __init__(self, version="auto", prefix=""):
         """TODO"""
+
+        self.RNAFOLD    = os.path.join(prefix, "RNAfold")
+        self.RNACOFOLD  = os.path.join(prefix, "RNAcofold")
+        self.RNASUBOPT  = os.path.join(prefix, "RNAsubopt")
+        self.RNAEVAL    = os.path.join(prefix, "RNAeval")
 
         self.versions = list()
         #Try native version
@@ -133,30 +134,30 @@ class ViennaRNA:
 
         if version == "auto":
             self.version = self.versions[0]
-            if len(self.versions) > 1:
-                self.fallbackversion = self.versions[1]
+        elif version == "nonnative":
+            if 2 in self.versions:
+                self.version = 2
+            elif 1 in self.versions:
+                self.version = 1
             else:
-                self.fallbackversion = False
+                raise ValueError("No nonnative ViennaRNA found.")
         else:
             if not version in self.versions:
-                raise Exception("Specified ViennaRNA version {} is not availble. Found: {}".format(version, self.versions))
+                raise ValueError("Specified ViennaRNA version {} is not availble. Found: {}".format(version, self.versions))
             self.version = version
 
-    def fold(self, seq, noPS=True, **kwargs):
+    def fold(self, seq, d=1):
         """RNAfold"""
-        version = self.version
 
         if self.version == "native":
-            if not noPS or kwargs:
-                version = self.fallbackversion
-                if not self.fallbackversion:
-                    raise Exception("ViennaRNA native cannot take any arguments, and no fallback available")
-            else:
-                return self.RNA.fold(seq)
+            self.RNA.cvar.dangles = d
+            self.RNA.cvar.cut_point = -1
+            f = self.RNA.fold(seq)
+            self.RNA.free_arrays()
+            return f
 
-        kwargs["noPS"] = noPS
-
-        options = self.versionize_kwargs(version, **kwargs)
+        kwargs = {"noPS": True, "d": d}
+        options = self.versionize_kwargs(kwargs)
 
         output = self.run_command([self.RNAFOLD] + options, seq)
         output = output.splitlines()
@@ -167,23 +168,36 @@ class ViennaRNA:
             print " ".join([self.RNAFOLD] + options)
             return None, None
 
-    def cofold(self, seq, noPS=True, **kwargs):
+    def cofold(self, seqs, d=1):
         """RNAcofold"""
-        version = self.version
+        if type(seqs) is list:
+            seqs = "&".join(seqs)
+
+        cps = seqs.count("&")
+        if cps > 1:
+            raise ValueError("Use maximum 1 cut-point in cofold.")
+        elif cps == 0:
+            return self.fold(seqs, d=d)
 
         if self.version == "native":
-            if not noPS or kwargs:
-                version = self.fallbackversion
-                if not self.fallbackversion:
-                    raise Exception("ViennaRNA native cannot take any arguments, and no fallback available")
-            else:
-                return self.RNA.cofold(seq)
+            self.RNA.cvar.dangles   = d
+            #Find cut point and set
+            cp = seqs.find("&")
+            self.RNA.cvar.cut_point = cp + 1
+            #Erase cut point marker
+            seqs = seqs.replace("&", "")
+            #Fold
+            f = self.RNA.cofold(seqs)
+            #Add cut point back
+            f[0] = self.add_cut_point(f[0], cp)
+            self.RNA.cvar.cut_point = -1
+            return f
 
-        kwargs["noPS"] = noPS
+        kwargs = {"noPS": True, "d": d}
 
-        options = self.versionize_kwargs(version, **kwargs)
+        options = self.versionize_kwargs(kwargs)
 
-        output = self.run_command([self.RNACOFOLD] + options, seq)
+        output = self.run_command([self.RNACOFOLD] + options, seqs)
         output = output.splitlines()
 
         if len(output) > 1:
@@ -191,33 +205,75 @@ class ViennaRNA:
         else:
             return None, None
 
-    def subopt(self, seq1, seq2, **kwargs):
+    def subopt(self, seqs, d=1, e=1):
         """RNAsubopt"""
-        version = self.version
+        if type(seqs) is list:
+            seqs = "&".join(seqs)
+
+        cps = seqs.count("&")
+        if cps > 1:
+            raise ValueError("Use maximum 1 cut-point in subopt.")
 
         if self.version == "native":
-            raise NotImplementedError("No native subopt yet")
+            mfe = self.cofold(seqs, d=d)[1]
 
-        options = self.versionize_kwargs(version, **kwargs)
+            cp = seqs.find("&")
+            self.RNA.cvar.cut_point = -1
+            if cps:
+                self.RNA.cvar.cut_point = cp + 1
+                seqs = seqs.replace("&", "")
 
-        seq = "&".join([seq1, seq2])
-        output = self.run_command([self.RNASUBOPT] + options, seq)
+            self.RNA.cvar.dangles = d
+            sub = self.RNA.subopt(seqs, None, int(round(e*100)))
+
+            output = list()
+            for i in range(sub.size()):
+                if cps:
+                    brackets = self.add_cut_point(sub.get(i).structure, cp)
+                else:
+                    brackets = sub.get(i).structure
+
+                energy = sub.get(i).energy
+
+                #print mfe, e, energy
+
+                if mfe+e > energy:
+                    output.append((brackets, energy))
+
+            return output
+
+        kwargs = {"d": d, "e": e}
+        options = self.versionize_kwargs(kwargs)
+
+        output = self.run_command([self.RNASUBOPT] + options, seqs)
         output = output.splitlines()
 
         if len(output) > 1:
             return [self.output_to_brackets_and_dG(line) for line in output[1:]]
         else:
             return []
-
     
-    def energy(self, seq, brackets, **kwargs):
-        """RNAsubopt"""
-        version = self.version
+    def energy(self, seq, brackets, d=1):
+        """RNAeval"""
+        if type(seq) is list:
+            seq = "&".join(seq)
+
+        if len(seq) != len(brackets):
+            raise ValueError("Sequence and structure have unequal length.")
 
         if self.version == "native":
-            raise NotImplementedError("No native energy yet")
+            cp = seq.find("&")
+            self.RNA.cvar.cut_point = -1
+            if cp != -1:
+                self.RNA.cvar.cut_point = cp + 1
 
-        options = self.versionize_kwargs(version, **kwargs)
+            self.RNA.cvar.dangles = d
+            output = self.RNA.energy_of_struct(seq, brackets)
+            self.RNA.cvar.cut_point = -1
+            return output
+
+        kwargs = {"d": d}
+        options = self.versionize_kwargs(kwargs)
 
         inp = "\n".join([seq, brackets])
         output = self.run_command([self.RNAEVAL] + options, inp)
@@ -228,11 +284,14 @@ class ViennaRNA:
         else:
             return None
 
+    def add_cut_point(self, structure, cp):
+        """Add a cut point (&) to the structure"""
+        return structure[:cp] + "&" + structure[cp:]
 
-    def versionize_kwargs(self, version, **kwargs):
+    def versionize_kwargs(self, kwargs):
         """Turn kwargs into a list of options fitting current version"""
         options = []
-        if version == 2:
+        if self.version == 2:
             for kw in kwargs:
                 if len(kw) == 1:
                     options.append("-" + kw)
@@ -246,7 +305,10 @@ class ViennaRNA:
             for kw in kwargs:
                 options.append("-" + kw)
                 if not (kwargs[kw] is True or kwargs[kw] is False):
-                    options.append(str(kwargs[kw]))
+                    if kw in ["d"]:
+                        options[-1] += str(kwargs[kw])
+                    else:
+                        options.append(str(kwargs[kw]))
 
         return options
 
