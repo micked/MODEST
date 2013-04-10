@@ -14,7 +14,7 @@ from helpers import valid_dna
 from helpers import valid_rna
 from helpers import valid_dgn
 from helpers import reverse_complement
-from helpers import degenerate_nucleotides
+from helpers import dgn_to_nts
 
 #Define a log
 log = logging.getLogger("MODEST.oligo")
@@ -391,226 +391,265 @@ class Gene:
 
 class Sequence:
     """Sequence object"""
-    def __init__(self, seq):
-        seq = str(seq).upper()
-        self.wbunits = list()
+    def __init__(self, s):
+        seq = str(s).upper()
+        self.org_seq = seq
 
-        if valid_dna(seq):
-            self.typ = 1
-            self.type = "DNA"
-        # elif valid_rna(seq):
-        #     self.typ = 2
-        #     self.type = "RNA"
-        else:
-            raise ValueError("Invalid sequence: {}".format(seq))
+        self.type = "DNA"
+        if "U" in seq:
+            self.type = "RNA"
+            seq = seq.replace("U", "T")
 
-        self.seql = dict()
-        for i, n in enumerate(seq):
-            self.seql[(i, 0)] = [n, n]
+        if not valid_dna(seq):
+            raise ValueError("Invalid {}: {}.".format(self.type, s))
 
-        self.mutations = dict()
-        self.positions = sorted(self.seql.keys())
+        self.seq = {i: [[nt, nt]] for i, nt in enumerate(seq)}
+        self.seql = [(i, 0) for i in range(len(seq))]
+        self.wobbles = list()
+        self.mutations = {i: ["n"] for i in range(len(seq))}
+
+    """
+    Wobble methods
+    ~~~~~~~~~~~~~~
+    """
+
+    class Wobble:
+        def __init__(self, wbseq, pos, seq_len):
+            self.seq = str(wbseq).upper()
+            if not valid_dgn(self.seq):
+                raise ValueError("Invalid wobble sequence: {}".format(wbseq))
+
+            self.start  = pos
+            if pos < 0:
+                self.seq = self.seq[-pos:]
+                self.start = 0
+
+            self.end    = pos + len(wbseq)
+            self.offset = 0
+            self.stop   = seq_len
+            self.allowed = [dgn_to_nts[nt] for nt in self.seq]
+
+        def slc(self):
+            return self.start+self.offset, min(self.end+self.offset, self.stop)
+        
+        def range(self): return range(*self.slc())
+        def lt(self, i): return i < self.start + self.offset
+
+        def __lt__(self, other): return self.start <  other.start
+        def __gt__(self, other): return self.start >  other.start
+        def __le__(self, other): return self.start <= other.start
+        def __ge__(self, other): return self.start >= other.start
+
+        def __str__(self): return self.seq
+        def __repr__(self):
+            fmtargs = (self.start, self.end, self.offset, self.seq)
+            return "wobble({}..{}+{}: {})".format(*fmtargs)
+
+        def __getitem__(self, i):
+            return self.allowed[i - self.start + self.offset]
+
+        def __contains__(self, i):
+            return self.start + self.offset <= i < self.end + self.offset
 
     def add_wobble(self, wbseq, pos):
-        """Add a wobble unit"""
-        wbl = WobbleSequence(wbseq, pos)
-        if self.test_wobble(wbl):
-            self.wbunits.append(wbl)
-            self.wbunits.sort(key=lambda wbl: wbl.start)
-        else:
+        wbl = self.Wobble(wbseq, pos, len(self))
+        if not self.test_wobble(wbl):
             raise ValueError("Wobble does not match seq: {}".format(wbseq))
 
+        self.wobbles.append(wbl)
+        self.wobbles.sort()
+
     def test_wobble(self, wbl):
-        """Test a single wobble sequence"""
-        st, nd = wbl.range()
-        for i, n in enumerate(self[st:nd], st):
-            if n not in wbl.possible[i]:
+        for i in wbl.range():
+            if self[i] not in wbl[i]:
                 return False
         return True
+
+    """
+    Mutation methods
+    ~~~~~~~~~~~~~~~~
+    """
+
+    def mutate(self, nt, a, b=None):
+        pass
+        #TODO: Run random mutations, extract mutations, apply mutations
+        #and verify
+
+    def delete(self, a, b=None):
+        if b is None:
+            c = a
+            a, b = self.seql[a]
+        else:
+            #Nonexistant
+            if (a, b) not in self.seql:
+                return False
+            c = self.seql.index((a, b))
+
+        #Inside wobble, abort
+        for wbl in self.wobbles:
+            if c in wbl:
+                return False
+
+        #Already deleted
+        if self.seq[a][b][0] == "-":
+            return False
+
+        new = self.copy()
+
+        for wbl in new.wobbles:
+            if wbl.lt(c): wbl.offset -= 1
+
+        #Deleting insertion
+        if len(new.seq[a]) > 1:
+            nt = new.seq[a][b][0] 
+            del(new.seq[a][b])
+            del(new.seql[c])
+            #Mutation list change
+            del(new.mutations[a][b])
+            if b == 0:
+                #Convert old insertion to deletion
+                if nt != new.seq[a][b][0]:
+                    new.mutations[a][b] = "m"
+                #Insertion is equal to origital nt
+                else:
+                    new.mutations[a][b] = "n"
+                new.seq[a][b][1] = nt
+            return new
+
+        #Prev mut is an insertion
+        #Delete insertion and convert current position to a mutation
+        if len(new.seq[a-1]) > 0:
+            e = len(new.seq[a-1]) - 1
+            nt = new.seq[a-1][e][0]
+            del(new.seq[a-1][e])
+            del(new.seql[c-1])
+            del(new.mutations[a-1][e])
+            m = "m"
+            #Reverted to original
+            if nt == new.seq[a][b][1]:
+                m = "n"
+            new.seq[a][b][0] = nt
+            new.mutations[a][b] = m
+            return new
+
+        #Normal deletion
+        new.seq[a][b][0] = "-"
+        del(new.seql[c])
+        new.mutations[a] = ["d"]
+        return new
+
+    def insert(self, nt, a, b=None):
+        if nt not in ["A", "T", "G", "C"] or len(nt) != 1:
+            raise MutationError("{} is not a single DNA nucleotide!".format(nt))
+            
+        if b is None:
+            c = a
+            a, b = self.seql[a]
+        else:
+            #Nonexistant
+            if (a, b) not in self.seql:
+                return False
+            c = self.seql.index((a, b))
+
+        #Inside wobble, abort
+        for wbl in self.wobbles:
+            if c in wbl:
+                return False
+
+        new = self.copy()
+
+        for wbl in new.wobbles:
+            if wbl.lt(c): wbl.offset += 1
+
+        #Inserting into deletion
+        if new.seq[a-1][0][0] == "-":
+            e = a - 1
+            while e != 0 and new.seq[e-1][0][0] == "-":
+                e -= 1
+            #Convert deletion to insertion
+            new.seq[e][0][0] = nt
+            if new.seq[e][0][1] != nt:
+                new.mutations[e] = ["m"]
+            else:
+                new.mutations[e] = ["n"]
+            new.seql.insert(c, (e, 0))
+            return new
+
+        #Inserting into insertions
+        if b > 0:
+            e = len(new.seq[a])
+            new.seq[a].insert(b, [nt, "-"])
+            new.mutations[a].insert(b, "i")
+            new.seql.insert(c-b+e, (a, e))
+            return new
+
+        #No other insertions
+        if len(new.seq[a-1]) == 1:
+            new.seq[a-1].append([nt, "-"])
+            new.mutations[a-1].append("i")
+            new.seql.insert(c, (a-1, 1))
+            return new
+
+        #Inserting into end of insertions
+        e = len(new.seq[a-1])
+        new.seq[a-1].append([nt, "-"])
+        new.mutations[a-1].append("i")
+        new.seql.insert(c, (a-1, b+e))
+        return new
+
+
+    """
+    Other
+    ~~~~~
+    """
+
+    def mutated_str(self):
+        return "".join([nt[0] for i, nts in sorted(self.seq.items()) for nt in nts])
+
+    def mutation_str(self):
+        l = list()
+        for a in sorted(self.seq):
+            for b in range(len(self.seq[a])):
+                if b == 0 and self.mutations[a][b] == "n":
+                    l.append(" ")
+                else:
+                    l.append(self.mutations[a][b])
+        return "".join(l)
+
+    def original_str(self):
+        return "".join([nt[1] for i, nts in sorted(self.seq.items()) for nt in nts])
+
+    def __str__(self):
+        #return self.org_seq
+        return "".join([str(nt) for nt in self])
+
+    def __iter__(self):
+        for i, nts in sorted(self.seq.items()):
+            for mut, org in nts:
+                if mut != "-": yield mut
+
+    def __getitem__(self, a, b=None):
+        if b is None:
+            a, b = self.seql[a]
+        return self.seq[a][b][0]
 
     def __len__(self):
         return len(self.seql)
 
-    def __getitem__(self, slc):
-        if type(slc) is slice:            
-            return self.get_seq()[slc]
-        elif type(slc) is int:
-            return self.seql[(slc, 0)][0]
-        elif type(slc) is tuple:
-            return self.seql[slc][0]
-        else:
-            raise ValueError("Invalid key: {}/type: {}. Allowed: slice, int, tuple.".format(slc, type(slc)))
-
-    def __str__(self):
-        return self.seq
-
     def copy(self):
         return deepcopy(self)
 
-    def pprint(self, w_numbers=False):
-        """Pretty print"""
-        start = min(self.wbunits[0].start, 0) * -1 if self.wbunits else 0
-        #Original sequence
-        org_seq = self.get_original_seq()
-        if w_numbers:
-            print("     " + " " * start, end="")
-            i = 0
-            for j, n in enumerate(org_seq):
-                if j % 5 == 0: print("{:<5}".format(i), end="")
-                if n != "-": i += 1
-            print()
-
-        print("ORG: " + " " * start, end="")
-        print(org_seq)
-
-        #Mutated sequence
-        mut_seq = self.get_mutated_seq()
-        if w_numbers:
-            print("     " + " " * start, end="")
-            i = 0
-            for j, n in enumerate(mut_seq):
-                if j % 5 == 0: print("{:<5}".format(i), end="")
-                if n != "-": i += 1
-            print()
-
-        print("MUT: " + " " * start, end="")
-        print(mut_seq)
-
-        #Wobble sequences
-        if self.wbunits:
-            print("WBL: " + " " * max(self.wbunits[0].start, 0), end="")
-            last_end = 0
-            for wbl in self.wbunits:
-                diff = max(wbl.start - last_end, 0)
-                print(" "*diff, end="")
-                print(wbl, end="")
-                last_end = wbl.end
-            print()
-
-    def mutate(self, pos, n):
-        """Mutate pos to n"""
-        if len(n) != 1:
-            raise ValueError("Only point mutations allowed in mutate() (len(n) != 0)")
-
-        pos, abs_pos = self.get_abs_pos(pos)
-        if pos is None: return False
-
-        for wbl in self.wbunits:
-            if n not in wbl[abs_pos]:
-                return False
-
-        if self.seql[pos][0] == n:
-            return False
-
-        self.seql[pos][0] = n
-
-        if self.seql[pos][1] == n:
-            del(self.mutations[pos])
-        else:
-            self.mutations[pos] = n
-
-        return True
-
-    def delete(self, pos):
-        """Delete pos"""
-        pos, abs_pos = self.get_abs_pos(pos)
-        if pos is None: return False
-
-        #Check whether insert is inside a wobble
-        for wbl in self.wbunits:
-            if abs_pos in wbl:
-                return False
-
-        #Already deleted
-        if self.seql[pos][0] == "-":
-            return False
-
-        self.seql[pos][0] = "-"
-        self.mutations[pos] = "deletion"
-        del(self.positions[abs_pos])
-        #TODO: insert stuff
-
-        for wbl in self.wbunits:
-            if abs_pos < wbl:
-                wbl.offset -= 1
-
-        return True
-
-    def get_abs_pos(self, pos):
-        """Get absolute and index position from unknown pos"""
-        if type(pos) is int:
-            abs_pos = pos
-            try:
-                pos = self.positions[pos]
-            except IndexError:
-                return None, None
-        elif type(pos) is tuple:
-            try:
-                abs_pos = self.positions.index(pos)
-            except ValueError:
-                return None, None
-        else:
-            raise ValueError("pos can only be int or tuple in mutation(). Found: {}".format(type(pos)))
-
-        return pos, abs_pos
-
-
-    def get_seq(self):
-        """Set seq string"""
-        return "".join([self.seql[pos][0] for pos in sorted(self.seql) if self.seql[pos][0] != "-"])
-        #self.positions = [x for x in sorted(self.seql) if self.seql[x][0] != "-"]
-
-    def get_original_seq(self):
-        """Original sequence including gaps"""
-        return "".join([self.seql[pos][1] for pos in sorted(self.seql)])
-
-    def get_mutated_seq(self):
-        """Mutated sequence including gaps"""
-        return "".join([self.seql[pos][0] for pos in sorted(self.seql)])
-
-
-class WobbleSequence:
-    """Wobble sequence object"""
-
-    nucleotides = set(["A", "T", "G", "C"])
-
-    def __init__(self, wbseq, pos):
-        self.seq = str(wbseq).upper()
-        if not valid_dgn(self.seq):
-            raise ValueError("Invalid wobble sequence: {}".format(wbseq))
-
-        self.start = pos
-        self.end   = pos + len(wbseq)
-
-        self.offset = 0
-
-        self.possible = dict()
-        for i, n in enumerate(self.seq, pos):
-            if n in ["A", "T", "G", "C"]:
-                self.possible[i] = [n]
-            else:    
-                self.possible[i] = degenerate_nucleotides[n]
-
-    def range(self):
-        return (max(self.start + self.offset, 0), self.end + self.offset)
-
-    def __str__(self):
-        return self.seq
-
-    def __repr__(self):
-        return "wobble({}..{}: {})".format(self.start, self.end, self.seq)
-
-    def __getitem__(self, i):
-        if self.start + self.offset <= i < self.end + self.offset:
-            return self.possible[i - self.offset]
-        else:
-            return self.nucleotides
-
-    def __contains__(self, i):
-        return self.start + self.offset <= i < self.end + self.offset
-
-    def __gt__(self, i):
-        return i < self.start + self.offset
+    def pprint(self):
+        mut_str = self.mutation_str()
+        print(mut_str)
+        print(self.original_str())
+        print(self.mutated_str())
+        gp = 0
+        for wbl in self.wobbles:
+            inst = sum([n.count("i") for i,n in self.mutations.items() if wbl.lt(i)])
+            print(" "*(wbl.start - gp + inst) + str(wbl), end="")
+            gp = wbl.end
+        print()
 
 
 class MutationError(ValueError): pass

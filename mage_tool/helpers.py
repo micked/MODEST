@@ -7,19 +7,26 @@ Constants
 
 amino_acids = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y']
 
-degenerate_nucleotides = {
-    "R": ["A", "G"],
-    "M": ["A", "C"],
-    "Y": ["C", "T"],
-    "K": ["G", "T"],
-    "S": ["C", "G"],
-    "W": ["A", "T"],
-    "B": ["C", "G", "T"],
-    "D": ["A", "G", "T"],
-    "H": ["A", "C", "T"],
-    "V": ["A", "C", "G"],
-    "N": ["A", "C", "G", "T"]
-}
+degenerate_nucleotides = (
+    ("A", frozenset(["A"])),
+    ("T", frozenset(["T"])),
+    ("G", frozenset(["G"])),
+    ("C", frozenset(["C"])),
+    ("R", frozenset(["A", "G"])),
+    ("M", frozenset(["A", "C"])),
+    ("Y", frozenset(["C", "T"])),
+    ("K", frozenset(["G", "T"])),
+    ("S", frozenset(["C", "G"])),
+    ("W", frozenset(["A", "T"])),
+    ("B", frozenset(["C", "G", "T"])),
+    ("D", frozenset(["A", "G", "T"])),
+    ("H", frozenset(["A", "C", "T"])),
+    ("V", frozenset(["A", "C", "G"])),
+    ("N", frozenset(["A", "C", "G", "T"]))
+)
+
+nts_to_dgn = {nts: dgn for dgn, nts in degenerate_nucleotides}
+dgn_to_nts = {dgn: nts for dgn, nts in degenerate_nucleotides}
 
 """
 DNA string tools
@@ -130,26 +137,8 @@ def seqs_to_degenerate(seqs):
 
         tested.append(seq)
 
-    dgn_lookup = {
-        frozenset(["A"]): "A",
-        frozenset(["T"]): "T",
-        frozenset(["G"]): "G",
-        frozenset(["C"]): "C",
-        frozenset(["A", "G"]): "R",
-        frozenset(["A", "C"]): "M",
-        frozenset(["C", "T"]): "Y",
-        frozenset(["G", "T"]): "K",
-        frozenset(["C", "G"]): "S",
-        frozenset(["A", "T"]): "W",
-        frozenset(["C", "G", "T"]): "B",
-        frozenset(["A", "G", "T"]): "D",
-        frozenset(["A", "C", "T"]): "H",
-        frozenset(["A", "C", "G"]): "V",
-        frozenset(["A", "C", "G", "T"]): "N"
-    }
-
     dgn_seq = list()
     for pool in zip(*seqs):
-        dgn_seq.append(dgn_lookup[frozenset(pool)])
+        dgn_seq.append(nts_to_dgn[frozenset(pool)])
 
     return "".join(dgn_seq)

@@ -9,11 +9,11 @@ from __future__ import print_function
 import random
 import math
 
-from mutation_tools import find_mutation_box
-from mutation_tools import compare_seqs
-from oligo_design import Mutation
-from helpers import degenerate_nucleotides
+from helpers import dgn_to_nts
 from helpers import valid_rna
+from oligo_design import Mutation
+from mutation_tools import compare_seqs
+from mutation_tools import find_mutation_box
 from ViennaRNA import ViennaRNA
 from ViennaRNA import brackets_to_basepairing
 from ViennaRNA import basepairing_to_brackets
@@ -234,7 +234,7 @@ class RBSMonteCarlo:
             if N in ["A", "T", "G", "C"]:
                 self.wobble.append(False)
             else:
-                self.wobble.append(degenerate_nucleotides[N])
+                self.wobble.append(dgn_to_nts[N])
 
         if not any(self.wobble):
             raise ValueError("Wobble sequnce [{}] has no possibility for mutation.".format(gene.leader_wobble))
