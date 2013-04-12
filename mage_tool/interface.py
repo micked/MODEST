@@ -10,7 +10,7 @@ import signal
 
 from oligo_design import Oligo
 import translation
-import custom
+import manual
 
 #Define a log
 log = logging.getLogger("MODEST")
@@ -203,7 +203,7 @@ Custom Mutations
 ~~~~~~~~~~~~~~~~
 """
 
-def custom_mutation(gene, op, config, mut):
+def gene_mutation(gene, op, config, mut):
     """Allows for a desired mutation.
 
     Options:
@@ -213,12 +213,12 @@ def custom_mutation(gene, op, config, mut):
     TATCAACGCC\ **GCTCG**\ CTTTCATGACT to TATCAACGCC\ **A**\ GCTTTCATGACT.
 
     """
-    mut = custom.custom_mutation(gene, mut)
+    mut = manual.gene_mutation(gene, mut)
     if not mut:
         log.debug(op + " Not mutating, did not find mutation box")
         return []
         
-    code = "CustomMut"
+    code = "GeneMut"
     return [(mut, code, op, [])]
 
 
@@ -361,7 +361,7 @@ OPERATIONS = {
                                            "n": (int, 10),
                                            "max_mutations": (int, 10),
                                            "passes": (int, 1)}),
-    "custom_mutation":      (custom_mutation, {"mut": (str, "[=]")})
+    "gene_mutation":      (gene_mutation, {"mut": (str, "[=]")})
     }
 
 
