@@ -390,10 +390,19 @@ class Gene:
 
 
 class Sequence:
-    """Sequence object"""
+    """A DNA sequence object.
+
+    A Sequence is a simple DNA sequence object with various mutation methods.
+
+        >>> s = Sequence("AACGGCACAGGAGTTGGCG")
+
+    The mutation methods keep track of what positions are mutated
+
+    """
     def __init__(self, s):
         seq = str(s).upper()
         self.org_seq = seq
+        self.org_len = len(seq)
 
         self.type = "DNA"
         if "U" in seq:
@@ -446,7 +455,7 @@ class Sequence:
             return "wobble({}..{}+{}: {})".format(*fmtargs)
 
         def __getitem__(self, i):
-            return self.allowed[i - self.start + self.offset]
+            return self.allowed[i - self.start - self.offset]
 
         def __contains__(self, i):
             return self.start + self.offset <= i < self.end + self.offset
@@ -470,12 +479,40 @@ class Sequence:
     ~~~~~~~~~~~~~~~~
     """
 
-    def mutate(self, nt, a, b=None):
-        pass
-        #TODO: Run random mutations, extract mutations, apply mutations
-        #and verify
+    def mutate(self, nt, a, b=None, in_place=True):
+        if nt not in ["A", "T", "G", "C"] or len(nt) != 1:
+            raise MutationError("{} is not a single DNA nucleotide!".format(nt))
+            
+        if b is None:
+            c = a
+            a, b = self.seql[a]
+        else:
+            #Nonexistant
+            if (a, b) not in self.seql:
+                return False
+            c = self.seql.index((a, b))
 
-    def delete(self, a, b=None):
+        if self.seq[a][b][0] == nt:
+            return False
+
+        new = self
+        if not in_place:
+            new = self.copy()
+
+        for wbl in new.wobbles:
+            if c in wbl and nt not in wbl[c]:
+                return False
+
+        new.seq[a][b][0] = nt
+        if b == 0:
+            if new.seq[a][b][1] == nt:
+                new.mutations[a][b] = "n"
+            else:
+                new.mutations[a][b] = "m"
+
+        return new
+
+    def delete(self, a, b=None, in_place=True):
         if b is None:
             c = a
             a, b = self.seql[a]
@@ -494,7 +531,9 @@ class Sequence:
         if self.seq[a][b][0] == "-":
             return False
 
-        new = self.copy()
+        new = self
+        if not in_place:
+            new = self.copy()
 
         for wbl in new.wobbles:
             if wbl.lt(c): wbl.offset -= 1
@@ -518,7 +557,7 @@ class Sequence:
 
         #Prev mut is an insertion
         #Delete insertion and convert current position to a mutation
-        if len(new.seq[a-1]) > 0:
+        if len(new.seq[a-1]) > 1:
             e = len(new.seq[a-1]) - 1
             nt = new.seq[a-1][e][0]
             del(new.seq[a-1][e])
@@ -538,13 +577,16 @@ class Sequence:
         new.mutations[a] = ["d"]
         return new
 
-    def insert(self, nt, a, b=None):
+    def insert(self, nt, a, b=None, in_place=True):
         if nt not in ["A", "T", "G", "C"] or len(nt) != 1:
             raise MutationError("{} is not a single DNA nucleotide!".format(nt))
             
         if b is None:
             c = a
-            a, b = self.seql[a]
+            try:
+                a, b = self.seql[a]
+            except IndexError:
+                return False
         else:
             #Nonexistant
             if (a, b) not in self.seql:
@@ -556,7 +598,9 @@ class Sequence:
             if c in wbl:
                 return False
 
-        new = self.copy()
+        new = self
+        if not in_place:
+            new = self.copy()
 
         for wbl in new.wobbles:
             if wbl.lt(c): wbl.offset += 1
@@ -597,16 +641,177 @@ class Sequence:
         new.seql.insert(c, (a-1, b+e))
         return new
 
+    def do_mutations(self, *muts):
+        """Perform a mutation in the form of ("[m|i|d]", p, nt).
+
+        Any number of mutations can be supplied:
+
+            >>> s = Sequence("ATGC")
+            >>> f = s.do_mutations(("m", 0, "T"), ("m", 1, "T"), ("m", 2, "T"))
+            >>> str(s)
+            'TTTC'
+
+        Returns number of failed mutations:
+
+            >>> f
+            1
+
+        """
+        f = 0
+        for mut in muts:
+            if mut[0] == "m":
+                if not self.mutate(mut[2], mut[1], in_place=True): f += 1
+            elif mut[0] == "i":
+                if not self.insert(mut[2], mut[1], in_place=True): f += 1
+            elif mut[0] == "d":
+                if not self.delete(mut[1], in_place=True): f += 1
+            else:
+                raise MutationError("Invalid mutation code: {}".format(mut[0]))
+
+        return f
+
+    def optimise_mutations(self, penalty_mid=(2,3,3), in_place=True):
+        """Try to remove insertions and deletions for a better alignment.
+
+        When doing lots of deletions and insertions, one may end up with a
+        sequence that has a lot of mutations in it, rather than insertions/
+        deletions:
+
+            >>> s = Sequence("AACGGCACAGTTGCTGGAAATTGCAGGAGTTGGCG")
+            >>> s.do_mutations(("i", 18, "A"), ("i", 18, "T"), ("i", 18, "C"),
+            ...                ("m", 21, "T"), ("m", 22, "T"), ("d", 23), ("d", 23))
+            0
+            >>> str(s)
+            'AACGGCACAGTTGCTGGACTATTGCAGGAGTTGGCG'
+            >>> s.get_mutation()
+            Mutation: [AATT=ctatt] at pos 18
+            >>> s = s.optimise_mutations()
+            >>> str(s)
+            'AACGGCACAGTTGCTGGACTATTGCAGGAGTTGGCG'
+            >>> s.get_mutation()
+            Mutation: [A=ct] at pos 18
+
+        """
+        insr = self.get_insertions()
+        dels = self.get_deletions()
+        if not insr or not dels:
+            return self
+
+        st = min(insr[0][0], dels[0][0])
+        nd = max(insr[-1][0], dels[-1][0]) + 1
+        mut_seq = ["0"] + [nt[0] for a in range(st, nd) for nt in self.seq[a] if nt[0] != "-"]
+        org_seq = ["0"] + [nt[1] for a in range(st, nd) for nt in self.seq[a] if nt[1] != "-"]
+
+        p_mis, p_ins, p_del = penalty_mid
+
+        mat = list()#[[(0, -1)]]
+        for i, m in enumerate(mut_seq):
+            row = list()
+            mat.append(row)
+            for j, o in enumerate(org_seq):
+                if i > 0 and j > 0:
+                    score = 0 if m == o else p_mis    
+                    c_mis = (mat[i-1][j-1][0] + score, 0)
+                    c_ins = (mat[i][j-1][0]   + p_ins, 1)
+                    c_del = (mat[i-1][j][0]   + p_del, 2)
+                    row.append(min(c_mis, c_ins, c_del))
+                elif i == 0 and j == 0:
+                    row.append((0, 0))
+                elif i == 0:
+                    row.append((mat[i][j-1][0]   + p_ins, 1))
+                elif j == 0:
+                    row.append((mat[i-1][j][0]   + p_del, 2))
+
+        new = self
+        if not in_place:
+            new = self.copy()
+
+        for a in range(st, nd):
+            new.seq[a] = [["-", "-"]]
+            new.mutations[a] = ["n"]
+        b = 0
+        i, j = len(mat)-1, len(mat[0])-1
+
+        while i or j:
+            score, v = mat[i][j]
+            a = nd-len(org_seq)+j
+            if v == 0:
+                b = 0
+                new.seq[a][b] = [mut_seq[i], org_seq[j]]
+                if mut_seq[i] != org_seq[j]:
+                    new.mutations[a][b] = "m"
+                i -= 1
+                j -= 1
+            elif v == 1:
+                b = 0
+                new.seq[a][b] = ["-", org_seq[j]]
+                new.mutations[a][b] = "d"
+                j -= 1
+            elif v == 2:
+                b += 1
+                new.seq[a].insert(1, [mut_seq[i], "-"])
+                new.mutations[a].insert(1, "i")
+                i -= 1
+
+        new.seql = [(a, b) for a in range(new.org_len) for b in range(len(new.seq[a]))]
+
+        return new
 
     """
     Other
     ~~~~~
     """
 
-    def mutated_str(self):
+    def get_mutation(self):
+        """Returns a mutation object relative to the sequence"""
+        muts = self.get_mutated_positions()
+        insertions = len(self.get_insertions())
+        deletions  = len(self.get_deletions())
+
+        start = sum(muts[0])
+        end   = muts[-1][0]
+
+        #Before mutation
+        before = self.org_seq[start:end+1]
+
+        #After mutation. Lowercase all mutations
+        after  = ""
+        for p in self.seql[start:end+insertions-deletions+1]:
+            a, b = p
+            if p in muts:
+                after += self.seq[a][b][0].lower()
+            else:
+                after += self.seq[a][b][0].upper()
+
+        #Mutation object
+        mut = "[{}={}]".format(before, after)
+        mut = Mutation("eq", mut, start)
+        return mut
+
+    def get_mutated_positions(self):
+        """Return a list coordinates for all mutated positions"""
+        return [(a,b) for a in range(self.org_len)
+                      for b in range(len(self.seq[a]))
+                      if  self.mutations[a][b] != "n"]
+
+    def get_deletions(self):
+        """Return a list of coordinates for all deletions"""
+        return [(a,b) for a in range(self.org_len)
+                      for b in range(len(self.seq[a]))
+                      if  self.mutations[a][b] == "d"]
+
+    def get_insertions(self):
+        """Return a list of coordinates for all insertions"""
+        return [(a,b) for a in range(self.org_len)
+                      for b in range(len(self.seq[a]))
+                      if  self.mutations[a][b] == "i"]
+
+    def get_mutated_str(self):
+        """Mutated string with deletions marked with '-'. """
         return "".join([nt[0] for i, nts in sorted(self.seq.items()) for nt in nts])
 
-    def mutation_str(self):
+    def get_mutation_str(self):
+        """A string of one-symbol mutations."""
         l = list()
         for a in sorted(self.seq):
             for b in range(len(self.seq[a])):
@@ -614,18 +819,19 @@ class Sequence:
                     l.append(" ")
                 else:
                     l.append(self.mutations[a][b])
+
         return "".join(l)
 
-    def original_str(self):
+    def get_original_str(self):
+        """Original sequence with insertions marked with '-'. """
         return "".join([nt[1] for i, nts in sorted(self.seq.items()) for nt in nts])
 
     def __str__(self):
-        #return self.org_seq
         return "".join([str(nt) for nt in self])
 
     def __iter__(self):
-        for i, nts in sorted(self.seq.items()):
-            for mut, org in nts:
+        for i in xrange(self.org_len):
+            for mut, org in self.seq[i]:
                 if mut != "-": yield mut
 
     def __getitem__(self, a, b=None):
@@ -637,19 +843,36 @@ class Sequence:
         return len(self.seql)
 
     def copy(self):
+        """A function that can be optimised a lot."""
         return deepcopy(self)
 
-    def pprint(self):
-        mut_str = self.mutation_str()
-        print(mut_str)
-        print(self.original_str())
-        print(self.mutated_str())
-        gp = 0
-        for wbl in self.wobbles:
-            inst = sum([n.count("i") for i,n in self.mutations.items() if wbl.lt(i)])
-            print(" "*(wbl.start - gp + inst) + str(wbl), end="")
-            gp = wbl.end
-        print()
+    def pprint(self, org=True):
+        """Pretty print sequence with wobbles.
+
+        Set org=True, to print original sequence, set to False to print only
+        mutated sequence.
+
+        """
+        if org:
+            mut_str = self.get_mutation_str()
+            print("MUT:", mut_str)
+            print("ORG:", self.get_original_str())
+            print("NEW:", self.get_mutated_str())
+            if self.wobbles:
+                print("WBL: ", end="")
+                gp = 0
+                for wbl in self.wobbles:
+                    inst = sum([n.count("i") for i,n in self.mutations.items() if wbl.lt(i)])
+                    print(" "*(wbl.start - gp + inst) + str(wbl), end="")
+                    gp = wbl.end
+                print()
+        else:
+            print(self)
+            gp = 0
+            for wbl in self.wobbles:
+                print(" "*(wbl.start - gp + wbl.offset) + str(wbl), end="")
+                gp = wbl.end
+            print()
 
 
 class MutationError(ValueError): pass
