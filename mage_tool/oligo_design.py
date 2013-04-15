@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 
 """
 Module for designing DNA oligos from mutation objects
@@ -6,15 +5,18 @@ Module for designing DNA oligos from mutation objects
 
 from __future__ import print_function
 
+import random
 import logging
 from copy import deepcopy
 
 import ViennaRNA
+from helpers import is_inside
 from helpers import valid_dna
 from helpers import valid_rna
 from helpers import valid_dgn
 from helpers import reverse_complement
 from helpers import dgn_to_nts
+from helpers import nts_to_dgn
 
 #Define a log
 log = logging.getLogger("MODEST.oligo")
@@ -423,23 +425,26 @@ class Sequence:
     """
 
     class Wobble:
-        def __init__(self, wbseq, pos, seq_len):
+        def __init__(self, wbseq, pos, seq_len=None):
             self.seq = str(wbseq).upper()
             if not valid_dgn(self.seq):
                 raise ValueError("Invalid wobble sequence: {}".format(wbseq))
 
-            self.start  = pos
+            self.start = pos
             if pos < 0:
                 self.seq = self.seq[-pos:]
                 self.start = 0
 
-            self.end    = pos + len(wbseq)
+            self.end = pos + len(wbseq)
+            if seq_len and self.end > seq_len:
+                self.seq = self.seq[:seq_len - pos]
+                self.end = seq_len
+
             self.offset = 0
-            self.stop   = seq_len
             self.allowed = [dgn_to_nts[nt] for nt in self.seq]
 
         def slc(self):
-            return self.start+self.offset, min(self.end+self.offset, self.stop)
+            return self.start+self.offset, self.end+self.offset
         
         def range(self): return range(*self.slc())
         def lt(self, i): return i < self.start + self.offset
@@ -453,6 +458,7 @@ class Sequence:
         def __repr__(self):
             fmtargs = (self.start, self.end, self.offset, self.seq)
             return "wobble({}..{}+{}: {})".format(*fmtargs)
+        def __int__(self): return self.start + self.offset
 
         def __getitem__(self, i):
             return self.allowed[i - self.start - self.offset]
@@ -460,19 +466,72 @@ class Sequence:
         def __contains__(self, i):
             return self.start + self.offset <= i < self.end + self.offset
 
+        def __add__(self, other):
+            """Add two wobbles and find common consensus.
+
+                >>> w1 = Sequence.Wobble("CDGN", 2)
+                >>> w2 = Sequence.Wobble( "NGCNCA", 3)
+                >>> w1 + w2
+                wobble(2..9+0: CDGCNCA)
+
+                >>> w3 = Sequence.Wobble("CACNGCNCA", 0)
+                >>> w3
+                wobble(0..9+0: CACNGCNCA)
+                >>> w1 + w3
+                wobble(0..9+0: CACDGCNCA)
+
+            """
+            #Wobble start, intersection start
+            st, i_st = sorted([self, other], key=lambda w: w.start)
+            #Intersection end, wobble end
+            i_nd, nd = sorted([self, other], key=lambda w: w.end)
+
+            seq = st.seq[:i_st.start - st.start]
+
+            for i in range(i_st.start, i_nd.end):
+                common = self[i] & other[i]
+                if not common: raise ValueError("Incompatible wobble sequences: {}, {}".format(self, other))
+                seq += nts_to_dgn[common]
+
+            seq += nd.seq[i_nd.end - nd.start:nd.end - nd.start]
+
+            return Sequence.Wobble(seq, st.start)
+
     def add_wobble(self, wbseq, pos):
+        """Add a wobble sequence to the sequence."""
         wbl = self.Wobble(wbseq, pos, len(self))
         if not self.test_wobble(wbl):
             raise ValueError("Wobble does not match seq: {}".format(wbseq))
+
+        for i in range(len(self.wobbles)):
+            o_wbl = self.wobbles[i]
+            if is_inside(o_wbl.start, o_wbl.end, wbl.start, wbl.end):
+                self.wobbles[i] += wbl
+                return
 
         self.wobbles.append(wbl)
         self.wobbles.sort()
 
     def test_wobble(self, wbl):
+        """Test a wobble sequence against the sequence."""
         for i in wbl.range():
             if self[i] not in wbl[i]:
                 return False
         return True
+
+    def get_wobble(self, i):
+        """Returns a list of possible codons at pos i."""
+        for wbl in self.wobbles:
+            if i in wbl:
+                return wbl[i]
+
+        #Run-out, return False to distinguish between N and no wbl.
+        return False
+
+    def reverse_complement(self):
+        """TODO"""
+        pass
+
 
     """
     Mutation methods
@@ -480,6 +539,28 @@ class Sequence:
     """
 
     def mutate(self, nt, a, b=None, in_place=True):
+        """Do a point mutation.
+
+        Supply only a to mutate an absolute position:
+
+            >>> s = Sequence("ATGC")
+            >>> s.insert("A", 3, in_place=True)
+            ATGAC
+            >>> s.mutate("T", 3, in_place=False)
+            ATGTC
+
+        Supply both a and b to mutate in a specific position:
+
+            >>> s.mutate("T", 3, 0, in_place=False)
+            ATGAT
+
+        Mutation methods return False if mutation is not possible, returns the
+        new sequence otherwise:
+
+            >>> s.mutate("A", 0, in_place=False)
+            False
+
+        """
         if nt not in ["A", "T", "G", "C"] or len(nt) != 1:
             raise MutationError("{} is not a single DNA nucleotide!".format(nt))
             
@@ -513,6 +594,11 @@ class Sequence:
         return new
 
     def delete(self, a, b=None, in_place=True):
+        """Delete a position.
+
+        Behaves similarly to mutate()
+
+        """
         if b is None:
             c = a
             a, b = self.seql[a]
@@ -557,7 +643,7 @@ class Sequence:
 
         #Prev mut is an insertion
         #Delete insertion and convert current position to a mutation
-        if len(new.seq[a-1]) > 1:
+        if a > 1 and len(new.seq[a-1]) > 1:
             e = len(new.seq[a-1]) - 1
             nt = new.seq[a-1][e][0]
             del(new.seq[a-1][e])
@@ -578,20 +664,32 @@ class Sequence:
         return new
 
     def insert(self, nt, a, b=None, in_place=True):
+        """Insert a nt as pos.
+
+        Behaves similarly to mutate()
+
+        """
         if nt not in ["A", "T", "G", "C"] or len(nt) != 1:
             raise MutationError("{} is not a single DNA nucleotide!".format(nt))
-            
+
         if b is None:
             c = a
             try:
                 a, b = self.seql[a]
             except IndexError:
-                return False
-        else:
-            #Nonexistant
-            if (a, b) not in self.seql:
-                return False
-            c = self.seql.index((a, b))
+                if c in range(self.org_len):
+                    a += 1
+                    b = 0
+                elif c == len(self):
+                    a, b = self.seql[-1]
+                    b += 1
+                else:
+                    return False
+        else: 
+            raise NotImplementedError("No coordinates for insertions.")
+
+        if c == 0:
+            return False
 
         #Inside wobble, abort
         for wbl in self.wobbles:
@@ -620,7 +718,7 @@ class Sequence:
             return new
 
         #Inserting into insertions
-        if b > 0:
+        elif b > 0:
             e = len(new.seq[a])
             new.seq[a].insert(b, [nt, "-"])
             new.mutations[a].insert(b, "i")
@@ -628,21 +726,22 @@ class Sequence:
             return new
 
         #No other insertions
-        if len(new.seq[a-1]) == 1:
+        elif len(new.seq[a-1]) == 1:
             new.seq[a-1].append([nt, "-"])
             new.mutations[a-1].append("i")
             new.seql.insert(c, (a-1, 1))
             return new
 
-        #Inserting into end of insertions
-        e = len(new.seq[a-1])
-        new.seq[a-1].append([nt, "-"])
-        new.mutations[a-1].append("i")
-        new.seql.insert(c, (a-1, b+e))
-        return new
+        else:
+            #Inserting into end of insertions
+            e = len(new.seq[a-1])
+            new.seq[a-1].append([nt, "-"])
+            new.mutations[a-1].append("i")
+            new.seql.insert(c, (a-1, b+e))
+            return new
 
     def do_mutations(self, *muts):
-        """Perform a mutation in the form of ("[m|i|d]", p, nt).
+        """Perform a list of mutations in the form of ("[m|i|d]", p, nt).
 
         Any number of mutations can be supplied:
 
@@ -753,7 +852,112 @@ class Sequence:
                 new.mutations[a].insert(1, "i")
                 i -= 1
 
-        new.seql = [(a, b) for a in range(new.org_len) for b in range(len(new.seq[a]))]
+        new.seql = [(a, b) for a in range(new.org_len)
+                           for b in range(len(new.seq[a]))]
+
+        return new
+
+    def random_mutation(self, max_mut=None, p_di=(0.2, 0.2)):
+        """Perform a random mutation.
+
+        Use p_di to set the probabilities of deletions and insertions. The
+        probality of a point mutation is 1 - sum(p_di).
+
+        """
+        thr = sum(p_di)
+        if thr > 1:
+            raise ValueError("Sum of probabilities can not be above 1.")
+
+        #Which pos are we mutating
+        pos = random.randint(0, len(self)-1)
+
+        #Determine if we are in wobble
+        is_wbl = self.get_wobble(pos)
+
+        #Number to decide deletion, insertion or mutation
+        dim = random.random() if not is_wbl else 2
+        print(dim)
+
+        #print(self.mutations)
+
+        #Insertion
+        if dim < p_di[0]:
+            pos += 1
+            nt = random.choice(["A", "T", "G", "C"])
+            new = self.insert(nt, pos, in_place=False)
+            if max_mut:
+                muts = self.get_mutated_positions()
+                #Remove a random mutation
+                while len(muts) > int(max_mut)-1:
+                    r = random.choice(range(len(muts)))
+                    new.revert_mutation(*muts[r], in_place=True)
+                    del(muts[r])
+            return new
+        #Deletion
+        elif dim < thr:
+            new = self.delete(pos, in_place=False)
+            if max_mut:
+                muts = new.get_mutated_positions()
+                t = self.seql[pos]
+                if t in muts: del(muts[muts.index(t)])
+                #Remove a random mutation
+                while len(muts) > int(max_mut)-1:
+                    r = random.choice(range(len(muts)))
+                    new.revert_mutation(*muts[r], in_place=True)
+                    del(muts[r])
+            return new
+        #Mutation
+        else:
+            for i in xrange(len(self)*2):
+                candidates = is_wbl if is_wbl else ["A", "T", "G", "C"]
+                del(candidates[candidates.index(self[pos])])
+                #If there are no possible mutations
+                if not candidates:
+                    pos = random.randint(0, len(self))
+                    is_wbl = self.get_wobble(pos)
+                    continue
+
+                nt = random.choice(candidates)
+                new = self.mutate(nt, pos, in_place=False)
+                if max_mut:
+                    muts = new.get_mutated_positions()
+                    t = self.seql[pos]
+                    if t in muts: del(muts[muts.index(t)])
+                    #Remove a random mutation
+                    while len(muts) > int(max_mut)-1:
+                        r = random.choice(range(len(muts)))
+                        new.revert_mutation(*muts[r], in_place=True)
+                        del(muts[r])
+                return new
+
+            #This is SO going to be optimised.
+            return False
+
+    def revert_mutation(self, a, b, in_place=True):
+        """Revert a mutation."""
+        new = self
+        if not in_place:
+            new = self.copy()
+
+        print(a, b)
+
+
+        if new.mutations[a][b] == "n":
+            return new
+        elif new.mutations[a][b] == "m":
+            new.mutations[a][b] = "n"
+            new.seq[a][b][0] = new.seq[a][b][1]
+        elif new.mutations[a][b] == "d":
+            new.mutations[a][b] = "n"
+            new.seq[a][b][0] = new.seq[a][b][1]
+            c = 0
+            while (a, b) > new.seql[c]:
+                c += 1
+            new.seql.insert(c, (a, b))
+        elif new.mutations[a][b] == "i":
+            del(new.mutations[a][b])
+            del(new.seq[a][b])
+            del(new.seql[new.seql.index((a, b))])
 
         return new
 
@@ -828,6 +1032,9 @@ class Sequence:
 
     def __str__(self):
         return "".join([str(nt) for nt in self])
+
+    def __repr__(self):
+        return self.__str__()
 
     def __iter__(self):
         for i in xrange(self.org_len):

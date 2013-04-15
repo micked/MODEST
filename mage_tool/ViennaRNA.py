@@ -6,6 +6,8 @@ Python wrapper for the Vienna RNA Package by Andreas R. Gruber, Ronny Lorenz,
 Stephan H. Bernhart, Richard Neubock, and Ivo L. Hofacker (NAR, 2008).
 """
 
+from __future__ import print_function
+
 import re
 import os
 from subprocess import Popen, PIPE
@@ -164,8 +166,8 @@ class ViennaRNA:
         if len(output) > 1:
             return self.output_to_brackets_and_dG(output[1])
         else:
-            print seq
-            print " ".join([self.RNAFOLD] + options)
+            # print seq
+            # print " ".join([self.RNAFOLD] + options)
             return None, None
 
     def cofold(self, seqs, d=1):

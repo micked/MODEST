@@ -3,17 +3,20 @@
 Classes dealing with input/output and format changes
 """
 
-import logging
-import csv
 import re
+import csv
 import codecs
-import cStringIO as strIO
+import logging
 
+try: import cStringIO as strIO
+except ImportError: from io import StringIO as strIO
+
+from oligo_design import Gene
+from helpers import is_inside
+from helpers import cds_to_wobble
+from helpers import seqs_to_degenerate
 from helpers import reverse_complement
 from helpers import reverse_complement_dgn
-from helpers import seqs_to_degenerate
-from helpers import cds_to_wobble
-from oligo_design import Gene
 
 log = logging.getLogger("MODEST.IO")
 log.addHandler(logging.NullHandler())
@@ -115,71 +118,6 @@ def find_wobble_seq(genome, l_start, l_end, codon_table, dgn_table):
                 leader_wobble = st + str(w_seq[start_offset:end_offset]) + ed
 
     return leader_wobble
-
-def is_inside(db_start, db_end, q_start, q_end):
-    """Checks whether q_start:q_end is inside db_start:db_end
-
-    Checks for all possibilities:
-
-        >>> is_inside(10, 15, 8, 12)
-        True
-        >>> is_inside(10, 15, 12, 18)
-        True
-        >>> is_inside(10, 15, 11, 14)
-        True
-        >>> is_inside(10, 15, 10, 15)
-        True
-        >>> is_inside(10, 15, 10, 18)
-        True
-        >>> is_inside(10, 15, 8, 17)
-        True
-
-    Return False if slices do not cross:
-
-        >>> is_inside(10, 15, 5, 8)
-        False
-        >>> is_inside(10, 15, 16, 18)
-        False
-        >>> is_inside(10, 15, 5, 10)
-        False
-        >>> is_inside(10, 15, 15, 17)
-        False
-
-    If start > end, it means the string is circular:
-
-        >>> is_inside(10, 15, 12, 2)
-        True
-        >>> is_inside(10, 15, 8, 2)
-        True
-        >>> is_inside(10, 15, 17, 2)
-        False
-        >>> is_inside(10, 2, 12, 18)
-        True
-        >>> is_inside(10, 2, 12, 1)
-        True
-        >>> is_inside(10, 4, 6, 8)
-        False
-
-    Same goes for negative values:
-
-        >>> is_inside(10, 15, -6, 8)
-        False
-
-    """
-    if db_start > db_end:
-        db_end += max(db_start, q_start, q_end)
-    if q_start > q_end:
-        q_end += db_end
-
-    if q_start < db_start < q_end:
-        return True
-    if q_start < db_end < q_end:
-        return True
-    if q_start >= db_start and q_end <= db_end:
-        return True
-
-    return False
-
 
 
 def parse_barcode_library(barcode_filehandle):

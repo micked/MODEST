@@ -1,9 +1,13 @@
 #!/usr/bin/env python
 
-import unittest
-import doctest
-import cStringIO
+from __future__ import print_function
+
 import sys
+import doctest
+import unittest
+
+try: import cStringIO as strIO
+except ImportError: from io import StringIO as strIO
 
 from Bio import SeqIO
 
@@ -114,13 +118,13 @@ config = {'Definition': 'Escherichia coli str. K-12 substr. MG1655',
 def testest():
     class Self: pass
     self = Self()
-    self.genome = SeqIO.read(cStringIO.StringIO(genome), "genbank")
+    self.genome = SeqIO.read(strIO.StringIO(genome), "genbank")
     self.config = create_config_tables(config)
     self.genes = seqIO_to_genelist(self.genome, config)
 
-    print self.genes["fakZ"].leader
-    print self.genes["fakZ"].leader_wobble
-    print helpers.reverse_complement(self.genes["fakZ"].leader)
+    print(self.genes["fakZ"].leader)
+    print(self.genes["fakZ"].leader_wobble)
+    print(helpers.reverse_complement(self.genes["fakZ"].leader))
 
     exit(0)
 
@@ -129,7 +133,7 @@ def testest():
 class TestMageTool(unittest.TestCase):
     """Test cases for the various oligo design routines"""
     def setUp(self):
-        self.genome = SeqIO.read(cStringIO.StringIO(genome), "genbank")
+        self.genome = SeqIO.read(strIO.StringIO(genome), "genbank")
         self.config = create_config_tables(config)
         self.genes = seqIO_to_genelist(self.genome, self.config)
 

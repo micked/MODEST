@@ -1,4 +1,8 @@
-from string import maketrans
+try:
+    from string import maketrans
+except ImportError:
+    maketrans = str.maketrans
+
 import re
 
 """
@@ -119,6 +123,7 @@ def cds_to_wobble(seq, codon_table, dgn_table):
 
     return "".join(dgn)
 
+
 def seqs_to_degenerate(seqs):
     """Turn a list of sequences into one degenerate DNA sequence"""
 
@@ -142,3 +147,73 @@ def seqs_to_degenerate(seqs):
         dgn_seq.append(nts_to_dgn[frozenset(pool)])
 
     return "".join(dgn_seq)
+
+
+def is_inside(db_start, db_end, q_start, q_end):
+    """Checks whether q_start:q_end is inside db_start:db_end
+
+    Checks for all possibilities:
+
+        >>> is_inside(10, 15, 8, 12)
+        True
+        >>> is_inside(10, 15, 12, 18)
+        True
+        >>> is_inside(10, 15, 11, 14)
+        True
+        >>> is_inside(10, 15, 10, 15)
+        True
+        >>> is_inside(10, 15, 10, 18)
+        True
+        >>> is_inside(10, 15, 8, 17)
+        True
+
+    Return False if slices do not cross:
+
+        >>> is_inside(10, 15, 5, 8)
+        False
+        >>> is_inside(10, 15, 16, 18)
+        False
+        >>> is_inside(10, 15, 5, 10)
+        False
+        >>> is_inside(10, 15, 15, 17)
+        False
+
+    If start > end, it means the string is circular:
+
+        >>> is_inside(10, 15, 12, 2)
+        True
+        >>> is_inside(10, 15, 8, 2)
+        True
+        >>> is_inside(10, 15, 17, 2)
+        False
+        >>> is_inside(10, 2, 12, 18)
+        True
+        >>> is_inside(10, 2, 12, 1)
+        True
+        >>> is_inside(10, 4, 6, 8)
+        False
+
+    Same goes for negative values:
+
+        >>> is_inside(10, 15, -6, 8)
+        False
+
+    """
+    if db_start > db_end:
+        db_end += max(db_start, q_start, q_end)
+    if q_start > q_end:
+        q_end += db_end
+
+    if q_start < db_start < q_end:
+        return True
+    if q_start < db_end < q_end:
+        return True
+    if q_start >= db_start and q_end <= db_end:
+        return True
+
+    return False
+
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
