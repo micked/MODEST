@@ -103,9 +103,9 @@ config = {'Definition': 'Escherichia coli str. K-12 substr. MG1655',
                'GCT': ['A', 0.11],'GGA': ['G', 0.13],'GGC': ['G', 0.46],
                'GGG': ['G', 0.12],'GGT': ['G', 0.29],'GTA': ['V', 0.17],
                'GTC': ['V', 0.18],'GTG': ['V', 0.4],'GTT': ['V', 0.25],
-               'TAA': ['*', 0.64],'TAC': ['Y', 0.47],'TAG': ['*', 0.0],
+               'TAA': ['$', 0.64],'TAC': ['Y', 0.47],'TAG': ['$', 0.0],
                'TAT': ['Y', 0.53],'TCA': ['S', 0.15],'TCC': ['S', 0.11],
-               'TCG': ['S', 0.16],'TCT': ['S', 0.11],'TGA': ['*', 0.36],
+               'TCG': ['S', 0.16],'TCT': ['S', 0.11],'TGA': ['$', 0.36],
                'TGC': ['C', 0.58],'TGG': ['W', 1.0],'TGT': ['C', 0.42],
                'TTA': ['L', 0.15],'TTC': ['F', 0.43],'TTG': ['L', 0.12],
                'TTT': ['F', 0.57]},
@@ -122,9 +122,11 @@ def testest():
     self.config = create_config_tables(config)
     self.genes = seqIO_to_genelist(self.genome, config)
 
-    print(self.genes["fakZ"].leader)
-    print(self.genes["fakZ"].leader_wobble)
-    print(helpers.reverse_complement(self.genes["fakZ"].leader))
+    seq = self.genes["fakA"].leader
+    args = (self.config["codon_table"], self.config["dgn_table"])
+    #No wobble
+    print(find_wobble_seq(self.genome, seq, 10, 13, *args).get_wobble_str())
+    #self.assertEqual(find_wobble_seq(self.genome, gene, 10, 13, *args), gene)
 
     exit(0)
 
@@ -138,20 +140,43 @@ class TestMageTool(unittest.TestCase):
         self.genes = seqIO_to_genelist(self.genome, self.config)
 
     def test_find_wobble(self):
+        args = (self.config["codon_table"], self.config["dgn_table"])
+        
         #No wobble
-        self.assertEqual(find_wobble_seq(self.genome, 10, 13, self.config["codon_table"], self.config["dgn_table"]), None)
+        seq = oligo_design.Sequence("TCT")
+        w = find_wobble_seq(self.genome, seq, 10, 13, *args)
+        self.assertEqual(w.get_wobble_str(), "NNN")
+        
         #Right-side wobble
-        self.assertEqual(find_wobble_seq(self.genome, 10, 19, self.config["codon_table"], self.config["dgn_table"]), "NNNGAYTGY")
+        seq = oligo_design.Sequence("TCTGACTGC")
+        w = find_wobble_seq(self.genome, seq, 10, 19, *args)
+        self.assertEqual(w.get_wobble_str(), "NNNGAYTGY")
+        
         #Left-side wobble
-        self.assertEqual(find_wobble_seq(self.genome, 30, 40, self.config["codon_table"], self.config["dgn_table"]), "YGTNWSNNNN")
+        seq = oligo_design.Sequence("TGTCTCTGTG")
+        w = find_wobble_seq(self.genome, seq, 30, 40, *args)
+        self.assertEqual(w.get_wobble_str(), "YGTNWSNNNN")
+        
         #Both-side wobble
-        self.assertEqual(find_wobble_seq(self.genome, 10, 40, self.config["codon_table"], self.config["dgn_table"]), "NNNGAYTGYAAYGGNCARTAYGTNWSNNNN")
+        seq = oligo_design.Sequence("TCTGACTGCAACGGGCAATATGTCTCTGTG")
+        w = find_wobble_seq(self.genome, seq, 10, 40, *args)
+        self.assertEqual(w.get_wobble_str(), "NNNGAYTGYAAYGGNCARTAYGTNWSNNNN")
+        
         #Inside wobble
-        self.assertEqual(find_wobble_seq(self.genome, 13, 16, self.config["codon_table"], self.config["dgn_table"]), "GAY")
+        seq = oligo_design.Sequence("GAC")
+        w = find_wobble_seq(self.genome, seq, 13, 16, *args)
+
+        self.assertEqual(w.get_wobble_str(), "GAY")
         #Right-side wobble (complement gene)
-        self.assertEqual(find_wobble_seq(self.genome, 50, 60, self.config["codon_table"], self.config["dgn_table"]), "NNNNARNGTY")
+        seq = oligo_design.Sequence("AAAGAGTGTC")
+        w = find_wobble_seq(self.genome, seq, 50, 60, *args)
+        self.assertEqual(w.get_wobble_str(), "NNNNARNGTY")
+
         #Left side wobble (complement gene)
-        self.assertEqual(find_wobble_seq(self.genome, 74, 80, self.config["codon_table"], self.config["dgn_table"]), "RAANNN")
+        seq = oligo_design.Sequence("GAACTG")
+        w = find_wobble_seq(self.genome, seq, 74, 80, *args)
+        self.assertEqual(w.get_wobble_str(), "RAANNN")
+        
         #TODO: Test wobble exceeding genome
 
     def test_sequences(self):

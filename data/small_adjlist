@@ -3,7 +3,7 @@ thrA	start_codon_optimal ID2
 thrB	start_codon_optimal ID3
 thrC	start_codon_optimal ID4
 yaaX	start_codon_optimal ID1+ID2,ID2+ID3
-yaaA	custom_mutation ID2 mut=TATCAACGCC[GCTC=]GCTTTCATGACT
+yaaA	gene_mutation ID2 mut=TATCAACGCC[GCTC=]GCTTTCATGACT
 yaaJ	start_codon_optimal ID3
 talB	start_codon_optimal ID4
 mog	start_codon_optimal ID1

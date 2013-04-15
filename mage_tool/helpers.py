@@ -35,46 +35,84 @@ dgn_to_nts = {dgn: nts for dgn, nts in degenerate_nucleotides}
 """
 DNA string tools
 """
-    
-def complement(x):
-    """Complement a DNA string"""
-    try:
-        return x.complement()
-    except AttributeError:
-        return x.translate(maketrans("ATGCatgc", "TACGtacg"))
-
 
 def reverse_complement(x):
-    """Reverse complement."""
+    """Reverse complement.
+
+    Checks for an internal reverse_complement() method of the supplied object,
+    otherwise performs a string translate. String translate retains case.
+
+        >>> s = "AaTtGgCc"
+        >>> reverse_complement(s)
+        'gGcCaAtT'
+
+    Internal method:
+
+        >>> class Whatever:
+        ...     def reverse_complement(self):
+        ...         return "reverse complement"
+        >>> w = Whatever()
+        >>> reverse_complement(w)
+        'reverse complement'
+
+    """
     try:
         return x.reverse_complement()
     except AttributeError:
-        return x.translate(maketrans("ATGCatgc", "TACGtacg"))[::-1]
+        #return x.translate(maketrans("ATGCatgc", "TACGtacg"))[::-1]
+        return str(x).translate(maketrans("ATGCRYMKBVDHatgcrymkbvdh",
+                                          "TACGYRKMVBHDtacgyrkmvbhd"))[::-1]
 
 
 def reverse_complement_dgn(x):
     """Reverse complement a degenerate DNA sequence."""
-    return str(x).translate(maketrans("ATGCRYMKBVDHatgcrymkbvdh",
-                                      "TACGYRKMVBHDtacgyrkmvbhd"))[::-1]
+    print("DeprecationWarning: use normal reverse_complement()")
+    return reverse_complement(x)
 
 
 def valid_na(seq):
-    """Check for valid DNA/RNA"""
-    return bool(re.match(r"^[ATGCU]+$", seq, re.IGNORECASE))
+    """Check for valid DNA/RNA.
+
+        >>> valid_na("ATCGacTCUuUGACT")
+        True
+
+    """
+    return bool(re.match(r"^[ATGCU]+$", str(seq), re.IGNORECASE))
 
 
 def valid_rna(seq):
-    """Check for valid RNA"""
+    """Check for valid RNA.
+
+        >>> valid_rna("ATAGCAT")
+        False
+        >>> valid_rna("AUuagU")
+        True
+
+    """
     return bool(re.match(r"^[AGCU]+$", seq, re.IGNORECASE))
 
 
 def valid_dna(seq):
-    """Check for valid DNA"""
+    """Check for valid DNA.
+
+        >>> valid_dna("AtagCAT")
+        True
+        >>> valid_dna("AUuagU")
+        False
+
+    """
     return bool(re.match(r"^[ATGC]+$", seq, re.IGNORECASE))
 
 
 def valid_dgn(seq):
-    """Check for valid degenerate DNA"""
+    """Check for valid degenerate DNA.
+
+        >>> valid_dgn("NnYDAtagCAT")
+        True
+        >>> valid_dgn("AUuagU")
+        False
+
+    """
     return bool(re.match(r"^[ATGCRYMKSWBDHVN]+$", seq, re.IGNORECASE))
 
 
@@ -112,9 +150,6 @@ def cds_to_wobble(seq, codon_table, dgn_table):
     seq = str(seq).upper().replace("U", "T")
     if not valid_dna(seq):
         raise ValueError("Not valid DNA/RNA: {}".format(seq))
-
-    #codon_table = options["codon_table"]
-    #dgn_table = options["dgn_table"]
 
     dgn = list()
     for i in range(0, len(seq), 3):

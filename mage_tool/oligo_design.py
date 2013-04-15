@@ -14,9 +14,9 @@ from helpers import is_inside
 from helpers import valid_dna
 from helpers import valid_rna
 from helpers import valid_dgn
-from helpers import reverse_complement
 from helpers import dgn_to_nts
 from helpers import nts_to_dgn
+from helpers import reverse_complement
 
 #Define a log
 log = logging.getLogger("MODEST.oligo")
@@ -424,82 +424,9 @@ class Sequence:
     ~~~~~~~~~~~~~~
     """
 
-    class Wobble:
-        def __init__(self, wbseq, pos, seq_len=None):
-            self.seq = str(wbseq).upper()
-            if not valid_dgn(self.seq):
-                raise ValueError("Invalid wobble sequence: {}".format(wbseq))
-
-            self.start = pos
-            if pos < 0:
-                self.seq = self.seq[-pos:]
-                self.start = 0
-
-            self.end = pos + len(wbseq)
-            if seq_len and self.end > seq_len:
-                self.seq = self.seq[:seq_len - pos]
-                self.end = seq_len
-
-            self.offset = 0
-            self.allowed = [dgn_to_nts[nt] for nt in self.seq]
-
-        def slc(self):
-            return self.start+self.offset, self.end+self.offset
-        
-        def range(self): return range(*self.slc())
-        def lt(self, i): return i < self.start + self.offset
-
-        def __lt__(self, other): return self.start <  other.start
-        def __gt__(self, other): return self.start >  other.start
-        def __le__(self, other): return self.start <= other.start
-        def __ge__(self, other): return self.start >= other.start
-
-        def __str__(self): return self.seq
-        def __repr__(self):
-            fmtargs = (self.start, self.end, self.offset, self.seq)
-            return "wobble({}..{}+{}: {})".format(*fmtargs)
-        def __int__(self): return self.start + self.offset
-
-        def __getitem__(self, i):
-            return self.allowed[i - self.start - self.offset]
-
-        def __contains__(self, i):
-            return self.start + self.offset <= i < self.end + self.offset
-
-        def __add__(self, other):
-            """Add two wobbles and find common consensus.
-
-                >>> w1 = Sequence.Wobble("CDGN", 2)
-                >>> w2 = Sequence.Wobble( "NGCNCA", 3)
-                >>> w1 + w2
-                wobble(2..9+0: CDGCNCA)
-
-                >>> w3 = Sequence.Wobble("CACNGCNCA", 0)
-                >>> w3
-                wobble(0..9+0: CACNGCNCA)
-                >>> w1 + w3
-                wobble(0..9+0: CACDGCNCA)
-
-            """
-            #Wobble start, intersection start
-            st, i_st = sorted([self, other], key=lambda w: w.start)
-            #Intersection end, wobble end
-            i_nd, nd = sorted([self, other], key=lambda w: w.end)
-
-            seq = st.seq[:i_st.start - st.start]
-
-            for i in range(i_st.start, i_nd.end):
-                common = self[i] & other[i]
-                if not common: raise ValueError("Incompatible wobble sequences: {}, {}".format(self, other))
-                seq += nts_to_dgn[common]
-
-            seq += nd.seq[i_nd.end - nd.start:nd.end - nd.start]
-
-            return Sequence.Wobble(seq, st.start)
-
     def add_wobble(self, wbseq, pos):
         """Add a wobble sequence to the sequence."""
-        wbl = self.Wobble(wbseq, pos, len(self))
+        wbl = SequenceWobble(wbseq, pos, len(self))
         if not self.test_wobble(wbl):
             raise ValueError("Wobble does not match seq: {}".format(wbseq))
 
@@ -528,10 +455,57 @@ class Sequence:
         #Run-out, return False to distinguish between N and no wbl.
         return False
 
-    def reverse_complement(self):
-        """TODO"""
-        pass
+    def get_wobble_str(self, not_wbl="N", dels=""):
+        """Get wobbles represented as a string.
 
+        Free positions marked as not_wbl, 'N' by default.
+
+            >>> s = Sequence("AACGGCACA")
+            >>> s.add_wobble( "ACNGC", 1)
+            >>> s.get_wobble_str()
+            'NACNGCNNN'
+            >>> s.get_wobble_str("*")
+            '*ACNGC***'
+
+        Insertions can be marked as well, with dels:
+
+            >>> s.delete(7)
+            AACGGCAA
+            >>> s.get_wobble_str(" ", "-")
+            ' ACNGC - '
+
+        """
+        wbl_str = list()
+
+        for a in range(self.org_len):
+            for b in range(len(self.seq[a])):
+                if self.mutations[a][b] == "d":
+                    wbl_str.append(dels)
+                else:
+                    c = self.seql.index((a, b))
+                    for wbl in self.wobbles:
+                        if c in wbl:
+                            wbl_str.append(str(wbl)[c])
+                            break
+                    else:
+                        wbl_str.append(not_wbl)
+
+        return "".join(wbl_str)
+
+    def reverse_complement(self):
+        """Reverse complement a Sequence including wobbles."""
+        if self.get_mutated_positions():
+            raise NotImplementedError("A mutated sequence can not (yet) be reverse complemented.")
+
+        new_seq = reverse_complement(str(self.org_seq))
+        new = Sequence(new_seq)
+
+        for wbl in self.wobbles:
+            new_wbl_seq = reverse_complement(wbl.seq)
+            new_wbl_start = self.org_len - len(wbl.seq) - wbl.start
+            new.add_wobble(new_wbl_seq, new_wbl_start)
+
+        return new
 
     """
     Mutation methods
@@ -617,28 +591,30 @@ class Sequence:
         if self.seq[a][b][0] == "-":
             return False
 
-        new = self
-        if not in_place:
-            new = self.copy()
+        #Maybe take a copy
+        new = self.copy() if not in_place else self
 
         for wbl in new.wobbles:
             if wbl.lt(c): wbl.offset -= 1
 
         #Deleting insertion
         if len(new.seq[a]) > 1:
-            nt = new.seq[a][b][0] 
+            org_nt = new.seq[a][b][1]
+            #delete sequence and mutation position
             del(new.seq[a][b])
-            del(new.seql[c])
-            #Mutation list change
             del(new.mutations[a][b])
             if b == 0:
-                #Convert old insertion to deletion
-                if nt != new.seq[a][b][0]:
+                #Convert old insertion to mutation
+                if new.seq[a][b][0] != org_nt:
                     new.mutations[a][b] = "m"
                 #Insertion is equal to origital nt
                 else:
                     new.mutations[a][b] = "n"
-                new.seq[a][b][1] = nt
+                new.seq[a][b][1] = org_nt
+                c += 1
+
+            #Delete sequence list position
+            del(new.seql[c])
             return new
 
         #Prev mut is an insertion
@@ -680,20 +656,21 @@ class Sequence:
                 if c in range(self.org_len):
                     a += 1
                     b = 0
-                elif c == len(self):
-                    a, b = self.seql[-1]
-                    b += 1
+                # elif c == len(self):
+                #     a, b = self.seql[-1]
+                #     b += 1
                 else:
                     return False
         else: 
-            raise NotImplementedError("No coordinates for insertions.")
+            raise NotImplementedError("Coordinates not possible for insertions.")
 
-        if c == 0:
+        #Inserting as very first codon
+        if c == 0 and self.seql[0] == (0, 0):
             return False
 
         #Inside wobble, abort
         for wbl in self.wobbles:
-            if c in wbl:
+            if c in wbl and c-1 in wbl:
                 return False
 
         new = self
@@ -701,7 +678,7 @@ class Sequence:
             new = self.copy()
 
         for wbl in new.wobbles:
-            if wbl.lt(c): wbl.offset += 1
+            if wbl.lt(c) or wbl.lt(c - 1): wbl.offset += 1
 
         #Inserting into deletion
         if new.seq[a-1][0][0] == "-":
@@ -939,9 +916,6 @@ class Sequence:
         if not in_place:
             new = self.copy()
 
-        print(a, b)
-
-
         if new.mutations[a][b] == "n":
             return new
         elif new.mutations[a][b] == "m":
@@ -1037,14 +1011,39 @@ class Sequence:
         return self.__str__()
 
     def __iter__(self):
-        for i in xrange(self.org_len):
-            for mut, org in self.seq[i]:
-                if mut != "-": yield mut
+        for a, b in self.seql:
+            yield self.seq[a][b][0]
 
-    def __getitem__(self, a, b=None):
-        if b is None:
-            a, b = self.seql[a]
-        return self.seq[a][b][0]
+    def __getitem__(self, a):
+        """getitem.
+
+        It is possible to use coordinates:
+
+            >>> s = Sequence("ATCG")
+            >>> s[1,0]
+            'T'
+
+        Integers:
+
+            >>> s[1]
+            'T'
+
+        And slices:
+
+            >>> s[1:3]
+            'TC'
+
+        """
+        if type(a) is tuple:
+            a, b = a
+            return self.seq[a][b][0]
+        else:
+            out = list()
+            if type(a) is int:
+                a = slice(a, a + 1)
+            for a, b in self.seql[a]:
+                out.append(self.seq[a][b][0])
+            return "".join(out)
 
     def __len__(self):
         return len(self.seql)
@@ -1066,13 +1065,7 @@ class Sequence:
             print("ORG:", self.get_original_str())
             print("NEW:", self.get_mutated_str())
             if self.wobbles:
-                print("WBL: ", end="")
-                gp = 0
-                for wbl in self.wobbles:
-                    inst = sum([n.count("i") for i,n in self.mutations.items() if wbl.lt(i)])
-                    print(" "*(wbl.start - gp + inst) + str(wbl), end="")
-                    gp = wbl.end
-                print()
+                print("WBL:", self.get_wobble_str(" ", "_"))
         else:
             print(self)
             gp = 0
@@ -1080,6 +1073,91 @@ class Sequence:
                 print(" "*(wbl.start - gp + wbl.offset) + str(wbl), end="")
                 gp = wbl.end
             print()
+
+
+class SequenceWobble:
+    def __init__(self, wbseq, pos, seq_len=None):
+        self.seq = str(wbseq).upper()
+        if not valid_dgn(self.seq):
+            raise ValueError("Invalid wobble sequence: {}".format(wbseq))
+
+        self.start = pos
+        if pos < 0:
+            self.seq = self.seq[-pos:]
+            self.start = 0
+
+        self.end = pos + len(wbseq)
+        if seq_len and self.end > seq_len:
+            self.seq = self.seq[:seq_len - pos]
+            self.end = seq_len
+
+        self.stop = seq_len if seq_len else self.end
+        self.offset = 0
+        self.allowed = [dgn_to_nts[nt] for nt in self.seq]
+
+    def slc(self):
+        return self.start+self.offset, self.end+self.offset
+    
+    def range(self): return range(*self.slc())
+    def lt(self, i): return i < self.start + self.offset
+
+    def __lt__(self, other): return self.start <  other.start
+    def __gt__(self, other): return self.start >  other.start
+    def __le__(self, other): return self.start <= other.start
+    def __ge__(self, other): return self.start >= other.start
+
+    def __str__(self):
+        """Returns a representation of the wobble in Sequence space.
+
+            >>> w = SequenceWobble("ATC", 3, 9)
+            >>> str(w)
+            '---ATC---'
+
+        """
+        #Span including offset
+        st, nd = self.slc()
+        return "-"*st + self.seq + "-"*(self.stop - nd)
+
+    def __repr__(self):
+        fmtargs = (self.start, self.end, self.offset, self.seq)
+        return "wobble({}..{}+{}: {})".format(*fmtargs)
+
+    def __getitem__(self, i):
+        return self.allowed[i - self.start - self.offset]
+
+    def __contains__(self, i):
+        return self.start + self.offset <= i < self.end + self.offset
+
+    def __add__(self, other):
+        """Add two wobbles and find common consensus.
+
+            >>> w1 = SequenceWobble("CDGN", 2)
+            >>> w2 = SequenceWobble( "NGCNCA", 3)
+            >>> w1 + w2
+            wobble(2..9+0: CDGCNCA)
+
+            >>> w3 = SequenceWobble("CACNGCNCA", 0)
+            >>> w3
+            wobble(0..9+0: CACNGCNCA)
+            >>> w1 + w3
+            wobble(0..9+0: CACDGCNCA)
+
+        """
+        #Wobble start, intersection start
+        st, i_st = sorted([self, other], key=lambda w: w.start)
+        #Intersection end, wobble end
+        i_nd, nd = sorted([self, other], key=lambda w: w.end)
+
+        seq = st.seq[:i_st.start - st.start]
+
+        for i in range(i_st.start, i_nd.end):
+            common = self[i] & other[i]
+            if not common: raise ValueError("Incompatible wobble sequences: {}, {}".format(self, other))
+            seq += nts_to_dgn[common]
+
+        seq += nd.seq[i_nd.end - nd.start:nd.end - nd.start]
+
+        return SequenceWobble(seq, st.start)
 
 
 class MutationError(ValueError): pass

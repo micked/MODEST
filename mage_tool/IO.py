@@ -12,6 +12,7 @@ try: import cStringIO as strIO
 except ImportError: from io import StringIO as strIO
 
 from oligo_design import Gene
+from oligo_design import Sequence
 from helpers import is_inside
 from helpers import cds_to_wobble
 from helpers import seqs_to_degenerate
@@ -39,15 +40,14 @@ def seqIO_to_genelist(genome, config, include_genes=None, leader_len=35):
             #This is mostly a good thing
             strand = g.location.strand
             cds = g.extract(genome).seq
-            #Gene start in genome context (+1)
-            if strand == -1:
-                pos = g.location.end
-            else:
-                pos = g.location.start
 
-            #Leader start/end
-            l_start = min(pos, pos-leader_len*strand)
-            l_end = max(pos, pos-leader_len*strand)
+            #Gene start, and leader start/end
+            if strand == -1:
+                pos = l_start =  g.location.end
+                l_end = l_start + leader_len
+            else:
+                pos = l_end = g.location.start
+                l_start = l_end - leader_len
 
             #Leader in genome context (+1)
             if l_start >= 0:
@@ -56,17 +56,21 @@ def seqIO_to_genelist(genome, config, include_genes=None, leader_len=35):
                 #In the very unlikely coincidence that leader extends beyond 0
                 leader = genome.seq[l_start:] + genome.seq[:l_end]
 
+            #In the very unlikely coincidence that leader extends beyond len(genome)
             if l_end > len(genome.seq):
                 leader += genome.seq[:l_end-len(genome.seq)]
 
-            leader_wobble = find_wobble_seq(genome, l_start, l_end,
+            leader = Sequence(leader)
+
+            #Extract wobbles
+            leader = find_wobble_seq(genome, leader, l_start, l_end,
                                             config["codon_table"],
                                             config["dgn_table"])
             if strand == -1:
-                leader = reverse_complement(leader)
+                leader = leader.reverse_complement()
                 pos = g.location.end
-                if leader_wobble:
-                    leader_wobble = reverse_complement_dgn(leader_wobble)
+                # if leader_wobble:
+                #     leader_wobble = reverse_complement_dgn(leader_wobble)
 
             #TODO
             promoter = None
@@ -77,47 +81,49 @@ def seqIO_to_genelist(genome, config, include_genes=None, leader_len=35):
                 #raise Exception("Gene {} found twice!".format(name))
             else:
                 genes[name] = Gene(name, pos, strand, cds, leader,
-                                   leader_wobble, promoter, promoter_pos)
+                                   leader.get_wobble_str(), promoter, promoter_pos)
     return genes
 
 
-def find_wobble_seq(genome, l_start, l_end, codon_table, dgn_table):
+def find_wobble_seq(genome, leader, l_start, l_end, codon_table, dgn_table):
     """Find a wobble sequence between l_start and l_end.
 
     Returns None if no wobble sequence if found
 
     """
-    leader_wobble = None
+    #leader_wobble = None
     #Look for CDS in leader
     for c in genome.features:
         if c.type == "CDS":
             if is_inside(l_start, l_end, c.location.start, c.location.end):
                 w_cds = c.extract(genome).seq
-                # w_seq = w_cds
                 w_seq = cds_to_wobble(w_cds, codon_table, dgn_table)
 
                 #Wobble sequence in genome context (+1)
                 if c.location.strand == -1:
-                    w_seq = reverse_complement_dgn(w_seq)
+                    w_seq = reverse_complement(w_seq)
 
-                start_offset = l_start - c.location.start
-                end_offset = l_end - c.location.start
+                start_offset = c.location.start - l_start
 
-                st = ""
-                ed = ""
-                if start_offset < 0:
-                    # st = str(genome.seq[l_start:l_start-start_offset])
-                    st = "N"*-start_offset
-                    start_offset = 0
-                if end_offset > len(w_seq):
-                    #DOUBLE CHECK!!!
-                    # ed = str(genome.seq[l_start+start_offset+len(w_seq):l_end])
-                    ed = "N"*(end_offset-len(w_seq))
-                    end_offset = len(w_seq)
+                leader.add_wobble(w_seq, start_offset)
 
-                leader_wobble = st + str(w_seq[start_offset:end_offset]) + ed
+                # end_offset = l_end - c.location.start
 
-    return leader_wobble
+                # st = ""
+                # ed = ""
+                # if start_offset < 0:
+                #     # st = str(genome.seq[l_start:l_start-start_offset])
+                #     st = "N"*-start_offset
+                #     start_offset = 0
+                # if end_offset > len(w_seq):
+                #     #DOUBLE CHECK!!!
+                #     # ed = str(genome.seq[l_start+start_offset+len(w_seq):l_end])
+                #     ed = "N"*(end_offset-len(w_seq))
+                #     end_offset = len(w_seq)
+
+                # leader_wobble = st + str(w_seq[start_offset:end_offset]) + ed
+
+    return leader
 
 
 def parse_barcode_library(barcode_filehandle):

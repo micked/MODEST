@@ -175,6 +175,177 @@ RBS_RT_EFF = 2.222
 RBS_LOG_K =  7.824
 RBS_K = 2500.0
 
+"""
+wt expression = a0
+alt expression = ai
+max expression = am
+number of outputs = o
+
+Sortings: fuzzy  : quick n' dirty
+          expn   : n-fold improvement
+                   ai = a0*n^i (until ai > am)
+                   (ignores o)
+          expauto: auto-fold improvement
+                   ai = a0*n^i (until i = o)
+                   ao = am
+                   n = (am/a0)^(1/o)
+
+Do it as a function?
+"""
+
+def RBS_Monte_Carlo(gene, target, maxmuts=10, collect_library=False, **kwargs):
+    """TODO"""
+    #Start temp is a function of muts
+    calc_start_temp = kwargs.get("calc_start_temp", lambda n: (0.6 / n) * 3)
+    end_temp        = kwargs.get("end_temp", 0.01)
+
+    #"Main" mutation period
+    min_mut_period = kwargs.get("min_mut_period", 1000)
+    #Cool mutation period
+    max_mut_period = kwargs.get("max_mut_period", 4000)
+
+    #Number of rejects before bumping to an extra mutation
+    stationary = kwargs.get("stationary", 500)
+
+    #Tolerance to target (dG)
+    tolerance = kwargs.get("tolerance", 0.25)
+
+    #Zero tolerance start-codon-in-leader policy
+    prevent_start_codons = kwargs.get("prevent_start_codons", False)
+    start_codons = kwargs.get("start_codons", ["ATG"])
+
+    #Verbose mode. Handy for plots
+    verbose = kwargs.get("verbose", False)
+
+    #Maximum attempted moves before shutting down simulation
+    max_attempted_moves = 100
+
+    #RNA folder
+    RNAfold = kwargs.get("RNAfold", ViennaRNA())
+
+    #Verify target is a float
+    target = float(target)
+
+    #Proximity to target
+    delta = lambda dG: abs(target - dG)
+
+    #Initial delta
+    start_delta = delta(RBS_predict(gene.leader, gene.cds, RNAfold=RNAfold))
+    best_delta = start_delta
+
+    #Initial leader
+    best_leader = gene.leader.copy()
+
+    #Mutate away start codons
+    if prevent_start_codons:
+        best_leader = eliminate_start_codons(best_leader)
+
+    start_mutations = len(best_leader.get_mutated_pos()) + 1
+    if start_mutations > maxmuts:
+        raise Exception("start_mutations ({}) is larger than maxmuts ({}) due to start codons.".format(start_mutations, maxmuts))
+
+    #Number of rejects
+    rejects = 0
+
+    #Main loop; n = number of mutations
+    for n in range(start_mutations, maxmuts + 1):
+        #Temperature control
+        start_temp = calc_start_temp(n)
+        temp_step = (start_temp - end_temp) / min_mut_period
+        current_temp = start_temp
+
+        #TODO: do ALL mutations
+        for i in xrange(max_mut_period):
+            #Create candidate
+            for attempted_move in xrange(max_attempted_moves):
+                candidate = best_leader.random_mutation(max_mut=n)
+
+                if not prevent_start_codons or check_leader(candidate, start_codons):
+                    break
+            else:
+                #Redo this one after a while
+                #Let's see if it gets triggered
+                raise Exception("Too many attempted moves.")
+
+            #Calculate new total free energy
+            new_dG = RBS_predict(candidate, gene.cds, RNAfold=RNAfold)
+            new_delta = delta(new_dG)
+
+            accept_move = False
+            if new_delta < best_delta:
+                accept_move = True
+                rejects = 0
+                if verbose:
+                    Monte_Carlo_status("Accepted", new_dG, n)
+            elif new_delta == best_delta:
+                rejects += 1
+                if random.random() > 0.8:
+                    #Randomly accept
+                    accept_move = True
+                    if verbose:
+                        Monte_Carlo_status("Randomly_accepted:", new_dG, n)
+                elif verbose:
+                    Monte_Carlo_status("Randomly_rejected:", new_dG, n)
+            else:
+                try:
+                    P = math.exp((best_delta - new_delta)/current_temp)
+                except OverflowError:
+                    if verbose:
+                        Monte_Carlo_status("OverflowError: ", new_dG, n)
+                else:
+                    if P > random.random():
+                        #Conditionally accept
+                        accept_move = True
+                        rejects = 0
+                        if verbose:
+                            Monte_Carlo_status("Cond_accepted:", new_dG, n, P)
+                    else:
+                        rejects += 1
+                        if verbose:
+                            Monte_Carlo_status("Cond_rejected:", new_dG, n, P)
+
+            #Move is accepted
+            if accept_move:
+                best_leader = candidate
+                # self.dG = new_dG
+                best_delta = new_delta
+
+            #Library generation
+            # if make_library:
+            #     if self.energy < self.optimal_energy:
+            #         new_addition = (self.dG, list(self.mutations), "".join(self.leader))
+            #         self.mutation_lib.append(new_addition)
+            #         self.optimal_energy = self.energy
+
+            # #Target reached, STOP
+            # if new_energy < self.tol:
+            #     self.target_reached = True
+            #     return "".join(self.leader)
+
+            # #Decrease temp while in "hot period"
+            # if i < self.min_mutation_period:
+            #     current_temp -= temp_step
+            # #Look for stationary phases in "cold period"
+            # elif rejects >= self.stationary:
+            #     #Bump number of mutations if we are stationary
+            #     break
+
+
+def check_leader(leader, start_codons):
+    """Check a leader for start codons."""
+    for start_codon in start_codons:
+        if start_codon in str(leader):
+            return False
+    return True
+
+def Monte_Carlo_status(self, msg, dG, n, P=None):
+    """Print status"""
+    if P is None: P = last_P
+    self.last_P = P
+    print("{:<18} {:>2} {:>5.2f} {:>5.2f} {:>2} {:4.2f}".format(msg, self.total_its, self.dG, dG, n, P))
+
+
+
 class RBSMonteCarlo:
     """Monte Carlo simulations
 
