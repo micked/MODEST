@@ -41,12 +41,16 @@ def translational_KO(gene, stop_codons=["TAG", "TAA", "TGA"], KO_frame=10):
     beside each other, double mutations with a match inbetween, and finally
     triple mutations.
     """
+    KO_mutations = 3
     start_offset = 3
-    KO_frame = min(KO_frame, (len(gene.cds)-start_offset)/3)
+    #KO_frame = min(KO_frame, (len(gene.cds)-start_offset)/3)
+    KO_frame = (len(gene.cds)/3)/2
 
-    KO = gene.cds[start_offset:KO_frame*3+start_offset]
+    KO = gene.cds[start_offset:KO_frame*3]
     #m = target mutations, g = target groups
     for m,g in [(1,1), (2,1), (2,2), (3,1)]:
+        pos_muts = list()
+        pos_muts_stop = list()
         #Loop codons
         for i in range(0, len(KO), 3):
             #Parent codon
@@ -55,13 +59,20 @@ def translational_KO(gene, stop_codons=["TAG", "TAA", "TGA"], KO_frame=10):
                 #test mutitions and test groups
                 tm,tg = compare_seqs(parent, child)
                 if tm <= m and tg <= g:
+                    pos_muts.append(i)
+                    pos_muts_stop.append(child)
+                    break
+        for i in range(len(pos_muts)-2):
+            if (pos_muts[i+2]/3-pos_muts[i]/3) <= KO_mutations-1:
+                    child = "{}{}{}".format(pos_muts_stop[i],pos_muts_stop[i+1],pos_muts_stop[i+2])
+                    parent = KO[pos_muts[i]:pos_muts[i+2]+start_offset]
                     #Do mutation
                     mutation = find_mutation_box(parent, child)
                     #print(start_offset, i, parent, child, mutation, gene.cds[0:50])
-                    mutation.pos += i + start_offset
+                    mutation.pos += pos_muts[i] + start_offset
                     #Apply mutation
                     new_mut = gene.do_mutation(mutation)
-                    new_mut._codon_offset = (i+start_offset)/3
+                    new_mut._codon_offset = (pos_muts[i]+start_offset)/3
                     return new_mut
 
 
@@ -335,9 +346,9 @@ class RBSMonteCarlo:
                         mp = random.randint(0, self.leader_len-1)
 
                     #Pick a new nucleotide to mutate to
-                    new_NT = random.choice(self.wobble[mp])
+                    new_NT = random.choice(list(self.wobble[mp]))
                     while new_NT == self.leader[mp]:
-                        new_NT = random.choice(self.wobble[mp])
+                        new_NT = random.choice(list(self.wobble[mp]))
 
                     candidate[mp] = new_NT
 

@@ -206,7 +206,7 @@ def create_config_tables(config):
             AAtable[AA].append(triplet)
         else:
             AAtable[AA] = [triplet]
-        if AA == "*":
+        if AA == "$":
             config["stop_codons"].append(triplet)
 
     #Reverse translation table
