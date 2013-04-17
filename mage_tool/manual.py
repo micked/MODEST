@@ -10,31 +10,45 @@ import random
 import math
 import re
 
+from oligo_design import Mutation
 from mutation_tools import find_mutation_box
 from mutation_tools import compare_seqs
 from oligo_design import Mutation
 from helpers import degenerate_nucleotides
 from helpers import dgn_to_nts
+from helpers import contains_digits
 
 
 def gene_mutation(gene, mutation):
     """Do specified custom mutations"""
-    #Find specified mutation. Specified as "upstream nucleotides"["original nucleotides" = "new nucleotides"]"downstream nucleotides".
-    #Any part can be omitted, ie. new nucleotides can be omitted for a deletion.
-    m = re.match("(\w*)\[(\w*)=(\w*)\](\w*)", mutation.upper())
-    m = m.groups()
-    before = m[0]+m[1]+m[3]
-    after = m[0]+m[2]+m[3]
-    #Find mutation offset on gene.
-    offset = 0
-    while str(gene.cds[offset:len(before)+offset]) != before:
-        offset += 1
-        if len(before)+offset > len(gene.cds):
+    #Find specified mutation. Specified as ["original nucleotides"="new nucleotides"]."position".
+    #Nucleotides can be omitted for insertion/deletion.
+    if contains_digits(mutation):
+        m = re.match("\[(\w*)=(\w*)\]\.(\d*)", mutation)
+        m = m.groups()
+        before = m[0]
+        after = m[1]
+        offset = int(m[2])-1
+        if str(gene.cds[offset:offset+len(m[0])]) != before:
             return False
-    #Find mutationbox offset from supplied sequence.
-    mutation = find_mutation_box(before, after)
-    #Add gene offset.
-    mutation.pos += offset
+    #Find specified mutation. Specified as "upstream nucleotides"["original nucleotides"="new nucleotides"]"downstream nucleotides".
+    #Any part can be omitted, ie. new nucleotides can be omitted for a deletion.
+    else:
+        m = re.match("(\w*)\[(\w*)=(\w*)\](\w*)", mutation)
+        m = m.groups()
+        before = m[1]
+        after = m[2]
+        original_string = m[0]+m[1]+m[3]
+        #Find mutation offset on gene.
+        offset = len(m[0])
+        if gene.cds.count(original_string) != 1:
+            return False
+        else:
+            offset += gene.cds.find(original_string)
+            
+    #Do mutation
+    mut = "{}={}".format(before, after) 
+    mutation = Mutation("eq", mut, offset)
     #Return gene mutation.
     return gene.do_mutation(mutation)
 
@@ -116,5 +130,4 @@ def residue_mutation(gene, mutations, codon_table, dgn_table, usage_table):
     
     mutation = find_mutation_box(gene.cds, new_dna_string)
     return gene.do_mutation(mutation)
-    pos = m[1]
 

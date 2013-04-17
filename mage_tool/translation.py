@@ -47,7 +47,48 @@ def translational_KO(gene, stop_codons=["TAG", "TAA", "TGA"], KO_frame=10):
     KO_frame = (len(gene.cds)/3)/2
 
     KO = gene.cds[start_offset:KO_frame*3]
-    #m = target mutations, g = target groups
+    
+    codon_muts = list()
+    for i in range(0, len(KO), 3):
+        stop_muts = list()
+        parent = KO[i:i+start_offset]
+        for child in stop_codons:
+            needed_muts = 0
+            for p,m in zip(parent,child):
+                if not p == m:
+                    needed_muts += 1
+            stop_muts.append(needed_muts)
+        codon_muts.append(stop_muts)
+    
+    totalmuts_codon = list()
+    for i in range(len(codon_muts)-2):
+        sublist = codon_muts[i:i+KO_mutations]
+        pos_muts = list()
+        for j, m1 in enumerate(sublist[0]):
+            for k, m2 in enumerate(sublist[1]):
+                if k != j:
+                    for l, m3 in enumerate(sublist[2]):
+                        if l != k and l != j:
+                            used_muts = [j, k, l, m1+m2+m3, i+start_offset/3, [m1, m2, m3]]
+                            pos_muts.append(used_muts)
+        pos_muts.sort(key=lambda x:x[3])
+        totalmuts_codon.append(pos_muts[0])
+    totalmuts_codon.sort(key=lambda x:x[3])
+    muts = totalmuts_codon[0]
+    after = stop_codons[muts[0]]+stop_codons[muts[1]]+stop_codons[muts[2]]
+    before = gene.cds[muts[4]*3:muts[4]*3+9]
+
+    
+    mut = "{}={}".format(before, after) 
+    mutation = Mutation("eq", mut, muts[4]*3)
+    
+    mutation = gene.do_mutation(mutation)
+    mutation._codon_offset = muts[4]+1
+    
+    return mutation
+    
+    
+    """
     for m,g in [(1,1), (2,1), (2,2), (3,1)]:
         pos_muts = list()
         pos_muts_stop = list()
@@ -74,7 +115,7 @@ def translational_KO(gene, stop_codons=["TAG", "TAA", "TGA"], KO_frame=10):
                     new_mut = gene.do_mutation(mutation)
                     new_mut._codon_offset = (pos_muts[i]+start_offset)/3
                     return new_mut
-
+    """
 
 def RBS_single_mutation(gene, maximise=True, insert=False, delete=False, top=3):
     """Maxi/minimise RBS binding with single mutations (Bruteforce approach)"""
