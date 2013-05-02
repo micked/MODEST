@@ -76,7 +76,7 @@ class Oligo:
         #Fetch post sequence
         post_seq_start = self.mut.pos+len(self.mut.before)
         post_seq = genome[post_seq_start : post_seq_start+post_seq_len]
-        
+
         return pre_seq + self.mut.after + post_seq
 
     def optimise_folding(self, genome, threshold=-20.0):
@@ -140,7 +140,7 @@ class Oligo:
             else:
                 self.replichore = 2
                 return True
-        #OriC is on the first half of the genome 
+        #OriC is on the first half of the genome
         else:
             #Replichore 1, reverse complement
             if ori[1] < self.pos < ter[0]:
@@ -150,7 +150,7 @@ class Oligo:
             else:
                 self.replichore = 2
                 return True
-        
+
     def add_barcodes(self, barcode_ids, barcoding_lib):
         """TODO"""
         #Add barcode IDs to self.barcode_ids
@@ -198,7 +198,7 @@ class Mutation:
     """Mutation object
 
     IMPORTANT: Position must be 0-indexed!
-    
+
     mut_format can be:
     arrow: position required
         point mutation: A->T, pos, mut_change="Point_Mutation"
@@ -210,7 +210,7 @@ class Mutation:
         deletion:       A=, pos
     genome: search genome for mutation (eq format)
         AATGATA[ATG=GT]ATGATA
-        
+
     """
     def __init__(self, mut_format, mut, pos=0, mut_type="", ref_genome=False):
         if mut_format.lower() == "arrow":
@@ -224,7 +224,7 @@ class Mutation:
             if n in self.after:
                 return
         self.after = self.after.lower()
-    
+
     def __repr__(self):
         return "Mutation: [{}={}] at pos {}".format(
             self.before,
@@ -233,7 +233,7 @@ class Mutation:
 
     def __str__(self, idx=0):
         return "[{}={}].{}".format(self.before, self.after, self.pos+idx)
-    
+
     def small_str(self, idx=0):
         before = self.before
         after = self.after
@@ -243,11 +243,11 @@ class Mutation:
             after = after[0:2] + ".." + after[-2:]
 
         return "[{}={}].{}".format(before, after, self.pos+idx)
-    
+
     def _parse_arrow(self, mut, pos, mut_type, ref_genome=False):
         """Parse arrow format"""
         self.pos = pos
-        if mut_type.lower() == "point_mutation":  
+        if mut_type.lower() == "point_mutation":
             self.before = mut.split("->")[0]
             self.after = mut.split("->")[1]
         elif mut_type.lower() == "insertion":
@@ -260,7 +260,7 @@ class Mutation:
             self.after = ""
         else:
             raise Exception("Unknown mut_type: " + mut_type)
-            
+
     def _parse_eq(self, mut, pos):
         self.pos = pos
         mut = mut.strip("[]")
@@ -396,9 +396,29 @@ class Sequence:
 
     A Sequence is a simple DNA sequence object with various mutation methods.
 
-        >>> s = Sequence("AACGGCACAGGAGTTGGCG")
+        >>> s = Sequence("ATAGCACATA")
 
-    The mutation methods keep track of what positions are mutated
+    The mutation methods keep track of what positions are mutated, and attempts
+    to redo and create the best possible 'alignment' while the sequence is
+    being mutated.
+
+    TODO: mut example
+    TODO: delete example
+
+    Insertions:
+
+        >>> seq = s.copy()
+        >>> seq.insert("G", 1)
+        AGTAGCACATA
+        >>> seq.insert("T", 1)
+        ATGTAGCACATA
+
+    Insertions at either end is currently not supported:
+
+        >>> seq.insert("G", 0)
+        False
+        >>> seq.insert("G", 12)
+        False
 
     """
     def __init__(self, s):
@@ -515,7 +535,7 @@ class Sequence:
     def mutate(self, nt, a, b=None, in_place=True):
         """Do a point mutation.
 
-        Supply only a to mutate an absolute position:
+        Supply only ``a`` to mutate an absolute position:
 
             >>> s = Sequence("ATGC")
             >>> s.insert("A", 3, in_place=True)
@@ -523,7 +543,7 @@ class Sequence:
             >>> s.mutate("T", 3, in_place=False)
             ATGTC
 
-        Supply both a and b to mutate in a specific position:
+        Supply both ``a`` and ``b`` to mutate in a specific position:
 
             >>> s.mutate("T", 3, 0, in_place=False)
             ATGAT
@@ -537,7 +557,7 @@ class Sequence:
         """
         if nt not in ["A", "T", "G", "C"] or len(nt) != 1:
             raise MutationError("{} is not a single DNA nucleotide!".format(nt))
-            
+
         if b is None:
             c = a
             a, b = self.seql[a]
@@ -611,10 +631,13 @@ class Sequence:
                 else:
                     new.mutations[a][b] = "n"
                 new.seq[a][b][1] = org_nt
-                c += 1
 
             #Delete sequence list position
-            del(new.seql[c])
+            #while (a, b) in new.seql:
+            #    b += 1
+            #    c += 1
+            #del(new.seql[c-1])
+            new.recreate_seql()
             return new
 
         #Prev mut is an insertion
@@ -623,7 +646,7 @@ class Sequence:
             e = len(new.seq[a-1]) - 1
             nt = new.seq[a-1][e][0]
             del(new.seq[a-1][e])
-            del(new.seql[c-1])
+            #del(new.seql[c-1])
             del(new.mutations[a-1][e])
             m = "m"
             #Reverted to original
@@ -631,12 +654,14 @@ class Sequence:
                 m = "n"
             new.seq[a][b][0] = nt
             new.mutations[a][b] = m
+            new.recreate_seql()
             return new
 
         #Normal deletion
         new.seq[a][b][0] = "-"
-        del(new.seql[c])
+        #del(new.seql[c])
         new.mutations[a] = ["d"]
+        new.recreate_seql()
         return new
 
     def insert(self, nt, a, b=None, in_place=True):
@@ -661,7 +686,7 @@ class Sequence:
                 #     b += 1
                 else:
                     return False
-        else: 
+        else:
             raise NotImplementedError("Coordinates not possible for insertions.")
 
         #Inserting as very first codon
@@ -681,7 +706,7 @@ class Sequence:
             if wbl.lt(c) or wbl.lt(c - 1): wbl.offset += 1
 
         #Inserting into deletion
-        if new.seq[a-1][0][0] == "-":
+        if a and new.seq[a-1][0][0] == "-":
             e = a - 1
             while e != 0 and new.seq[e-1][0][0] == "-":
                 e -= 1
@@ -691,7 +716,8 @@ class Sequence:
                 new.mutations[e] = ["m"]
             else:
                 new.mutations[e] = ["n"]
-            new.seql.insert(c, (e, 0))
+            #new.seql.insert(c, (e, 0))
+            new.recreate_seql()
             return new
 
         #Inserting into insertions
@@ -699,14 +725,16 @@ class Sequence:
             e = len(new.seq[a])
             new.seq[a].insert(b, [nt, "-"])
             new.mutations[a].insert(b, "i")
-            new.seql.insert(c-b+e, (a, e))
+            #new.seql.insert(c-b+e, (a, e))
+            new.recreate_seql()
             return new
 
         #No other insertions
         elif len(new.seq[a-1]) == 1:
             new.seq[a-1].append([nt, "-"])
             new.mutations[a-1].append("i")
-            new.seql.insert(c, (a-1, 1))
+            #new.seql.insert(c, (a-1, 1))
+            new.recreate_seql()
             return new
 
         else:
@@ -714,7 +742,8 @@ class Sequence:
             e = len(new.seq[a-1])
             new.seq[a-1].append([nt, "-"])
             new.mutations[a-1].append("i")
-            new.seql.insert(c, (a-1, b+e))
+            #new.seql.insert(c, (a-1, b+e))
+            new.recreate_seql()
             return new
 
     def do_mutations(self, *muts):
@@ -774,6 +803,8 @@ class Sequence:
             return self
 
         st = min(insr[0][0], dels[0][0])
+        #TODO: This is an inelegant and cheapo fix
+        if st == 0: st = 1
         nd = max(insr[-1][0], dels[-1][0]) + 1
         mut_seq = ["0"] + [nt[0] for a in range(st, nd) for nt in self.seq[a] if nt[0] != "-"]
         org_seq = ["0"] + [nt[1] for a in range(st, nd) for nt in self.seq[a] if nt[1] != "-"]
@@ -786,7 +817,7 @@ class Sequence:
             mat.append(row)
             for j, o in enumerate(org_seq):
                 if i > 0 and j > 0:
-                    score = 0 if m == o else p_mis    
+                    score = 0 if m == o else p_mis
                     c_mis = (mat[i-1][j-1][0] + score, 0)
                     c_ins = (mat[i][j-1][0]   + p_ins, 1)
                     c_del = (mat[i-1][j][0]   + p_del, 2)
@@ -829,8 +860,10 @@ class Sequence:
                 new.mutations[a].insert(1, "i")
                 i -= 1
 
-        new.seql = [(a, b) for a in range(new.org_len)
-                           for b in range(len(new.seq[a]))]
+        #new.seql = [(a, b) for a in range(new.org_len)
+        #                   for b in range(len(new.seq[a]))
+        #                   if new.mutations[a][b] != "d"]
+        new.recreate_seql()
 
         return new
 
@@ -838,7 +871,7 @@ class Sequence:
         """Perform a random mutation.
 
         Use p_di to set the probabilities of deletions and insertions. The
-        probality of a point mutation is 1 - sum(p_di).
+        probability of a point mutation is 1 - sum(p_di).
 
         """
         thr = sum(p_di)
@@ -853,14 +886,12 @@ class Sequence:
 
         #Number to decide deletion, insertion or mutation
         dim = random.random() if not is_wbl else 2
-        print(dim)
-
-        #print(self.mutations)
 
         #Insertion
         if dim < p_di[0]:
-            pos += 1
+            if pos == 0: pos = 1
             nt = random.choice(["A", "T", "G", "C"])
+            #print(pos, nt)
             new = self.insert(nt, pos, in_place=False)
             if max_mut:
                 muts = self.get_mutated_positions()
@@ -872,6 +903,7 @@ class Sequence:
             return new
         #Deletion
         elif dim < thr:
+            #print(pos)
             new = self.delete(pos, in_place=False)
             if max_mut:
                 muts = new.get_mutated_positions()
@@ -886,11 +918,11 @@ class Sequence:
         #Mutation
         else:
             for i in xrange(len(self)*2):
-                candidates = is_wbl if is_wbl else ["A", "T", "G", "C"]
+                candidates = list(is_wbl) if is_wbl else ["A", "T", "G", "C"]
                 del(candidates[candidates.index(self[pos])])
                 #If there are no possible mutations
                 if not candidates:
-                    pos = random.randint(0, len(self))
+                    pos = random.randint(0, len(self)-1)
                     is_wbl = self.get_wobble(pos)
                     continue
 
@@ -924,16 +956,26 @@ class Sequence:
         elif new.mutations[a][b] == "d":
             new.mutations[a][b] = "n"
             new.seq[a][b][0] = new.seq[a][b][1]
-            c = 0
-            while (a, b) > new.seql[c]:
-                c += 1
-            new.seql.insert(c, (a, b))
+            #c = 0
+            #while c < len(new.seql) and (a, b) > new.seql[c]:
+            #    c += 1
+            #new.seql.insert(c, (a, b))
+            new.recreate_seql()
         elif new.mutations[a][b] == "i":
             del(new.mutations[a][b])
             del(new.seq[a][b])
-            del(new.seql[new.seql.index((a, b))])
+            #while (a, b) in new.seql:
+            #    b += 1
+            #del(new.seql[new.seql.index((a, b-1))])
+            new.recreate_seql()
 
         return new
+
+    def recreate_seql(self):
+        """Regenerate the sequence list."""
+        self.seql = [(a, b) for a in range(self.org_len)
+                            for b in range(len(self.seq[a]))
+                            if self.mutations[a][b] != "d"]
 
     """
     Other
@@ -971,6 +1013,14 @@ class Sequence:
         return [(a,b) for a in range(self.org_len)
                       for b in range(len(self.seq[a]))
                       if  self.mutations[a][b] != "n"]
+
+    def n_muts(self):
+        """Return number of mutations."""
+        m = 0
+        for a in range(self.org_len):
+            for b in range(len(self.seq[a])):
+                if self.mutations[a][b] != "n": m += 1
+        return m
 
     def get_deletions(self):
         """Return a list of coordinates for all deletions"""
@@ -1097,7 +1147,7 @@ class SequenceWobble:
 
     def slc(self):
         return self.start+self.offset, self.end+self.offset
-    
+
     def range(self): return range(*self.slc())
     def lt(self, i): return i < self.start + self.offset
 

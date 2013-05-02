@@ -122,10 +122,28 @@ def testest():
     self.config = create_config_tables(config)
     self.genes = seqIO_to_genelist(self.genome, config)
 
-    seq = self.genes["fakA"].leader
-    args = (self.config["codon_table"], self.config["dgn_table"])
+    s = oligo_design.Sequence("ATAGCACATAAGACTAGACAT")
+
+    for i in range(1000):
+        s = s.random_mutation(5)
+        sseql = [(a, b) for a in range(s.org_len)
+                        for b in range(len(s.seq[a]))
+                        if s.mutations[a][b] != "d"]
+        #print(s.seql)
+        #print(sseql)
+        if sseql != s.seql:
+            print("AO")
+            raise Exception("aoe")
+
+    print(s.n_muts())
+    s.pprint()
+
+
+
+    #seq = self.genes["fakA"].leader
+    #args = (self.config["codon_table"], self.config["dgn_table"])
     #No wobble
-    print(find_wobble_seq(self.genome, seq, 10, 13, *args).get_wobble_str())
+    #print(find_wobble_seq(self.genome, seq, 10, 13, *args).get_wobble_str())
     #self.assertEqual(find_wobble_seq(self.genome, gene, 10, 13, *args), gene)
 
     exit(0)
@@ -141,27 +159,27 @@ class TestMageTool(unittest.TestCase):
 
     def test_find_wobble(self):
         args = (self.config["codon_table"], self.config["dgn_table"])
-        
+
         #No wobble
         seq = oligo_design.Sequence("TCT")
         w = find_wobble_seq(self.genome, seq, 10, 13, *args)
         self.assertEqual(w.get_wobble_str(), "NNN")
-        
+
         #Right-side wobble
         seq = oligo_design.Sequence("TCTGACTGC")
         w = find_wobble_seq(self.genome, seq, 10, 19, *args)
         self.assertEqual(w.get_wobble_str(), "NNNGAYTGY")
-        
+
         #Left-side wobble
         seq = oligo_design.Sequence("TGTCTCTGTG")
         w = find_wobble_seq(self.genome, seq, 30, 40, *args)
         self.assertEqual(w.get_wobble_str(), "YGTNWSNNNN")
-        
+
         #Both-side wobble
         seq = oligo_design.Sequence("TCTGACTGCAACGGGCAATATGTCTCTGTG")
         w = find_wobble_seq(self.genome, seq, 10, 40, *args)
         self.assertEqual(w.get_wobble_str(), "NNNGAYTGYAAYGGNCARTAYGTNWSNNNN")
-        
+
         #Inside wobble
         seq = oligo_design.Sequence("GAC")
         w = find_wobble_seq(self.genome, seq, 13, 16, *args)
@@ -176,7 +194,7 @@ class TestMageTool(unittest.TestCase):
         seq = oligo_design.Sequence("GAACTG")
         w = find_wobble_seq(self.genome, seq, 74, 80, *args)
         self.assertEqual(w.get_wobble_str(), "RAANNN")
-        
+
         #TODO: Test wobble exceeding genome
 
     def test_sequences(self):

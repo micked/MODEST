@@ -6,8 +6,9 @@ Mutation generation routines related to translation initiation
 
 from __future__ import print_function
 
-import random
 import math
+import random
+import logging
 
 from helpers import dgn_to_nts
 from helpers import valid_rna
@@ -18,6 +19,9 @@ from ViennaRNA import ViennaRNA
 from ViennaRNA import brackets_to_basepairing
 from ViennaRNA import basepairing_to_brackets
 
+#Define a log
+log = logging.getLogger("MODEST")
+log.addHandler(logging.NullHandler())
 
 def replace_start_codon(gene, start_codon="ATG"):
     """Replace start codon"""
@@ -25,8 +29,9 @@ def replace_start_codon(gene, start_codon="ATG"):
     if str(gene.cds[0:3]).upper() == str(start_codon).upper():
         return False
     if len(start_codon) != 3:
-        raise ValueError("start_codon must be 3 nucleotides long. Recieved {} ({})".format(start_codon, len(start_codon)))
-    
+        raise ValueError("start_codon must be 3 nucleotides long. Recieved: "
+                         "{} ({})".format(start_codon, len(start_codon)))
+
     mutation = find_mutation_box(gene.cds[0:3], start_codon)
 
     return gene.do_mutation(mutation)
@@ -65,95 +70,155 @@ def translational_KO(gene, stop_codons=["TAG", "TAA", "TGA"], KO_frame=10):
                     return new_mut
 
 
-def RBS_single_mutation(gene, maximise=True, insert=False, delete=False, top=3):
-    """Maxi/minimise RBS binding with single mutations (Bruteforce approach)"""
-    mutation_list = list()
-    
-    old_value = RBS_predict(gene.leader, gene.cds)
-    mutation_list.append((old_value, 0, ""))
+def RBS_library_fuzzy(gene, target, n, max_mutations, low_count=0):
+    """Generate a fuzzy RBS library.
 
-    mutations = {"A": ["T", "G", "C"],
-                 "T": ["A", "G", "C"],
-                 "G": ["A", "T", "C"],
-                 "C": ["A", "T", "G"]}
+    'fuzzy' means a single Monte Carlo simulation is run, and a library is
+    collected along the way. This method has a tendency to be biased towards a
+    higher mutation count or higher expression level.
 
-    if delete:
-        for N in mutations:
-            mutations[N].append("")
+    target is the target translation initiation rate in AU, n is number of RBS
+    sequences to output, and max_mutations is the maximum number of mutations
+    to perform.
 
-    if insert:
-        for N in mutations:
-            for M in ["A", "T", "G", "C"]:
-                mutations[N].append(N+M)
+    low_count can be set to prioritise sequences with number of mutations that
+    are below this number. Ie. at low_count=6, the best sequences with 1 to 6
+    (included) mutations are added before the rest of the library is selected.
 
-    leader = str(gene.leader)
+    """
+    #Convert target to dG
+    target_dG = AU_to_dG(target)
 
-    for i,n in enumerate(leader.upper()):
-        for m in mutations[n]:
-            new_leader = leader[:i] + m + leader[i+1:]
-            # new_seq = new_leader + str(gene.cds)
-            # RBS_calc = RBS_Calculator(new_seq, [34+len(m), 34+len(m)], "")
-            # RBS_calc.calc_dG()
+    seq_lib = RBS_Monte_Carlo(gene, target_dG, max_mutations, True)
+    seq_lib.sort(key=lambda seq: seq.delta)
 
-            tmp_mut = "{}={}".format(n, m.lower())
-            # if not len(RBS_calc.dG_total_list):
-            #     continue
-            new_value = RBS_predict(new_leader, gene.cds)
-            mutation_list.append((new_value, i, tmp_mut))
+    selected_lib = list()
+
+    #Select best sequences with low_count
+    if low_count:
+        for m in range(1, int(low_count)+1):
+            m_muts = [seq for seq in seq_lib if seq.n_muts() == m]
+            if m_muts:
+                m_muts[0].low_count = True
+                selected_lib.append(m_muts[0])
+
+        selected_lib.sort(key=lambda seq: seq.delta)
+
+    if len(selected_lib) >= n:
+        seq_lib = selected_lib
+        selected_lib = list()
+
+    #Fill in the remaining spots
+    n = n - len(selected_lib)
+    stepsize = (seq_lib[0].delta - seq_lib[-1].delta) / n
+
+    #Go through each leader in library and select one closest to target
+    for i in range(0, n):
+        step = seq_lib[0].delta - (stepsize * i)
+        #print("Step:", step)
+        closest = sorted(seq_lib, key=lambda l: abs(l.delta - step))
+        for close in closest:
+            if str(close) not in [str(l) for l in selected_lib]:
+                selected_lib.append(close)
+                break
+
+    selected_lib.sort(key=lambda seq: seq.delta)
+
+    orgAU = dG_to_AU(RBS_predict(gene.leader, gene.cds))
 
     muts = list()
-    for m in sorted(mutation_list, key=lambda x: x[0], reverse=maximise)[0:top]:
-        if not m[2]:
-            break
-        mut = Mutation("eq", m[2], -len(leader)+m[1])
-        mut._adjustment = m[0] / old_value
-        muts.append(gene.do_mutation(mut))
+    for seq in selected_lib:
+        mut = seq.get_mutation()
+        mut.pos -= len(gene.leader)
+        mut = gene.do_mutation(mut)
+        mut._AU = dG_to_AU(seq.dG)
+        mut._orgAU = orgAU
+        mut._n = seq.n_muts()
+        muts.append(mut)
 
     return muts
 
 
-def generate_RBS_library(gene, target, n, max_mutations, passes):
-    """Generate an RBS library
+def RBS_library(gene, target, n, max_mutations, m=None):
+    """Create an RBS library.
 
-    target          -- Target translation initiation rate (AU).
-    n               -- Number of mutations (oligos) to output.
-    max_mutations   -- Maximum number of mutations to perform.
-    passes          -- Number of passes to perform to increase resolution.
+    The function will attempt to reach as close to target as possible within
+    the number of mutations defined in max_mutations.
+
+    n is the number of new RBS sequences generated for the library.
+
+    The library will reach target in m-fold steps, where m is either given as a
+    parameter or calculated automatically (m=None). If m given, the function
+    will return a maximum of n RBS sequences, but if target is reached before n
+    sequences are generated or is unreachable, the number of RBS sequences will
+    be less than n.
 
     """
-    #Convert target to dG
-    target = AU_to_dG(target)
+    targetAU = target
+    targetdG = AU_to_dG(target)
 
-    MC = RBSMonteCarlo(gene, target)
-    #MC.verbose = True
-    lib = MC.create_library(n, max_mutations, passes)
+    pre_lib = RBS_Monte_Carlo(gene, targetdG, max_mutations, True)
+    pre_lib.sort(key=lambda seq: seq.delta)
 
-    if not lib:
-        return False
+    orgdG = RBS_predict(gene.leader, gene.cds)
+    orgAU = dG_to_AU(orgdG)
+    bestAU = dG_to_AU(pre_lib[0].dG)
 
-    org_leader = gene.leader
-    org_expr = dG_to_AU(MC.original_dG)
+    if not m:
+        m = (bestAU / orgAU)**(1./n)
 
-    muts_out = list()
-    for expr, muts, seq, prox in lib:
-        muts = sorted(muts)
-        before = org_leader[muts[0]:muts[-1]+1]
-        after = list()
-        for i in range(muts[0], muts[-1]+1):
-            if i in muts:
-                after.append(seq[i].lower())
-            else:
-                after.append(org_leader[i].upper())
-        after = "".join(after)
+    #Automatically adjust m
+    if bestAU > orgAU and m < 1:
+        log.debug("[{}]: m automatically changed from {} to {} because target "
+                  "({}) or reached ({}) is higher than wt ({})."
+                  "".format(str(gene), m, 1./m, targetAU, bestAU, orgAU))
+        m = 1./m
+    elif bestAU < orgAU and m > 1:
+        log.debug("[{}]: m automatically changed from {} to {} because target "
+                  "({}) or reached ({}) is lower than wt ({})."
+                  "".format(str(gene), m, 1./m, targetAU, bestAU, orgAU))
+        m = 1./m
 
-        mut = "{}={}".format(before, after)
-        mut = Mutation("eq", mut, -len(org_leader)+muts[0])
-        mut._expr = expr
-        mut._org_expr = org_expr
-        mut._n_muts = len(muts)
-        muts_out.append(gene.do_mutation(mut))
+    lib = list()
 
-    return muts_out
+    current_target = orgAU
+
+    for j in range(n):
+        current_target *= m
+        curr_dG = AU_to_dG(current_target)
+        curr_delta = abs(targetdG - curr_dG)
+
+        if curr_delta < pre_lib[0].delta:
+            break
+
+        initial = pre_lib[-1]
+        for i in range(len(pre_lib), 0, -1):
+            if pre_lib[i-1].delta < curr_delta: break
+            initial = pre_lib[i-1]
+
+        mutgene = gene.copy()
+        initial = initial.copy()
+        del(initial.dG)
+        mutgene.leader = initial
+
+        newseq = RBS_Monte_Carlo(mutgene, curr_dG, max_mutations, False)
+        lib.append(newseq[0])
+
+    if len(lib) < n:
+        lib.append(pre_lib[0])
+
+    muts = list()
+    for seq in lib:
+        mut = seq.get_mutation()
+        mut.pos -= len(gene.leader)
+        mut = gene.do_mutation(mut)
+        mut._AU = dG_to_AU(seq.dG)
+        mut._orgAU = orgAU
+        mut._n = seq.n_muts()
+        muts.append(mut)
+
+    return muts
+
 
 """
 RBS Monte Carlo functions
@@ -170,8 +235,8 @@ alt expression = ai
 max expression = am
 number of outputs = o
 
-Sortings: fuzzy  : quick n' dirty
-          expn   : n-fold improvement
+    Sortings: fuzzy  : quick n' dirty
+              expn   : n-fold improvement
                    ai = a0*n^i (until ai > am)
                    (ignores o)
           expauto: auto-fold improvement
@@ -184,6 +249,7 @@ Do it as a function?
 
 def RBS_Monte_Carlo(gene, target, maxmuts=10, collect_library=False, **kwargs):
     """TODO"""
+
     #Start temp is a function of muts
     calc_start_temp = kwargs.get("calc_start_temp", lambda n: (0.6 / n) * 3)
     end_temp        = kwargs.get("end_temp", 0.01)
@@ -199,15 +265,11 @@ def RBS_Monte_Carlo(gene, target, maxmuts=10, collect_library=False, **kwargs):
     #Tolerance to target (dG)
     tolerance = kwargs.get("tolerance", 0.25)
 
-    #Zero tolerance start-codon-in-leader policy
-    prevent_start_codons = kwargs.get("prevent_start_codons", False)
-    start_codons = kwargs.get("start_codons", ["ATG"])
-
     #Verbose mode. Handy for plots
     verbose = kwargs.get("verbose", False)
 
-    #Maximum attempted moves before shutting down simulation
-    max_attempted_moves = 100
+    #Number of rounds before each optimisation
+    opti_rounds = kwargs.get("opti_rounds", 25)
 
     #RNA folder
     RNAfold = kwargs.get("RNAfold", ViennaRNA())
@@ -219,19 +281,26 @@ def RBS_Monte_Carlo(gene, target, maxmuts=10, collect_library=False, **kwargs):
     delta = lambda dG: abs(target - dG)
 
     #Initial delta
-    start_delta = delta(RBS_predict(gene.leader, gene.cds, RNAfold=RNAfold))
-    best_delta = start_delta
+    best_dG = RBS_predict(gene.leader, gene.cds, RNAfold=RNAfold)
+    best_delta = optimal_delta = delta(best_dG)
 
     #Initial leader
     best_leader = gene.leader.copy()
 
-    #Mutate away start codons
-    if prevent_start_codons:
-        best_leader = eliminate_start_codons(best_leader)
+    #List leader sequences
+    output = list()
 
-    start_mutations = len(best_leader.get_mutated_pos()) + 1
+    start_mutations = max(best_leader.n_muts(), 1)
     if start_mutations > maxmuts:
-        raise Exception("start_mutations ({}) is larger than maxmuts ({}) due to start codons.".format(start_mutations, maxmuts))
+        raise Exception("start_mutations ({}) is larger than maxmuts ({})."
+                        "".format(start_mutations, maxmuts))
+
+    new_dG = P = total_its = 0
+    def status(msg):
+        if verbose:
+            fmts = (msg, total_its, best_dG, new_dG, n, P)
+            print("{:<18} {:>2} {:>5.2f} {:>5.2f} {:>2} {:4.2f}".format(*fmts))
+            # print(msg, total_its, new_dG, new_delta)
 
     #Number of rejects
     rejects = 0
@@ -246,402 +315,94 @@ def RBS_Monte_Carlo(gene, target, maxmuts=10, collect_library=False, **kwargs):
         #TODO: do ALL mutations
         for i in xrange(max_mut_period):
             #Create candidate
-            for attempted_move in xrange(max_attempted_moves):
-                candidate = best_leader.random_mutation(max_mut=n)
-
-                if not prevent_start_codons or check_leader(candidate, start_codons):
-                    break
-            else:
-                #Redo this one after a while
-                #Let's see if it gets triggered
-                raise Exception("Too many attempted moves.")
+            candidate = best_leader.random_mutation(max_mut=n)
 
             #Calculate new total free energy
             new_dG = RBS_predict(candidate, gene.cds, RNAfold=RNAfold)
+            if new_dG > 1e4:
+                continue
+
             new_delta = delta(new_dG)
 
             accept_move = False
             if new_delta < best_delta:
                 accept_move = True
                 rejects = 0
-                if verbose:
-                    Monte_Carlo_status("Accepted", new_dG, n)
+                status("Accepted")
             elif new_delta == best_delta:
                 rejects += 1
                 if random.random() > 0.8:
                     #Randomly accept
                     accept_move = True
-                    if verbose:
-                        Monte_Carlo_status("Randomly_accepted:", new_dG, n)
-                elif verbose:
-                    Monte_Carlo_status("Randomly_rejected:", new_dG, n)
+                    status("Randomly_accepted")
+                else:
+                    status("Randomly_rejected")
             else:
                 try:
                     P = math.exp((best_delta - new_delta)/current_temp)
                 except OverflowError:
-                    if verbose:
-                        Monte_Carlo_status("OverflowError: ", new_dG, n)
+                    status("OverflowError")
                 else:
                     if P > random.random():
                         #Conditionally accept
                         accept_move = True
                         rejects = 0
-                        if verbose:
-                            Monte_Carlo_status("Cond_accepted:", new_dG, n, P)
+                        status("Cond_accepted")
                     else:
                         rejects += 1
-                        if verbose:
-                            Monte_Carlo_status("Cond_rejected:", new_dG, n, P)
+                        status("Cond_rejected")
 
             #Move is accepted
             if accept_move:
                 best_leader = candidate
-                # self.dG = new_dG
+                best_dG = new_dG
                 best_delta = new_delta
 
             #Library generation
-            # if make_library:
-            #     if self.energy < self.optimal_energy:
-            #         new_addition = (self.dG, list(self.mutations), "".join(self.leader))
-            #         self.mutation_lib.append(new_addition)
-            #         self.optimal_energy = self.energy
-
-            # #Target reached, STOP
-            # if new_energy < self.tol:
-            #     self.target_reached = True
-            #     return "".join(self.leader)
-
-            # #Decrease temp while in "hot period"
-            # if i < self.min_mutation_period:
-            #     current_temp -= temp_step
-            # #Look for stationary phases in "cold period"
-            # elif rejects >= self.stationary:
-            #     #Bump number of mutations if we are stationary
-            #     break
-
-
-def check_leader(leader, start_codons):
-    """Check a leader for start codons."""
-    for start_codon in start_codons:
-        if start_codon in str(leader):
-            return False
-    return True
-
-def Monte_Carlo_status(self, msg, dG, n, P=None):
-    """Print status"""
-    if P is None: P = last_P
-    self.last_P = P
-    print("{:<18} {:>2} {:>5.2f} {:>5.2f} {:>2} {:4.2f}".format(msg, self.total_its, self.dG, dG, n, P))
-
-
-
-class RBSMonteCarlo:
-    """Monte Carlo simulations
-
-    This class works by ..
-
-    Two periods ..
-
-    """
-    #start_temp gets colder when more mutations are introduced
-    start_temp = lambda self, n_muts: (0.6 / n_muts) * 3
-    end_temp = 0.01
-    min_mutation_period = 1000
-    max_mutation_period = 4000
-    #Rejects before bumping to an extra mutation
-    stationary = 500
-    #Tolerance to target (dG)
-    tol = 0.25
-
-    #Maximum attempted moves before restarting simulation
-    max_attempted_moves = 100
-
-    #Keeping track of mutations
-    mutations = set()
-
-    # start_codons = ["ATG", "GTG", "TTG"]
-    start_codons = ["ATG"]
-    prevent_start_codons = False
-
-    #Maximise/minimise translation rates
-    high = -17. # ~5M AU
-    low = 32. # ~0.001 AU
-
-    mutation_lib = list()
-
-    #Verbose mode
-    verbose = False
-
-    total_its = 0
-
-    def __init__(self, gene, target):
-        """Set up Monte Carlo simulations
-
-        Supply target in dG, or "high" to maximise, "low" to minimise
-
-        """
-        self.RNAfold = ViennaRNA()
-
-        self.original_leader = str(gene.leader).upper()
-        self.leader_len = len(gene.leader)
-        self.cds = str(gene.cds).upper()
-        self.gene = gene
-
-        if target == "high":
-            self.target = self.high
-        elif target == "low":
-            self.target = self.low
-        else:
-            try:
-                self.target = float(target)
-            except ValueError:
-                raise ValueError("Could not parse: {} as target dG (use only lower-case for high/low)".format(target))
-
-        self.original_dG = RBS_predict(self.original_leader, self.cds, RNAfold=self.RNAfold)
-
-        self.wobble = list()
-        #Wobble sequences
-        for N in gene.leader_wobble.upper():
-            if N in ["A", "T", "G", "C"]:
-                self.wobble.append(False)
-            else:
-                self.wobble.append(dgn_to_nts[N])
-
-        if not any(self.wobble):
-            raise ValueError("Wobble sequnce [{}] has no possibility for mutation.".format(gene.leader_wobble))
-
-    def create_library(self, n=7, max_mutations=10, passes=1, prioritise_low_count=True):
-        """Create an RBS library from start to target with n candidates"""
-        self.mutation_lib = list()
-
-        target_expr_lvl = dG_to_AU(self.target)
-        #fitness/proximity to target
-        f = lambda x: abs(x - target_expr_lvl)
-        
-        for pas in range(passes):
-            self.run(max_mutations=max_mutations, make_library=True)
-
-        mut_lib = [(dG_to_AU(dG), sorted(muts), seq, f(dG_to_AU(dG))) for dG, muts, seq in self.mutation_lib]
-
-        if not mut_lib:
-            return False
-
-        selected_library = [min(mut_lib, key=lambda x: x[3])]
-
-        #Loop through each leader with m mutations
-        #And pickup the one closest to the target
-        if prioritise_low_count:
-            for m in range(1, max_mutations+1):
-                best_n = [l for l in mut_lib if len(l[1]) == m]
-                if best_n:
-                    best_n = min(best_n, key=lambda l: l[3])
-                    if best_n[2] not in [l[2] for l in selected_library]:
-                        selected_library.append(best_n)
-
-        if len(selected_library) >= n:
-            return selected_library[0:n]
-
-        n -= len(selected_library) - 1
-
-        best  = min(mut_lib, key=lambda x: x[3])
-        worst = max(mut_lib, key=lambda x: x[3])
-
-        stepsize = (best[3] - worst[3]) / n
-
-        #Go through each leader in library and select one closest to target
-        for i in range(1, n):
-            step = best[3] - (stepsize * i)
-            closest = sorted(mut_lib, key=lambda l: abs(l[3] - step))
-            for close in closest:
-                if close[2] not in [l[2] for l in selected_library]:
-                    selected_library.append(close)
-                    break
-
-        selected_library.sort(key=lambda l: l[3])
-
-        return selected_library
-
-    def run(self, max_mutations=10, make_library=False):
-        """Run simulations"""
-        #Initalisation vars
-        self.dG = self.original_dG
-        self.energy = abs(self.original_dG - self.target)
-        self.optimal_energy = self.energy
-        self.mutations = set()
-        self.leader = list(self.original_leader)
-
-        #Status
-        self.target_reached = False
-        self.last_P = 0.0
-
-        #Start by mutating away start codons
-        if self.prevent_start_codons:
-            self.eliminate_start_codons()
-
-        start_mutations = len(self.mutations) + 1
-        if start_mutations > max_mutations:
-            raise Exception("start_mutations ({}) is larger than max_mutations ({}) due to start codons.".format(start_mutations, max_mutations))
-
-        #Number of rejects
-        rejects = 0
-
-        #Main loop
-        for n_muts in range(start_mutations, max_mutations+1):
-            #Temperature control
-            start_temp = self.start_temp(n_muts)
-            temp_step = (start_temp - self.end_temp) / self.min_mutation_period
-            current_temp = start_temp
-
-            for i in range(self.max_mutation_period):
-                #do_move = True
-                #attempted_moves = 0
-                # while do_move:
-                for attempted_move in xrange(self.max_attempted_moves):
-                    mutations = self.mutations.copy()
-                    candidate = self.leader[:]
-
-                    #Pick a random position to move
-                    mp = random.randint(0, self.leader_len-1)
-                    while not self.wobble[mp]:
-                        mp = random.randint(0, self.leader_len-1)
-
-                    #Pick a new nucleotide to mutate to
-                    new_NT = random.choice(list(self.wobble[mp]))
-                    while new_NT == self.leader[mp]:
-                        new_NT = random.choice(list(self.wobble[mp]))
-
-                    candidate[mp] = new_NT
-
-                    # print("   ", "".join(self.leader))
-                    # print(mp, new_NT, "".join(candidate))
-
-                    #Reset mutation list if mutations mutate to original sequence
-                    if mp in mutations:
-                        if new_NT == self.original_leader[mp]:
-                            mutations.remove(mp)
-                    else:
-                        mutations.add(mp)
-
-                    #Revert a position
-                    if len(mutations) > n_muts:
-                        rev = random.choice(list(mutations))
-                        while rev != mp:
-                            rev = random.choice(list(mutations))
-                        candidate[rev] = self.original_leader[rev]
-                        mutations.remove(rev)
-
-                    #Check for illegal moves
-                    if not self.prevent_start_codons or self.check_leader(candidate):
-                        break
-
-                else:
-                    #Redo this one after a while
-                    #Let's see if it gets triggered
-                    raise Exception("Too many attempted moves.")
-
-                #Calculate new total free energy
-                new_dG = RBS_predict("".join(candidate), self.cds, RNAfold=self.RNAfold)
-
-                #Calculate simulation energy
-                new_energy = abs(new_dG - self.target)
-
-                accept_move = False
-                if new_energy < self.energy:
-                    accept_move = True
-                    rejects = 0
-                    if self.verbose:
-                        self.status("Accepted", new_dG, n_muts)
-                elif self.energy == new_energy:
-                    rejects += 1
-                    if random.random() > 0.8:
-                        #Randomly accept
-                        accept_move = True
-                        if self.verbose:
-                            self.status("Randomly_accepted:", new_dG, n_muts)
-                    elif self.verbose:
-                        self.status("Randomly_rejected:", new_dG, n_muts)
-                else:
-                    try:
-                        P = math.exp((self.energy - new_energy)/current_temp)
-                    except OverflowError:
-                        if self.verbose:
-                            self.status("OverflowError: ", new_dG, n_muts)
-                    else:
-                        if P > random.random():
-                            #Conditionally accept
-                            accept_move = True
-                            rejects = 0
-                            if self.verbose:
-                                self.status("Cond_accepted:", new_dG, n_muts, P)
-                        else:
-                            rejects += 1
-                            if self.verbose:
-                                self.status("Cond_rejected:", new_dG, n_muts, P)
-
-                #Move is accepted
-                if accept_move:
-                    self.leader = candidate
-                    self.dG = new_dG
-                    self.energy = new_energy
-                    self.mutations = mutations
-
-                #Library generation
-                if make_library:
-                    if self.energy < self.optimal_energy:
-                        new_addition = (self.dG, list(self.mutations), "".join(self.leader))
-                        self.mutation_lib.append(new_addition)
-                        self.optimal_energy = self.energy
-
-                #Target reached, STOP
-                if new_energy < self.tol:
-                    self.target_reached = True
-                    return "".join(self.leader)
-
-                #Decrease temp while in "hot period"
-                if i < self.min_mutation_period:
-                    current_temp -= temp_step
-                #Look for stationary phases in "cold period"
-                elif rejects >= self.stationary:
-                    #Bump number of mutations if we are stationary
-                    break
-
-                self.total_its += 1
-
-        return "".join(self.leader)
-
-    def status(self, msg, dG, n, P=None):
-        """Print status"""
-        if P is None: P = self.last_P
-        self.last_P = P
-        print("{:<18} {:>2} {:>5.2f} {:>5.2f} {:>2} {:4.2f}".format(msg, self.total_its, self.dG, dG, n, P))
-
-    def check_leader(self, new_seq):
-        """Checks the leader sequence for illegal moves.
-
-        Returns False on invalid sequence
-
-        """
-        leader_str = "".join(new_seq)
-        for stc in self.start_codons:
-            if leader_str.find(stc) != -1:
-                return False
-
-        return True
-
-    def eliminate_start_codons(self):
-        """Start by mutating away other start codons"""
-        leader_str = "".join(self.leader)
-        for stc in self.start_codons:
-            fnd = leader_str.find(stc)
-            if fnd != -1:
-                self.leader[fnd+2] = random.choice(["A", "T", "C"])
-                self.mutations.add(fnd+2)
+            if collect_library:
+                if best_delta < optimal_delta:
+                    best_leader.dG = best_dG
+                    best_leader.delta = best_delta
+                    output.append(best_leader.copy())
+                    optimal_delta = best_delta
+                    #print()
+                    #best_leader.pprint()
+
+            #Target reached, STOP
+            if best_delta < tolerance:
+                if not hasattr(best_leader, "dG"):
+                    best_leader.dG = best_dG
+                    best_leader.delta = best_delta
+                    output.append(best_leader.copy())
+                return output
+
+            #Optimise co-insertions/deletions
+            if opti_rounds and i % opti_rounds == 0:
+                best_leader.optimise_mutations()
+
+            #Decrease temp while in "hot period"
+            if i < min_mut_period:
+                current_temp -= temp_step
+            #Look for stationary phases in "cold period"
+            elif rejects >= stationary:
+                #Bump number of mutations if we are stationary
+                break
+
+            total_its += 1
+
+    #Runout, target not reached
+    if not hasattr(best_leader, "dG"):
+        best_leader.dG = best_dG
+        best_leader.delta = best_delta
+        output.append(best_leader.copy())
+
+    return output
 
 
 def AU_to_dG(AU):
     """Convert a dG value to expression level (AU)"""
     if AU == 0:
-        return 1e12
+        return 1e3 #Close enough
     return RBS_RT_EFF * (RBS_LOG_K - math.log(AU))
 
 
@@ -653,7 +414,7 @@ def dG_to_AU(dG):
 RBS Calculator
 """
 
-def RBS_predict(leader, cds, nt_cutoff=35, RNAfold=ViennaRNA(), verbose=False):
+def RBS_predict(pre_seq, cds, nt_cutoff=35, RNAfold=ViennaRNA(), verbose=False):
     """TODO: Create a more solid RBS calculator"""
     #TODO: Calculate these energies based on start tRNA
     start_codon_energies = {"AUG": -1.194,
@@ -681,7 +442,7 @@ def RBS_predict(leader, cds, nt_cutoff=35, RNAfold=ViennaRNA(), verbose=False):
     #Figure out dangles
 
     #Convert to Uppercase RNA
-    leader = str(leader).upper().replace("T", "U")
+    leader = str(pre_seq).upper().replace("T", "U")
     cds = str(cds).upper().replace("T", "U")
 
     if nt_cutoff:
@@ -715,10 +476,10 @@ def RBS_predict(leader, cds, nt_cutoff=35, RNAfold=ViennaRNA(), verbose=False):
     """
     mRNA_rRNA_list = RNAfold.subopt([leader, rRNA], e=energy_cutoff, d=2)
     calc_dG_spacing = (mRNA_rRNA_list, optimal_spacing, dG_push, dG_pull)
-    dG_spacing, bps_mRNA_rRNA = RBS_predict_calc_dG_spacing(*calc_dG_spacing)  
+    dG_spacing, bps_mRNA_rRNA = RBS_predict_calc_dG_spacing(*calc_dG_spacing)
     if not bps_mRNA_rRNA:
         return 1e12
-    
+
 
     # The rRNA-binding site is between the nucleotides at positions most_5p_mRNA
     # and most_3p_mRNA
@@ -920,7 +681,7 @@ def RBS_predict_calc_spacing_old(brackets):
 
     spacing = distance_to_start - farthest_3_prime_rRNA -1
 
-    
+
     return spacing, bps
 
 

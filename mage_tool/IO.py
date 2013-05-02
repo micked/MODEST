@@ -130,11 +130,11 @@ def parse_barcode_library(barcode_filehandle):
     """Parse an open barcoding library file.
 
     Barcoding library file has the following syntax:
-    
+
         >>> barcode_file = '''#Comments
         ... #Comments must always begin
         ... #at the beginning of a line.
-        ... 
+        ...
         ... #Empty lines are allowed
         ... #First header is for primers:
         ... >PRIMERS
@@ -143,7 +143,7 @@ def parse_barcode_library(barcode_filehandle):
         ... F2 GGAATTGAGA
         ... R1 CCGTCCGTTA
         ... R2 ATTTCCCTTG
-        ... 
+        ...
         ... #Second header is for the library
         ... >LIBRARY
         ... #ID FWD REV
@@ -185,7 +185,7 @@ def parse_barcode_library(barcode_filehandle):
         elif line.strip() == ">LIBRARY":
             barcodes_flag = True
             continue
-        
+
         if barcodes_flag:
             line = line.split()
             forward = primers[line[1]]
@@ -230,7 +230,7 @@ def oligolist_to_tabfile(oligolist, output):
     """Writeout oligolist to a tab separated file.
 
     Supply string filename or open file
-    
+
     """
     cls = False
     if not hasattr("write", output):
@@ -376,20 +376,23 @@ class OligoLibraryReport:
             y1 = list()
             y2 = list()
             labels = list()
+            mi = 1
             for gene in curr_genes:
                 wt = float(self.oplib["RBS_library"][gene][0]["wt"])
                 expr = max([float(oligo["altered"]) for oligo in self.oplib["RBS_library"][gene]])
+                min_expr = min([float(oligo["altered"]) for oligo in self.oplib["RBS_library"][gene]])
                 x.append(x[-1]+1)
                 y1.append(wt)
                 y2.append(expr)
                 labels.append(gene)
+                mi = min([mi, min_expr])
 
             del(x[0])
 
             fig = plt.figure(figsize=(fig_w, fig_h))
             ax = fig.add_subplot(111)
-            bar_wt = plt.bar(x, y1, bar_width, color="#9FF33D", linewidth=0, log=plot_log)
-            bar_lib = plt.bar([x1+bar_width for x1 in x], y2, bar_width, color="#007633", linewidth=0, log=plot_log)
+            bar_wt = plt.bar(x, y1, bar_width, color="#9FF33D", linewidth=0, bottom=0, log=plot_log)
+            bar_lib = plt.bar([x1+bar_width for x1 in x], y2, bar_width, color="#007633", bottom=0, linewidth=0, log=plot_log)
 
             ax.set_xticklabels(labels)
             ax.set_xticks([x1+bar_width for x1 in x])
@@ -397,9 +400,9 @@ class OligoLibraryReport:
 
 
             if plot_log:
-                ma = round(max(y2), len(str(max(y2))))
-                ax.set_ylim(1, ma*2)
-            
+                ma = max(y1 + y2)*1.1#round(max(y2), len(str(max(y2))))
+                ax.set_ylim(mi, ma*2)
+
             ax.set_xlim(1, len(curr_genes)+1)
 
             for gene, j in zip(curr_genes, x):
@@ -440,7 +443,7 @@ class OligoLibraryReport:
             elements.append(("png/pdf", imgdata_png, imgdata_pdf, "page", fig_h/fig_w))
 
         self.sections[prefix + "RBS_library"] = elements
- 
+
     """
     Output formats
     """

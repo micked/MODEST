@@ -1,19 +1,20 @@
-thrL	start_codon_optimal ID1
-thrA	start_codon_optimal ID2
-thrB	start_codon_optimal ID3
-thrC	start_codon_optimal ID4
-yaaX	start_codon_optimal ID1+ID2,ID2+ID3
-yaaA	gene_mutation ID2 mut=TATCAACGCC[GCTC=]GCTTTCATGACT
-yaaJ	start_codon_optimal ID3
-talB	start_codon_optimal ID4
-mog	start_codon_optimal ID1
-yaaH	start_codon_optimal ID2
-yaaW	start_codon_optimal ID3
-yaaI	start_codon_optimal ID4
-dnaK	start_codon_optimal ID2
-dnaJ	translational_KO    ID1  KO_frame=10
-mokC	RBSopt_single   ID1+ID2,ID2+ID3  insert=true,delete=yes
-hokC	RBSopt_single   ID2  insert=true,delete=yes
-nhaA	RBSopt_single   ID2  insert=true,delete=yes
-nhaR	RBSopt_single   ID2  insert=true,delete=yes,maximise=false
-thiM RBS_library ID1 max_mutations=1
+#thrL	RBS_library ID1 max_mutations=5,target=0,method=fuzzy
+thrL	RBS_library ID1 max_mutations=5,method=fuzzy,m=6
+#thrA	start_codon_optimal ID2
+#thrB	start_codon_optimal ID3
+#thrC	start_codon_optimal ID4
+#yaaX	start_codon_optimal ID1+ID2,ID2+ID3
+#yaaA	gene_mutation ID2 mut=TATCAACGCC[GCTC=]GCTTTCATGACT
+#yaaJ	start_codon_optimal ID3
+#talB	start_codon_optimal ID4
+#mog	start_codon_optimal ID1
+#yaaH	start_codon_optimal ID2
+#yaaW	start_codon_optimal ID3
+#yaaI	start_codon_optimal ID4
+#dnaK	start_codon_optimal ID2
+#dnaJ	translational_KO    ID1  KO_frame=10
+#mokC	RBSopt_single   ID1+ID2,ID2+ID3  insert=true,delete=yes
+#hokC	RBSopt_single   ID2  insert=true,delete=yes
+#nhaA	RBSopt_single   ID2  insert=true,delete=yes
+#nhaR	RBSopt_single   ID2  insert=true,delete=yes,maximise=false
+#thiM RBS_library ID1 max_mutations=1

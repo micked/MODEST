@@ -37,7 +37,8 @@ def parse_adjustments(adjfilehandle, genes):
         line = line.split()
         if len(line) < 3:
             #Append error and quit line
-            error_list.append("Too few arguments in line {} in adjustmentlist.".format(i))
+            error_list.append("Too few arguments in line {} in adjustmentlist."
+                              "".format(i))
             continue
         elif len(line) == 3:
             options = ""
@@ -53,16 +54,19 @@ def parse_adjustments(adjfilehandle, genes):
             op, op_kwargs = OPERATIONS[op_str]
         except KeyError:
             if op_str not in OPERATIONS:
-                error_list.append("Operation {} not found in line {}.".format(op_str, i))
+                error_list.append("Operation {} not found in line {}."
+                                  "".format(op_str, i))
             if gene_str not in genes:
-                error_list.append("Gene {} not found in line {}.".format(gene, i))
+                error_list.append("Gene {} not found in line {}."
+                                  "".format(gene, i))
             continue
 
         current_operation = {"op": op, "gene": gene, "barcodes": barcodes}
         options, options_str = parse_options(options, op_kwargs)
 
         if options is None:
-            error_list.append("Options parser error line {}: {}".format(i, options_str))
+            error_list.append("Options parser error line {}: {}"
+                              "".format(i, options_str))
             continue
 
         op_str = "[{}/{}] line {} {}".format(op_str, gene, i, options_str)
@@ -73,7 +77,8 @@ def parse_adjustments(adjfilehandle, genes):
     return parsed_operations, error_list
 
 
-def run_adjustments(adjfilehandle, genes, genome, config, project, barcoding_lib):
+def run_adjustments(adjfilehandle, genes, genome, config, project,
+                    barcoding_lib):
     """Pass"""
     parsed_operations, errors = parse_adjustments(adjfilehandle, genes)
     if errors:
@@ -178,7 +183,7 @@ def create_oligos(genome, op, gene, config, options, op_str, project, barcodes, 
             #Add
             oligos.append(temp_oligo)
             j += 1
-        
+
     return oligos
 
 
@@ -191,12 +196,17 @@ Each function described here must take a gene object, an op string (for logging
 purposes), a strain config dict, and additional kwargs described in global
 OPERATIONS dict.
 
-Each function must output a list of tuples, each tuple buing a mutation and
-containing (Mutation object, small code string, operation string + status, 
-            list of status/output values: [wt value, altered value, *other])
+Each function must output a list of tuples, each tuple being a mutation in the
+form: (mut, code, op, valuelist)
 
-List of status/output values can be empty, but wt value must always be at 0, and
-altered at 1. If wt valueis not applicable, return 0 or "" as wt value.
+Where:
+    mut       = Mutation object
+    code      = Compressed code string for oligo ID (length ~ 10 chars)
+    op        = String with operation and output status
+    valuelist = Status/output values in form [wt, altered, *other]
+
+List of status/output values can be empty, but wt value must always be at pos
+0, and altered at 1. If wt value is not applicable, return 0 or "" as wt value.
 
 
 Custom Mutations
@@ -217,7 +227,7 @@ def gene_mutation(gene, op, config, mut):
     if not mut:
         log.debug(op + " Not mutating, did not find mutation box")
         return []
-        
+
     code = "GeneMut"
     return [(mut, code, op, [])]
 
@@ -270,61 +280,53 @@ def translational_KO(gene, op, config, ko_frame):
     return [(mut, code, op, [0, mut._codon_offset])]
 
 
-def RBSopt_single(gene, op, config, insert, delete, top, maximise):
-    """Depreceated"""
-    muts = translation.RBS_single_mutation(gene, insert, delete, top, maximise)
-    if not muts:
-        return None
-
-    muts_out = list()
-    for m in muts:
-        code = "RBSoptSingle{:.2f}".format(m._adjustment)
-        l_op = op + " {:.4f}X wt".format(m._adjustment)
-        muts_out.append((m, code, l_op, [m._adjustment]))
-
-    return muts_out
-
-
-def RBS_library(gene, op, config, target, n, max_mutations, passes):
+def RBS_library(gene, op, config, target, n, max_mutations, method, m):
     """Create a library of different RBS expression levels.
 
     Options and default values:
-      - ``target=5000000`` Target expression level to reach for, in AU. If
+      - ``target=5000000`` Target expression level to reach for in AU. If
         target is reached, computation is stopped, and library will be created.
         if target is not reached within the specified number of mutations, a
         library of expression levels closest to target as possible will be
         created.
-      - ``n=10`` Number of mutations in library to create.
+      - ``n=10`` Number of library sequences to create.
       - ``max_mutations=10`` Maximum number of mutations to attempt.
-      - ``passes=1`` Number of computations. Specifying more passes will result
-        in the computation restarting. Doing more passes creates more diversity
-        and will result in a library with a higher resolution.
-      - ``id=-`` Specify an ID for the library, which will be included in the
-        code/ID for the resulting oligo. Usefull for tracing important libraries.
-        Leave at ``-`` to have an empty id.
+      - ``method=exp`` How to create the library. Two methods are available:
+        ``exp`` and ``fuzzy``. ``exp`` creates a library where each new
+        sequence is an ``m``-fold improvement over the last. ``m`` can either
+        be supplied via the ``m``-parameter, or calculated automatically to
+        create an evenly spaced library from wt level to target. The ``exp``
+        method runs multiple Monte Carlo simulations to reach each target,
+        however, it uses information from previous runs to more quickly reach
+        subsequent targets. ``fuzzy`` tries to replicate the ``exp`` library,
+        only the Monte Carlo simulation is only run once, and inbetween
+        are collected along the way. This method yields a less precise library,
+        but is quicker. Additionally, ``fuzzy`` enables picking out the best
+        sequences below a certain mutation count by using the ``m`` parameter.
+        Fx. using ``m=6``, ``fuzzy`` will collect the best possible sequences
+        with a maximum of 1, 2, .. 6 mutations. It will then try to fill out
+        the rest of the library with evenly spaced sequences.
+      - ``m=0`` se ``method`` for explanation on ``m``.
 
-    This operation will run an Monte-Carlo simulation in an attempt to reach the
-    specified target value within a number of mutations. Lower numbers of
-    mutations are tried first and are always prioritised over similar expression
-    levels with a higher mutation count.
-
-    If target is quickly reached (usually happens when lowering expression
-    levels), then RBS_library may not result in a full library. This can helped
-    by doing more passes.
+    This operation will run an Monte-Carlo simulation in an attempt to reach
+    the specified target value within a number of mutations. Lower numbers of
+    mutations are tried first and are always prioritised over similar
+    expression levels with a higher mutation count.
 
     """
-    muts = translation.generate_RBS_library(gene, target=target, n=n,
-                                            max_mutations=max_mutations,
-                                            passes=passes)
+    if method == "exp":
+        muts = translation.RBS_library(gene, target, n, max_mutations, m)
+    elif method == "fuzzy":
+        muts = translation.RBS_library_fuzzy(gene, target, n, max_mutations, m)
 
     if not muts:
         return None
 
     muts_out = list()
     for i, m in enumerate(muts):
-        code = "RBSlib{}_{:.1f}/{:.1f}({})".format(i, m._expr, m._org_expr, m._n_muts)
-        l_op = op + " {:.3f} (wt: {:.2f})".format(m._expr, m._org_expr)
-        muts_out.append((m, code, l_op, [m._org_expr, m._expr]))
+        code = "RBSlib{}_{:.1f}/{:.1f}({})".format(i, m._AU, m._orgAU, m._n)
+        l_op = op + " {:.3f} (wt: {:.2f})".format(m._AU, m._orgAU)
+        muts_out.append((m, code, l_op, [m._orgAU, m._AU]))
 
     return muts_out
 
@@ -332,9 +334,6 @@ def RBS_library(gene, op, config, target, n, max_mutations, passes):
 """
 Custom types
 """
-
-def int_list(lst):
-    raise Exception("TODO")
 
 def truefalse(t):
     """Parsed bool"""
@@ -346,6 +345,15 @@ def truefalse(t):
         raise ValueError("Could not parse: {} as true/false value".format(t))
 
 
+def rbs_method(s):
+    """RBS library method."""
+    s = s.lower()
+    if s in ["exp", "fuzzy"]:
+        return s
+    else:
+        raise ValueError("Unknown RBS_library method: {}".format(s))
+
+
 """
 Dict to map all allowed operations and associated options.
 """
@@ -353,15 +361,12 @@ Dict to map all allowed operations and associated options.
 OPERATIONS = {
     "start_codon_optimal":  (start_codon_optimal, {}),
     "translational_KO":     (translational_KO, {"ko_frame": (int, 10)}),
-    "RBSopt_single":        (RBSopt_single, {"insert": (truefalse, False),
-                                             "delete": (truefalse, False),
-                                             "top": (int, 3),
-                                             "maximise": (truefalse, True)}),
     "RBS_library":          (RBS_library, {"target": (float, 5000000.),
                                            "n": (int, 10),
                                            "max_mutations": (int, 10),
-                                           "passes": (int, 1)}),
-    "gene_mutation":      (gene_mutation, {"mut": (str, "[=]")})
+                                           "method": (rbs_method, "exp"),
+                                           "m": (float, 0)}),
+    "gene_mutation":        (gene_mutation, {"mut": (str, "[=]")})
     }
 
 
