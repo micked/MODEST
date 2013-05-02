@@ -232,6 +232,26 @@ def gene_mutation(gene, op, config, mut):
     return [(mut, code, op, [])]
 
 
+def residue_mutation(gene, op, config, mut):
+    """Allows for a mutating a desired residue
+
+    Options:
+      - ``mut=``
+
+    I.e. ``mut=`` changes
+
+
+    """
+    muts = mut.split(";")
+    mut = manual.residue_mutation(gene, muts, config["codon_table"], config["dgn_table"], config["codon_usage"])
+    if not mut:
+        log.debug(op + " Not mutating, did not find mutation box")
+        return []
+
+    code = "ResMut"
+    return [(mut, code, op, [])]
+
+
 """
 Translation modifications
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -366,7 +386,8 @@ OPERATIONS = {
                                            "max_mutations": (int, 10),
                                            "method": (rbs_method, "exp"),
                                            "m": (float, 0)}),
-    "gene_mutation":        (gene_mutation, {"mut": (str, "[=]")})
+    "gene_mutation":        (gene_mutation, {"mut": (str, "[=]")}),
+    "residue_mutation":     (residue_mutation, {"mut": (str, "[=]")})
     }
 
 
