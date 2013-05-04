@@ -234,6 +234,14 @@ class TestMageTool(unittest.TestCase):
         mut2 = oligo_design.Mutation("eq", "[CA=GG]", 2)
         mut2 = self.genes["fakD"].do_mutation(mut2)
         self.assertEqual(str(mut2), "[TG=cc].73")
+        
+    def test_KO(self):
+        mut1 = translation.translational_KO(self.genes["fakA"])
+        self.assertEqual(str(mut1), "[CAACGG=ataata].18")
+        mut2 = translation.translational_KO(self.genes["fakC"])
+        self.assertEqual(str(mut2), "[GACA=tagt].157")
+        mut3 = translation.translational_KO(self.genes["fakC"],["TAG", "TAA", "TGA"], 4)
+        self.assertEqual(str(mut3), "[GACAGATAAA=tagtgataat].157")
 
 
 if __name__ == "__main__":
