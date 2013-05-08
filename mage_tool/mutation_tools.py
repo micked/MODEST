@@ -2,7 +2,7 @@
 General Mutation tools
 """
 
-from oligo_design import Mutation
+from .oligo_design import Mutation
 
 
 def find_mutation_box(parent, child):

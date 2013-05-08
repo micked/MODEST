@@ -9,14 +9,14 @@ import random
 import logging
 from copy import deepcopy
 
-import ViennaRNA
-from helpers import is_inside
-from helpers import valid_dna
-from helpers import valid_rna
-from helpers import valid_dgn
-from helpers import dgn_to_nts
-from helpers import nts_to_dgn
-from helpers import reverse_complement
+from . import ViennaRNA
+from .helpers import is_inside
+from .helpers import valid_dna
+from .helpers import valid_rna
+from .helpers import valid_dgn
+from .helpers import dgn_to_nts
+from .helpers import nts_to_dgn
+from .helpers import reverse_complement
 
 #Define a log
 log = logging.getLogger("MODEST.oligo")

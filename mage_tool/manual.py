@@ -10,13 +10,13 @@ import random
 import math
 import re
 
-from oligo_design import Mutation
-from mutation_tools import find_mutation_box
-from mutation_tools import compare_seqs
-from oligo_design import Mutation
-from helpers import degenerate_nucleotides
-from helpers import dgn_to_nts
-from helpers import contains_digits
+from .oligo_design import Mutation
+from .mutation_tools import find_mutation_box
+from .mutation_tools import compare_seqs
+from .oligo_design import Mutation
+from .helpers import degenerate_nucleotides
+from .helpers import dgn_to_nts
+from .helpers import contains_digits
 
 
 def gene_mutation(gene, mutation):
@@ -45,9 +45,9 @@ def gene_mutation(gene, mutation):
             return False
         else:
             offset += gene.cds.find(original_string)
-            
+
     #Do mutation
-    mut = "{}={}".format(before, after) 
+    mut = "{}={}".format(before, after)
     mutation = Mutation("eq", mut, offset)
     #Return gene mutation.
     return gene.do_mutation(mutation)
@@ -79,30 +79,30 @@ def residue_mutation(gene, mutations, codon_table, dgn_table, usage_table):
 
     """
     new_dna_string = str(gene.cds)
-    
+
     mutations = sorted(mutations, key=lambda x: x[1:-1])
 
-    
-    for mut in mutations:     
-        #Find desired residue substitution. 
+
+    for mut in mutations:
+        #Find desired residue substitution.
         m = re.match("([A-Z*$])(\d+)([a-z]?)([A-Z*$])", mut)
         m = m.groups()
         old_AA = m[0]
         new_AA = m[3]
         pos = m[1]
         pos_letter = m[2]
-        
+
         dna_pos = int(pos)*3-3
         if old_AA != "*":
             dna_AA = str(gene.cds[dna_pos:dna_pos+3])
         else:
             dna_AA = "NNN"
             new_dna_string = "{}{}{}".format(new_dna_string[:dna_pos],dna_AA,new_dna_string[dna_pos:])
-            
+
         new_codon = ""
-        
+
         if new_AA != "*":
-            
+
             for dnt, nt in zip(dgn_table[new_AA], dna_AA):
                 if nt in dgn_to_nts[dnt]:
                     new_codon = "{}{}".format(new_codon, nt)
@@ -110,7 +110,7 @@ def residue_mutation(gene, mutations, codon_table, dgn_table, usage_table):
                     new_codon = "{}{}".format(new_codon, list(dgn_to_nts[dnt])[0])
                 else:
                     new_codon = "{}{}".format(new_codon, dnt)
-        
+
             pos_cds = [new_codon]
             for i, dnt in enumerate(new_codon):
                 if len(dgn_to_nts[dnt]) > 1:
@@ -119,15 +119,15 @@ def residue_mutation(gene, mutations, codon_table, dgn_table, usage_table):
                         cdn = "{}{}{}".format(new_codon[:i], dgn, new_codon[i+1:])
                         tmplist.append(cdn)
                     pos_cds = tmplist
-                    
+
             usage = -9
             for codon in pos_cds:
                 if usage_table[codon][1] > usage:
                     new_codon = codon
                     usage = usage_table[codon][1]
-        
+
         new_dna_string = "{}{}{}".format(new_dna_string[:dna_pos],new_codon,new_dna_string[dna_pos+3:])
-    
+
     mutation = find_mutation_box(gene.cds, new_dna_string)
     return gene.do_mutation(mutation)
 

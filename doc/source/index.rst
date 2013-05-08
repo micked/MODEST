@@ -56,7 +56,8 @@ Translational modifications
 Custom mutations
 ^^^^^^^^^^^^^^^^
 
-.. autofunction:: mage_tool.interface.custom_mutation
+.. autofunction:: mage_tool.interface.gene_mutation
+.. autofunction:: mage_tool.interface.residue_mutation
 
 
 Barcoding file

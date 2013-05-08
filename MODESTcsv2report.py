@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 """
 Commandline interface to <>
@@ -22,7 +22,7 @@ if __name__ == '__main__':
         output_pdf = args.o
     else:
         output_pdf = os.path.splitext(args.csvfile)[0] + ".pdf"
-    
+
     print("Writing report PDF to {}..".format(output_pdf))
 
     project = os.path.basename(os.path.splitext(args.csvfile)[0])

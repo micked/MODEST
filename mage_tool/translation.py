@@ -10,14 +10,14 @@ import math
 import random
 import logging
 
-from helpers import dgn_to_nts
-from helpers import valid_rna
-from oligo_design import Mutation
-from mutation_tools import compare_seqs
-from mutation_tools import find_mutation_box
-from ViennaRNA import ViennaRNA
-from ViennaRNA import brackets_to_basepairing
-from ViennaRNA import basepairing_to_brackets
+from .helpers import dgn_to_nts
+from .helpers import valid_rna
+from .oligo_design import Mutation
+from .mutation_tools import compare_seqs
+from .mutation_tools import find_mutation_box
+from .ViennaRNA import ViennaRNA
+from .ViennaRNA import brackets_to_basepairing
+from .ViennaRNA import basepairing_to_brackets
 
 #Define a log
 log = logging.getLogger("MODEST")
@@ -52,7 +52,7 @@ def translational_KO(gene, stop_codons=["TAG", "TAA", "TGA"], KO_frame=10):
     KO_frame = (len(gene.cds)/3)/2
 
     KO = gene.cds[start_offset:KO_frame*3]
-    
+
     codon_muts = list()
     for i in range(0, len(KO), 3):
         stop_muts = list()
@@ -64,7 +64,7 @@ def translational_KO(gene, stop_codons=["TAG", "TAA", "TGA"], KO_frame=10):
                     needed_muts += 1
             stop_muts.append(needed_muts)
         codon_muts.append(stop_muts)
-    
+
     totalmuts_codon = list()
     for i in range(len(codon_muts)-2):
         sublist = codon_muts[i:i+KO_mutations]
@@ -83,16 +83,16 @@ def translational_KO(gene, stop_codons=["TAG", "TAA", "TGA"], KO_frame=10):
     after = stop_codons[muts[0]]+stop_codons[muts[1]]+stop_codons[muts[2]]
     before = gene.cds[muts[4]*3:muts[4]*3+9]
 
-    
-    mut = "{}={}".format(before, after) 
+
+    mut = "{}={}".format(before, after)
     mutation = Mutation("eq", mut, muts[4]*3)
-    
+
     mutation = gene.do_mutation(mutation)
     mutation._codon_offset = muts[4]+1
-    
+
     return mutation
-    
-    
+
+
     """
     for m,g in [(1,1), (2,1), (2,2), (3,1)]:
         pos_muts = list()
@@ -217,6 +217,9 @@ def RBS_library(gene, target, n, max_mutations, m=None):
     bestAU = dG_to_AU(pre_lib[0].dG)
 
     if not m:
+        if not orgAU:
+            orgAU = 0.1
+            log.warning("[{}]: found no RBS binding site.".format(gene))
         m = (bestAU / orgAU)**(1./n)
 
     #Automatically adjust m

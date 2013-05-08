@@ -8,9 +8,9 @@ import logging
 from multiprocessing import Pool, Value, Lock
 import signal
 
-from oligo_design import Oligo
-import translation
-import manual
+from .oligo_design import Oligo
+from . import translation
+from . import manual
 
 #Define a log
 log = logging.getLogger("MODEST")
@@ -58,7 +58,7 @@ def parse_adjustments(adjfilehandle, genes):
                                   "".format(op_str, i))
             if gene_str not in genes:
                 error_list.append("Gene {} not found in line {}."
-                                  "".format(gene, i))
+                                  "".format(gene_str, i))
             continue
 
         current_operation = {"op": op, "gene": gene, "barcodes": barcodes}
