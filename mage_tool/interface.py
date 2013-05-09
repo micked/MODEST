@@ -4,13 +4,14 @@
 General interface to <>
 """
 
+import re
+import signal
 import logging
 from multiprocessing import Pool, Value, Lock
-import signal
 
-from .oligo_design import Oligo
-from . import translation
-from . import manual
+from oligo_design import Oligo
+import translation
+import manual
 
 #Define a log
 log = logging.getLogger("MODEST")
@@ -26,7 +27,7 @@ counter = Value('i', 0)
 lock = Lock()
 
 
-def parse_adjustments(adjfilehandle, genes):
+def parse_adjustments(adjfilehandle, genes, barcode_lib=None):
     """Pass"""
     error_list = list()
     parsed_operations = list()
@@ -61,6 +62,12 @@ def parse_adjustments(adjfilehandle, genes):
                                   "".format(gene_str, i))
             continue
 
+        if barcode_lib:
+            for bc in barcodes:
+                if bc not in barcode_lib:
+                    error_list.append("Barcode {} not found in barcode lib."
+                                      "".format(bc))
+
         current_operation = {"op": op, "gene": gene, "barcodes": barcodes}
         options, options_str = parse_options(options, op_kwargs)
 
@@ -78,30 +85,43 @@ def parse_adjustments(adjfilehandle, genes):
 
 
 def run_adjustments(adjfilehandle, genes, genome, config, project,
-                    barcoding_lib):
+                    barcoding_lib, threaded=True):
     """Pass"""
-    parsed_operations, errors = parse_adjustments(adjfilehandle, genes)
+    parser_args = (adjfilehandle, genes, barcoding_lib)
+    parsed_operations, errors = parse_adjustments(*parser_args)
     if errors:
         return [], errors
 
     oligo_kwargs = {"genome": genome, "config": config, "project": project,
                     "barcoding_lib": barcoding_lib}
 
-    pool = Pool(NUM_PROCESSES, process_initializer)
-    results = list()
+    if threaded:
+        pool = Pool(NUM_PROCESSES, process_initializer)
 
+    results = list()
     for run_op in parsed_operations:
         op_kwargs = oligo_kwargs.copy()
         op_kwargs.update(run_op)
-        results.append(pool.apply_async(create_oligos_decorator, (op_kwargs,)))
-        # results.append(pool.apply_async(create_oligos, [], op_kwargs))
+        if threaded:
+            results.append(pool.apply_async(create_oligos_decorator, (op_kwargs,)))
+        else:
+            try:
+                results.append(create_oligos(**op_kwargs))
+            except KeyboardInterrupt:
+                log.error("Computation manually stopped")
+                break
 
     oligos = list()
     for r in results:
         try:
-            res = r.get(999999)
+            if threaded:
+                res = r.get(999999)
+            else:
+                res = r
+
             if res is None:
-                log.error("Caught exception doing operation. Exception printed to stdout.")
+                log.error("Caught exception doing operation. "
+                          "Exception printed to stdout.")
             else:
                 oligos.extend(res)
         except KeyboardInterrupt:
@@ -112,32 +132,10 @@ def run_adjustments(adjfilehandle, genes, genome, config, project,
     return oligos, []
 
 
-def run_adjustments_unthreaded(adjfilehandle, genes, genome, config, project, barcoding_lib):
-    """Pass"""
-    parsed_operations, errors = parse_adjustments(adjfilehandle, genes)
-    if errors:
-        return [], errors
-
-    oligo_kwargs = {"genome": genome, "config": config, "project": project,
-                    "barcoding_lib": barcoding_lib}
-
-    results = list()
-
-    for run_op in parsed_operations:
-        op_kwargs = oligo_kwargs.copy()
-        op_kwargs.update(run_op)
-        results.append(create_oligos(**op_kwargs))
-
-    oligos = list()
-    for r in results:
-        oligos.extend(r)
-
-    return oligos, []
-
-
 def process_initializer():
     """Ignores all exceptions. Useful for subprocesses"""
     signal.signal(signal.SIGINT, signal.SIG_IGN)
+
 
 def create_oligos_decorator(kwargs):
     """TODO"""
@@ -148,6 +146,7 @@ def create_oligos_decorator(kwargs):
         print
         traceback.print_exc()
         return None
+
 
 def create_oligos(genome, op, gene, config, options, op_str, project, barcodes, barcoding_lib):
     """Run an operation and create oligos"""
@@ -208,12 +207,15 @@ Where:
 List of status/output values can be empty, but wt value must always be at pos
 0, and altered at 1. If wt value is not applicable, return 0 or "" as wt value.
 
+If an error occured within the function, the function should return None and
+log a message stating the error.
+
 
 Custom Mutations
 ~~~~~~~~~~~~~~~~
 """
 
-def gene_mutation(gene, op, config, mut):
+def dna_mutation(gene, op, config, mut):
     """Allows for a desired mutation.
 
     Options:
@@ -223,12 +225,16 @@ def gene_mutation(gene, op, config, mut):
     TATCAACGCC\ **GCTCG**\ CTTTCATGACT to TATCAACGCC\ **A**\ GCTTTCATGACT.
 
     """
+    if not mut:
+        log.error(op + " No mutation found.")
+        return None
+
     mut = manual.gene_mutation(gene, mut)
     if not mut:
-        log.debug(op + " Not mutating, did not find mutation box")
-        return []
+        log.error(op + " Not mutating, did not find mutation box")
+        return None
 
-    code = "GeneMut"
+    code = "DNAMut"
     return [(mut, code, op, [])]
 
 
@@ -240,13 +246,20 @@ def residue_mutation(gene, op, config, mut):
 
     I.e. ``mut=`` changes
 
-
     """
-    muts = mut.split(";")
-    mut = manual.residue_mutation(gene, muts, config["codon_table"], config["dgn_table"], config["codon_usage"])
+    if str(gene) == "genome":
+        log.error(op + " Cannot use residue_mutation on genome")
+        return None
+
     if not mut:
-        log.debug(op + " Not mutating, did not find mutation box")
-        return []
+        log.error(op + " No mutation specified!")
+        return None
+
+    mut = manual.residue_mutation(gene, mut, config["codon_table"],
+                                  config["dgn_table"], config["codon_usage"])
+    if not mut:
+        log.error(op + " Not mutating, did not find mutation box")
+        return None
 
     code = "ResMut"
     return [(mut, code, op, [])]
@@ -267,6 +280,10 @@ def start_codon_optimal(gene, op, config):
       - None
 
     """
+    if str(gene) == "genome":
+        log.error(op + " Cannot use start_codon_optimal on genome")
+        return None
+
     mut = translation.replace_start_codon(gene, config["start_codons"][0])
     if not mut:
         log.debug(op + " Not mutating, optimal start codon found.")
@@ -276,24 +293,26 @@ def start_codon_optimal(gene, op, config):
     return [(mut, code, op, [])]
 
 
-def translational_KO(gene, op, config, ko_mutations, ko_frame):
+def translational_knockout(gene, op, config, ko_mutations, ko_frame):
     """Gene knock-out by premature stop-codon.
 
-    Tries to knock out a gene by introducing an early stop-codon in the CDS with
-    the least amount of mutations possible.
+    Tries to knock out a gene by introducing a number of early stop-codons in
+    the CDS with the least amount of mutations possible.
 
     Options and default values:
-      - ``ko_frame=10`` Number of codons that are applicable to be mutated.
-        E.g. a value of 10 means the operation will try to mutate a stop codon
-        into the CDS within 10 codons of the start codon.
-
-    Mutations are prioritised as:
-        - Single mutation, NNN -> XNN
-        - Double concurrent mutation, NNN -> XXN
-        - Double gapped mutation, NNN -> XNX
-        - Triple mutation, NNN -> XXX
+      - ``ko_frame`` Number of codons that are applicable to be mutated.
+        E.g. a value of 10 means the operation will try to mutate stop codons
+        into the CDS within 10 codons of the start codon. Default is within one
+        half of the length of the CDS.
+      - ``ko_mutations`` number of stop codons to introduce. Default (and
+        minimum) is the number of different stop codons available in the genome
+        configuration file (normally 3).
 
     """
+    if str(gene) == "genome":
+        log.error(op + " Cannot use translational_knockout on genome")
+        return None
+
     stop_codons = config["stop_codons"]
     mut = translation.translational_KO(gene, stop_codons, ko_mutations, ko_frame)
     code = "TransKO{}".format(mut._codon_offset)
@@ -334,6 +353,10 @@ def RBS_library(gene, op, config, target, n, max_mutations, method, m):
     expression levels with a higher mutation count.
 
     """
+    if str(gene) == "genome":
+        log.error(op + " Cannot use RBS_library on genome")
+        return None
+
     if method == "exp":
         muts = translation.RBS_library(gene, target, n, max_mutations, m)
     elif method == "fuzzy":
@@ -374,21 +397,39 @@ def rbs_method(s):
         raise ValueError("Unknown RBS_library method: {}".format(s))
 
 
+def residue_mutlist(s):
+    """Several residue mutations."""
+    muts = s.split(";")
+    for mut in muts:
+        m = re.match("^([A-Z*$])(\d+)([a-z]?)([A-Z*$])$", mut)
+        if not m:
+            raise ValueError("Invalid mutation: {}".format(mut))
+    return muts
+
+
+def dna_mut(s):
+    """Mutation to DNA."""
+    t1 = re.match(r"^\[(\w*)=(\w*)\]\.(-?\d*)$", s)
+    t2 = re.match(r"^(\w*)\[(\w*)=(\w*)\](\w*)$", s)
+    if not t1 and t2:
+        raise ValueError("Invalid DNA mutation: {}".format(s))
+    return s
+
 """
 Dict to map all allowed operations and associated options.
 """
 
 OPERATIONS = {
-    "start_codon_optimal":  (start_codon_optimal, {}),
-    "translational_KO":     (translational_KO, {"ko_frame": (int, 10),
-                                                "ko_mutations": (int, 3)}),
-    "RBS_library":          (RBS_library, {"target": (float, 5000000.),
-                                           "n": (int, 10),
-                                           "max_mutations": (int, 10),
-                                           "method": (rbs_method, "exp"),
-                                           "m": (float, 0)}),
-    "gene_mutation":        (gene_mutation, {"mut": (str, "[=]")}),
-    "residue_mutation":     (residue_mutation, {"mut": (str, "[=]")})
+    "start_codon_optimal":    (start_codon_optimal, {}),
+    "translational_knockout": (translational_knockout, {"ko_frame": (int, 10),
+                                                        "ko_mutations": (int, 3)}),
+    "RBS_library":            (RBS_library, {"target": (float, 5000000.),
+                                             "n": (int, 10),
+                                             "max_mutations": (int, 10),
+                                             "method": (rbs_method, "exp"),
+                                             "m": (float, 0)}),
+    "dna_mutation":           (dna_mutation, {"mut": (dna_mut, None)}),
+    "residue_mutation":       (residue_mutation, {"mut": (residue_mutlist, None)})
     }
 
 

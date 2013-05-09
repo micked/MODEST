@@ -208,10 +208,6 @@ def residue_mutation(gene, mutations, codon_table=default_codon_table,
         Mutation: [C=t] at pos 127
 
     """
-    if str(gene) == "genome":
-        log.error("Cannot use residue_mutation on genome")
-        return None
-
     new_dna_string = str(gene.cds)
     mutations = sorted(mutations, key=lambda x: x[1:-1])
     seq = gene.cds.copy()

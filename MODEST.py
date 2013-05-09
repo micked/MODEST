@@ -14,7 +14,6 @@ import yaml
 from Bio import SeqIO
 
 from mage_tool.interface import run_adjustments
-from mage_tool.interface import run_adjustments_unthreaded
 from mage_tool.IO import seqIO_to_genelist
 from mage_tool.IO import oligolist_to_tabfile
 from mage_tool.IO import parse_barcode_library
@@ -115,11 +114,13 @@ if __name__ == '__main__':
         barcoding_lib = parse_barcode_library(bcs)
 
     print("Making oligos..")
-    adj_args = (adjustlist, genes, genome.seq, config, args.project, barcoding_lib)
-    if not args.T:
-        oligos, errors = run_adjustments(*adj_args)
-    else:
-        oligos, errors = run_adjustments_unthreaded(*adj_args)
+    threaded = not args.T
+    adj_args = (adjustlist, genes, genome.seq, config, args.project,
+                barcoding_lib, threaded)
+    #if not args.T:
+    oligos, errors = run_adjustments(*adj_args)
+    #else:
+    #    oligos, errors = run_adjustments_unthreaded(*adj_args)
     if errors:
         print("Computation not started, errors in adjustments file:")
         print("\n".join(errors))
