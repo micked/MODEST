@@ -30,6 +30,8 @@ if __name__ == '__main__':
         config = yaml.safe_load(cfg)
         config = create_config_tables(config)
 
+    print(config)
+
     include_genes = sys.argv[3:]
     genes = seqIO_to_genelist(genome, config, include_genes)
 
@@ -45,7 +47,7 @@ if __name__ == '__main__':
         print("Pos:       ", gene.pos)
         print("promoter:  ", gene.promoter)
         print("Leader:    ", gene.leader)
-        print("Leader wb :", gene.leader_wobble)
+        print("Leader wb :", gene.leader.get_wobble_str())
         print("Expression: {:.2f}".format(expr_lvl))
         print("cds:")
         for i in range(0,len(gene.cds), 60):

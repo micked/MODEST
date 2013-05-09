@@ -276,7 +276,7 @@ def start_codon_optimal(gene, op, config):
     return [(mut, code, op, [])]
 
 
-def translational_KO(gene, op, config, ko_frame):
+def translational_KO(gene, op, config, ko_mutations, ko_frame):
     """Gene knock-out by premature stop-codon.
 
     Tries to knock out a gene by introducing an early stop-codon in the CDS with
@@ -295,7 +295,7 @@ def translational_KO(gene, op, config, ko_frame):
 
     """
     stop_codons = config["stop_codons"]
-    mut = translation.translational_KO(gene, stop_codons, ko_frame)
+    mut = translation.translational_KO(gene, stop_codons, ko_mutations, ko_frame)
     code = "TransKO{}".format(mut._codon_offset)
     return [(mut, code, op, [0, mut._codon_offset])]
 
@@ -380,7 +380,8 @@ Dict to map all allowed operations and associated options.
 
 OPERATIONS = {
     "start_codon_optimal":  (start_codon_optimal, {}),
-    "translational_KO":     (translational_KO, {"ko_frame": (int, 10)}),
+    "translational_KO":     (translational_KO, {"ko_frame": (int, 10),
+                                                "ko_mutations": (int, 3)}),
     "RBS_library":          (RBS_library, {"target": (float, 5000000.),
                                            "n": (int, 10),
                                            "max_mutations": (int, 10),

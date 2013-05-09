@@ -5,15 +5,6 @@ except ImportError:
 
 import re
 
-"""
-
-String checks
-
-"""
-_digits = re.compile('\d')
-def contains_digits(d):
-     return bool(_digits.search(d))
-     
 
 """
 Constants

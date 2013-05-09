@@ -9,14 +9,14 @@ import random
 import logging
 from copy import deepcopy
 
-from . import ViennaRNA
-from .helpers import is_inside
-from .helpers import valid_dna
-from .helpers import valid_rna
-from .helpers import valid_dgn
-from .helpers import dgn_to_nts
-from .helpers import nts_to_dgn
-from .helpers import reverse_complement
+import ViennaRNA
+from helpers import is_inside
+from helpers import valid_dna
+from helpers import valid_rna
+from helpers import valid_dgn
+from helpers import dgn_to_nts
+from helpers import nts_to_dgn
+from helpers import reverse_complement
 
 #Define a log
 log = logging.getLogger("MODEST.oligo")
@@ -280,11 +280,6 @@ class Gene:
         >>> gene
         ficX
 
-    If wobble sequence is not supplied it is generated automatically:
-
-        >>> gene.leader_wobble
-        'NNNNNNNNNNNNNNN'
-
     Getting a part of a gene sequence can be done in a couple of ways. Using the
     normal int or slice to get a genes cds:
 
@@ -314,20 +309,30 @@ class Gene:
 
     """
 
-    def __init__(self, name, pos, strand, cds, leader, leader_wobble=None,
-                 promoter=None, promoter_pos=None):
+    def __init__(self, name, pos, strand, cds, leader=None, promoter=None,
+                 promoter_pos=None):
         self.name = name
         self.pos = pos
         self.strand = strand
-        self.cds = cds
-        self.leader = leader
-        self.leader_pos = pos-len(leader)
-        self.promoter = promoter
-        self.promoter_pos = promoter_pos
 
-        self.leader_wobble = leader_wobble
-        if not leader_wobble:
-            self.leader_wobble = "N"*len(self.leader)
+        #Coding sequence
+        self.cds = cds
+        if not isinstance(cds, Sequence):
+            self.cds = Sequence(cds)
+
+        #Leader sequence
+        self.leader = leader
+        if leader and not isinstance(leader, Sequence):
+            self.leader = Sequence(leader)
+
+        self.leader_pos = pos-len(leader) if leader else None
+
+        #Promoter sequence
+        self.promoter = promoter
+        if promoter and not isinstance(promoter, Sequence):
+            self.promoter = Sequence(promoter)
+
+        self.promoter_pos = promoter_pos
 
     def __str__(self):
         return self.name
@@ -985,6 +990,9 @@ class Sequence:
     def get_mutation(self):
         """Returns a mutation object relative to the sequence"""
         muts = self.get_mutated_positions()
+        if not muts:
+            return False
+
         insertions = len(self.get_insertions())
         deletions  = len(self.get_deletions())
 

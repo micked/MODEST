@@ -9,118 +9,116 @@ from __future__ import print_function
 import math
 import random
 import logging
+import itertools
 
-from .helpers import dgn_to_nts
-from .helpers import valid_rna
-from .oligo_design import Mutation
-from .mutation_tools import compare_seqs
-from .mutation_tools import find_mutation_box
-from .ViennaRNA import ViennaRNA
-from .ViennaRNA import brackets_to_basepairing
-from .ViennaRNA import basepairing_to_brackets
+from helpers import dgn_to_nts
+from helpers import valid_rna
+from oligo_design import Mutation
+from ViennaRNA import ViennaRNA
+from ViennaRNA import brackets_to_basepairing
+from ViennaRNA import basepairing_to_brackets
 
 #Define a log
-log = logging.getLogger("MODEST")
+log = logging.getLogger("MODEST.translation")
 log.addHandler(logging.NullHandler())
 
-def replace_start_codon(gene, start_codon="ATG"):
-    """Replace start codon"""
 
+def replace_start_codon(gene, start_codon="ATG"):
+    """Replace start codon.
+
+    Start codon will be replaced by start_codon, which must be a string with
+    length 3. (Default 'ATG')
+
+        >>> from oligo_design import Gene
+        >>> gene = Gene("ficX", 100, 1, "ATTATATAGACT")
+        >>> replace_start_codon(gene)
+        Mutation: [T=g] at pos 102
+
+        >>> gene.strand = -1
+        >>> replace_start_codon(gene, 'GGG')
+        Mutation: [AAT=ccc] at pos 97
+
+    If start_codon is equal to gene start codon, this function returns False:
+
+        >>> replace_start_codon(gene, "ATT")
+        False
+
+    """
     if str(gene.cds[0:3]).upper() == str(start_codon).upper():
         return False
     if len(start_codon) != 3:
         raise ValueError("start_codon must be 3 nucleotides long. Recieved: "
                          "{} ({})".format(start_codon, len(start_codon)))
 
-    mutation = find_mutation_box(gene.cds[0:3], start_codon)
+    #mutation = find_mutation_box(gene.cds[0:3], start_codon)
+    seq = gene.cds.copy()
+    for i, nt in enumerate(start_codon):
+        seq.mutate(nt, i, in_place=True)
 
-    return gene.do_mutation(mutation)
+    return gene.do_mutation(seq.get_mutation())
 
 
-def translational_KO(gene, stop_codons=["TAG", "TAA", "TGA"], KO_frame=10):
-    """Knock out a gene with a stop-codon with the least possible mutations
+def translational_KO(gene, stop_codons=["TAG", "TAA", "TGA"],
+                     KO_mutations=None, KO_frame=None):
+    """Knock out a gene with stop-codons with the least possible mutations.
 
-    KO_frame is how many codons the method will look for stop codon mutations.
+    At least one of each stop_codon will be used.
 
-    This method will prioritise single mutations, double mutations located
-    beside each other, double mutations with a match inbetween, and finally
-    triple mutations.
+    KO_mutations is how many subsequent codons should be mutated. Default is
+    one per stop codon. If a lower amount of codons is supplied, one per stop
+    codon will still be used.  KO_frame is how many codons the method will look
+    for stop codon mutations. Default is half the length of the gene.
+
     """
-    KO_mutations = 3
+    if not KO_mutations or KO_mutations < len(stop_codons):
+        KO_mutations = len(stop_codons)
+
     start_offset = 3
-    #KO_frame = min(KO_frame, (len(gene.cds)-start_offset)/3)
-    KO_frame = (len(gene.cds)/3)/2
+    if not KO_frame:
+        KO_frame = int((len(gene.cds)/3)/2)
 
     KO = gene.cds[start_offset:KO_frame*3]
-
     codon_muts = list()
     for i in range(0, len(KO), 3):
         stop_muts = list()
-        parent = KO[i:i+start_offset]
+        parent = KO[i:i+3]
         for child in stop_codons:
             needed_muts = 0
             for p,m in zip(parent,child):
                 if not p == m:
                     needed_muts += 1
-            stop_muts.append(needed_muts)
+            stop_muts.append([needed_muts, child])
         codon_muts.append(stop_muts)
 
+    stop_codons = frozenset(stop_codons)
     totalmuts_codon = list()
-    for i in range(len(codon_muts)-2):
-        sublist = codon_muts[i:i+KO_mutations]
-        pos_muts = list()
-        for j, m1 in enumerate(sublist[0]):
-            for k, m2 in enumerate(sublist[1]):
-                if k != j:
-                    for l, m3 in enumerate(sublist[2]):
-                        if l != k and l != j:
-                            used_muts = [j, k, l, m1+m2+m3, i+start_offset/3, [m1, m2, m3]]
-                            pos_muts.append(used_muts)
-        pos_muts.sort(key=lambda x:x[3])
-        totalmuts_codon.append(pos_muts[0])
-    totalmuts_codon.sort(key=lambda x:x[3])
-    muts = totalmuts_codon[0]
-    after = stop_codons[muts[0]]+stop_codons[muts[1]]+stop_codons[muts[2]]
-    before = gene.cds[muts[4]*3:muts[4]*3+9]
+    for i in range(len(codon_muts)-KO_mutations+1):
+        combinations = list()
+        for lists in itertools.product(*codon_muts[i:i+KO_mutations]):
+            combinations.append(list(lists))
+        combinations.sort(key=lambda x: sum(e[0] for e in x))
+        for comb in combinations:
+            stops = frozenset([e[1] for e in comb])
 
+            if stops == stop_codons:
+                muts = sum([e[0] for e in comb])
+                after = "".join([e[1] for e in comb])
+                pos = i+1
+                totalmuts_codon.append([muts, after, pos])
+                break
 
-    mut = "{}={}".format(before, after)
-    mutation = Mutation("eq", mut, muts[4]*3)
+    totalmuts_codon.sort(key=lambda x:x[0])
+    n_muts, muts, offset = totalmuts_codon[0]
 
-    mutation = gene.do_mutation(mutation)
-    mutation._codon_offset = muts[4]+1
+    seq = gene.cds.copy()
+    for i, nt in enumerate(muts):
+        seq.mutate(nt, i + offset*3, in_place=True)
+
+    mutation = gene.do_mutation(seq.get_mutation())
+    mutation._codon_offset = offset + 1
 
     return mutation
 
-
-    """
-    for m,g in [(1,1), (2,1), (2,2), (3,1)]:
-        pos_muts = list()
-        pos_muts_stop = list()
-        #Loop codons
-        for i in range(0, len(KO), 3):
-            #Parent codon
-            parent = KO[i:i+start_offset]
-            for child in stop_codons:
-                #test mutitions and test groups
-                tm,tg = compare_seqs(parent, child)
-                if tm <= m and tg <= g:
-                    pos_muts.append(i)
-                    pos_muts_stop.append(child)
-                    break
-        for i in range(len(pos_muts)-2):
-            if (pos_muts[i+2]/3-pos_muts[i]/3) <= KO_mutations-1:
-                    child = "{}{}{}".format(pos_muts_stop[i],pos_muts_stop[i+1],pos_muts_stop[i+2])
-                    parent = KO[pos_muts[i]:pos_muts[i+2]+start_offset]
-                    #Do mutation
-                    mutation = find_mutation_box(parent, child)
-                    #print(start_offset, i, parent, child, mutation, gene.cds[0:50])
-                    mutation.pos += pos_muts[i] + start_offset
-                    #Apply mutation
-                    new_mut = gene.do_mutation(mutation)
-                    new_mut._codon_offset = (pos_muts[i]+start_offset)/3
-                    return new_mut
-    """
 
 def RBS_library_fuzzy(gene, target, n, max_mutations, low_count=0):
     """Generate a fuzzy RBS library.
@@ -217,9 +215,6 @@ def RBS_library(gene, target, n, max_mutations, m=None):
     bestAU = dG_to_AU(pre_lib[0].dG)
 
     if not m:
-        if not orgAU:
-            orgAU = 0.1
-            log.warning("[{}]: found no RBS binding site.".format(gene))
         m = (bestAU / orgAU)**(1./n)
 
     #Automatically adjust m

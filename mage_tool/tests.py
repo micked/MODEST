@@ -16,6 +16,7 @@ import translation
 import IO
 import oligo_design
 import helpers
+import manual
 
 from IO import seqIO_to_genelist
 from IO import create_config_tables
@@ -215,10 +216,10 @@ class TestMageTool(unittest.TestCase):
 
     def test_wobbles(self):
         #No wobble
-        self.assertEqual(self.genes["fakB"].leader_wobble, "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN")
-        self.assertEqual(self.genes["fakA"].leader_wobble, "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN")
+        self.assertEqual(self.genes["fakB"].leader.get_wobble_str(), "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN")
+        self.assertEqual(self.genes["fakA"].leader.get_wobble_str(), "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN")
         #Wobble on one side
-        self.assertEqual(self.genes["fakC"].leader_wobble, "GNCAYTRRATHYTNTRRCCNATHTRRGCNNNNNNN")
+        self.assertEqual(self.genes["fakC"].leader.get_wobble_str(), "GNCAYTRRATHYTNTRRCCNATHTRRGCNNNNNNN")
         #print str(self.genes["fakC"].leader_wobble)
         #TODO:
         # test wobble on right side, both sides, and everywhere
@@ -235,6 +236,14 @@ class TestMageTool(unittest.TestCase):
         mut2 = self.genes["fakD"].do_mutation(mut2)
         self.assertEqual(str(mut2), "[TG=cc].73")
 
+    def test_KO(self):
+        mut1 = translation.translational_KO(self.genes["fakA"])
+        self.assertEqual(str(mut1), "[CAACGG=atAata].18")
+        mut2 = translation.translational_KO(self.genes["fakC"])
+        self.assertEqual(str(mut2), "[GACA=tAgt].157")
+        mut3 = translation.translational_KO(self.genes["fakC"],["TAG", "TAA", "TGA"], 4)
+        self.assertEqual(str(mut3), "[GACAGATAAA=tAgtGATAAt].157")
+
 
 if __name__ == "__main__":
     if "t" in sys.argv:
@@ -248,5 +257,6 @@ if __name__ == "__main__":
     suite.addTests(doctest.DocTestSuite(IO))
     suite.addTests(doctest.DocTestSuite(oligo_design))
     suite.addTests(doctest.DocTestSuite(helpers))
+    suite.addTests(doctest.DocTestSuite(manual))
 
     unittest.TextTestRunner(verbosity=2).run(suite)
