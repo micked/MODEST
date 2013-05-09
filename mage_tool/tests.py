@@ -58,6 +58,18 @@ FEATURES             Location/Qualifiers
                      /codon_start=1
                      /gene_synonym="fak003"
                      /transl_table=11
+     CDS             200..229
+                     /gene="fakE"
+                     /locus_tag="b0005"
+                     /codon_start=1
+                     /gene_synonym="fak005"
+                     /transl_table=11
+     CDS             260..289
+                     /gene="fakE"
+                     /locus_tag="b0006"
+                     /codon_start=1
+                     /gene_synonym="fak006"
+                     /transl_table=11
      CDS             complement(1053..1073)
                      /gene="fakZ"
                      /locus_tag="b0010"
@@ -123,23 +135,6 @@ def testest():
     self.config = create_config_tables(config)
     self.genes = seqIO_to_genelist(self.genome, config)
 
-    s = oligo_design.Sequence("ATAGCACATAAGACTAGACAT")
-
-    for i in range(1000):
-        s = s.random_mutation(5)
-        sseql = [(a, b) for a in range(s.org_len)
-                        for b in range(len(s.seq[a]))
-                        if s.mutations[a][b] != "d"]
-        #print(s.seql)
-        #print(sseql)
-        if sseql != s.seql:
-            print("AO")
-            raise Exception("aoe")
-
-    print(s.n_muts())
-    s.pprint()
-
-
 
     #seq = self.genes["fakA"].leader
     #args = (self.config["codon_table"], self.config["dgn_table"])
@@ -157,6 +152,25 @@ class TestMageTool(unittest.TestCase):
         self.genome = SeqIO.read(strIO.StringIO(genome), "genbank")
         self.config = create_config_tables(config)
         self.genes = seqIO_to_genelist(self.genome, self.config)
+
+    def test_seqIO_to_genelist(self):
+        #Default instantiation, with everything.
+        self.assertItemsEqual(["fakA", "fakB", "fakC", "fakD", "fakZ", "fakE",
+                               "b0001", "b0002", "b0003", "b0004", "b0010",
+                               "b0006", "b0005"], self.genes)
+
+        #Instantiation with a genelist and genome
+        genes = seqIO_to_genelist(self.genome, self.config, ("fakA"), True)
+        self.assertItemsEqual(genes, ["fakA", "genome"])
+
+        #Instantiation with genes and locus_tags
+        genes = seqIO_to_genelist(self.genome, self.config,
+                                  ("fakA", "b0001", "b0002"))
+        self.assertItemsEqual(["fakA", "b0001", "b0002"], genes)
+
+        #Duplicated gene, throw an exception
+        with self.assertRaises(IO.ParserError):
+            genes = seqIO_to_genelist(self.genome, self.config, ("fakA", "fakE"))
 
     def test_find_wobble(self):
         args = (self.config["codon_table"], self.config["dgn_table"])
@@ -243,6 +257,20 @@ class TestMageTool(unittest.TestCase):
         self.assertEqual(str(mut2), "[GACA=tAgt].157")
         mut3 = translation.translational_KO(self.genes["fakC"],["TAG", "TAA", "TGA"], 4)
         self.assertEqual(str(mut3), "[GACAGATAAA=tAgtGATAAt].157")
+
+    def test_a_lot_of_sequence_mutations(self):
+        """Shotgun a lot of mutations and do some automated tests."""
+        s = oligo_design.Sequence("ATAGCACATAAGACTAGACAT")
+
+        for i in range(500):
+            s = s.random_mutation(5)
+            sseql = [(a, b) for a in range(s.org_len)
+                            for b in range(len(s.seq[a]))
+                            if s.mutations[a][b] != "d"]
+            if sseql != s.seql:
+                raise Exception("aoe")
+
+
 
 
 if __name__ == "__main__":

@@ -14,6 +14,7 @@ import yaml
 from Bio import SeqIO
 
 from mage_tool.interface import run_adjustments
+from mage_tool.IO import ParserError
 from mage_tool.IO import seqIO_to_genelist
 from mage_tool.IO import oligolist_to_tabfile
 from mage_tool.IO import parse_barcode_library
@@ -107,7 +108,14 @@ if __name__ == '__main__':
     genome = SeqIO.read(genome_loc, "genbank")
 
     print("Collecting gene list..")
-    genes = seqIO_to_genelist(genome, config, include_genes)
+    incl_gnm = "genome" in include_genes
+    #include_genes = None if "all" in include_genes
+    try:
+        genes = seqIO_to_genelist(genome, config, include_genes,
+                                  include_genome=incl_gnm)
+    except ParserError as e:
+        print("Fatal error:", e)
+        exit(1)
 
     print("Loading barcode file..")
     with open(args.barcodes) as bcs:

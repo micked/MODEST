@@ -23,17 +23,25 @@ log = logging.getLogger("MODEST.IO")
 log.addHandler(logging.NullHandler())
 
 
-def seqIO_to_genelist(genome, config, include_genes=None, leader_len=35):
+class ParserError(Exception): pass
+
+
+def seqIO_to_genelist(genome, config, include_genes=None, include_genome=False,
+                      leader_len=35):
     """TODO"""
 
     genes = dict()
 
     for g in genome.features:
         if g.type == "CDS":
-            name = g.qualifiers["gene"][0]
+            name = gene_name = g.qualifiers["gene"][0]
+            locus_tag = g.qualifiers["locus_tag"][0]
 
             if include_genes and name not in include_genes:
-                continue
+                if locus_tag in include_genes:
+                    name = locus_tag
+                else:
+                    continue
 
             #Little bit of warning:
             #Bio converts positions to 0-index internally
@@ -69,22 +77,33 @@ def seqIO_to_genelist(genome, config, include_genes=None, leader_len=35):
             if strand == -1:
                 leader = leader.reverse_complement()
                 pos = g.location.end
-                # if leader_wobble:
-                #     leader_wobble = reverse_complement_dgn(leader_wobble)
 
             #TODO
             promoter = None
             promoter_pos = None
 
-            if name in genes:
-                log.warn("Gene {} found more than once.".format(name))
-                #raise Exception("Gene {} found twice!".format(name))
+            #If gene is already found and is specifically asked for.
+            if name in genes and include_genes and name in include_genes:
+                #log.warn("Gene {} found more than once.".format(name))
+                raise ParserError("Gene {} found more than once. Use locus_tag "
+                                  "[{}] instead.".format(name, locus_tag))
             else:
-                genes[name] = Gene(name, pos, strand, cds, leader,
+                gene = Gene(name, pos, strand, cds, leader,
                                    promoter, promoter_pos)
-    if include_genes and "genome" in include_genes:
+                gene.gene_name = gene_name
+                gene.locus_tag = locus_tag
+
+                genes[name] = gene
+                #Mixing genes and locus_tags are ok
+                #If no include_genes are supplied, duplicate all genes
+                if not include_genes or locus_tag in include_genes:
+                    genes[locus_tag] = gene
+
+    if include_genome:
+        #Circumvent the default Sequence object to save memory
         genes["genome"] = Gene("genome", 0, 1, "A")
         genes["genome"].cds = genome.seq
+
     return genes
 
 

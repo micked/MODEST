@@ -62,11 +62,11 @@ def parse_adjustments(adjfilehandle, genes, barcode_lib=None):
                                   "".format(gene_str, i))
             continue
 
-        if barcode_lib:
-            for bc in barcodes:
-                if bc not in barcode_lib:
-                    error_list.append("Barcode {} not found in barcode lib."
-                                      "".format(bc))
+        #Validate existance of barcodes
+        for bc in barcodes:
+            if barcode_lib and bc not in barcode_lib:
+                error_list.append("Barcode {} not found in barcode lib."
+                                  "".format(bc))
 
         current_operation = {"op": op, "gene": gene, "barcodes": barcodes}
         options, options_str = parse_options(options, op_kwargs)
@@ -345,7 +345,7 @@ def RBS_library(gene, op, config, target, n, max_mutations, method, m):
         Fx. using ``m=6``, ``fuzzy`` will collect the best possible sequences
         with a maximum of 1, 2, .. 6 mutations. It will then try to fill out
         the rest of the library with evenly spaced sequences.
-      - ``m=0`` se ``method`` for explanation on ``m``.
+      - ``m=0`` see ``method`` for explanation on ``m``.
 
     This operation will run an Monte-Carlo simulation in an attempt to reach
     the specified target value within a number of mutations. Lower numbers of
@@ -482,6 +482,13 @@ def parse_options(options, kwds):
         else:
             opts_out[o] = kwds[o][1]
 
-    opt_str = ",".join([o + "=" + str(v) for o,v in opts_out.items()])
+    opt_str = ""
+    for o, v in opts_out.items():
+        if isinstance(v, list) or isinstance(v, tuple):
+            v = ";".join(v)
+        opt_str += "," + o + "=" + str(v)
+
+    opt_str = opt_str.strip(",")
+    #opt_str = ",".join([o + "=" + str(v) for o,v in opts_out.items()])
 
     return opts_out, opt_str
