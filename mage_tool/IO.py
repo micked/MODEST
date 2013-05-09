@@ -83,7 +83,8 @@ def seqIO_to_genelist(genome, config, include_genes=None, leader_len=35):
                 genes[name] = Gene(name, pos, strand, cds, leader,
                                    promoter, promoter_pos)
     if include_genes and "genome" in include_genes:
-        genes["genome"] = Gene("genome", 0, 1, genome.seq, genome.seq[-35:])
+        genes["genome"] = Gene("genome", 0, 1, "A")
+        genes["genome"].cds = genome.seq
     return genes
 
 

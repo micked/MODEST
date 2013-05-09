@@ -18,7 +18,7 @@ from helpers import dgn_to_nts
 
 
 #Define a log
-log = logging.getLogger("MODEST.manual")
+log = logging.getLogger("MODEST.man")
 log.addHandler(logging.NullHandler())
 
 
@@ -146,7 +146,7 @@ def gene_mutation(gene, mutation):
         after = m[1]
         offset = int(m[2])
         if offset > 1: offset -= 1
-        if gene[offset, offset+len(m[0])] != before:
+        if str(gene[offset, offset+len(m[0])]) != str(before):
             log.debug("gene_mutation: {} not found in {}, found {} instead."
                       "".format(before, gene, gene[offset, offset+len(m[0])]))
             return False
@@ -208,6 +208,10 @@ def residue_mutation(gene, mutations, codon_table=default_codon_table,
         Mutation: [C=t] at pos 127
 
     """
+    if str(gene) == "genome":
+        log.error("Cannot use residue_mutation on genome")
+        return None
+
     new_dna_string = str(gene.cds)
     mutations = sorted(mutations, key=lambda x: x[1:-1])
     seq = gene.cds.copy()
@@ -219,6 +223,7 @@ def residue_mutation(gene, mutations, codon_table=default_codon_table,
 
         if not m:
             log.debug("Invalid residue mutation: {}.".format(mut))
+            return None
 
         old_AA, pos, pos_letter, new_AA = m.groups()
         pos = int(pos)

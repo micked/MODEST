@@ -19,7 +19,7 @@ from ViennaRNA import brackets_to_basepairing
 from ViennaRNA import basepairing_to_brackets
 
 #Define a log
-log = logging.getLogger("MODEST.translation")
+log = logging.getLogger("MODEST.trans")
 log.addHandler(logging.NullHandler())
 
 
@@ -44,6 +44,10 @@ def replace_start_codon(gene, start_codon="ATG"):
         False
 
     """
+    if str(gene) == "genome":
+        log.error("Cannot use replace_start_codon on genome")
+        return None
+
     if str(gene.cds[0:3]).upper() == str(start_codon).upper():
         return False
     if len(start_codon) != 3:
@@ -70,6 +74,10 @@ def translational_KO(gene, stop_codons=["TAG", "TAA", "TGA"],
     for stop codon mutations. Default is half the length of the gene.
 
     """
+    if str(gene) == "genome":
+        log.error("Cannot use translational_KO on genome")
+        return None
+
     if not KO_mutations or KO_mutations < len(stop_codons):
         KO_mutations = len(stop_codons)
 
@@ -136,6 +144,10 @@ def RBS_library_fuzzy(gene, target, n, max_mutations, low_count=0):
     (included) mutations are added before the rest of the library is selected.
 
     """
+    if str(gene) == "genome":
+        log.error("Cannot use RBS_library on genome")
+        return None
+
     #Convert target to dG
     target_dG = AU_to_dG(target)
 
@@ -204,6 +216,10 @@ def RBS_library(gene, target, n, max_mutations, m=None):
     be less than n.
 
     """
+    if str(gene) == "genome":
+        log.error("Cannot use translational_KO on genome")
+        return None
+
     targetAU = target
     targetdG = AU_to_dG(target)
 
@@ -279,23 +295,6 @@ RBS_RT_EFF = 2.222
 RBS_LOG_K =  7.824
 RBS_K = 2500.0
 
-"""
-wt expression = a0
-alt expression = ai
-max expression = am
-number of outputs = o
-
-    Sortings: fuzzy  : quick n' dirty
-              expn   : n-fold improvement
-                   ai = a0*n^i (until ai > am)
-                   (ignores o)
-          expauto: auto-fold improvement
-                   ai = a0*n^i (until i = o)
-                   ao = am
-                   n = (am/a0)^(1/o)
-
-Do it as a function?
-"""
 
 def RBS_Monte_Carlo(gene, target, maxmuts=10, collect_library=False, **kwargs):
     """TODO"""
@@ -460,9 +459,11 @@ def dG_to_AU(dG):
     """Convert an expression level to dG"""
     return RBS_K * math.exp(-dG / RBS_RT_EFF)
 
+
 """
 RBS Calculator
 """
+
 
 def RBS_predict(pre_seq, cds, nt_cutoff=35, RNAfold=ViennaRNA(), verbose=False):
     """TODO: Create a more solid RBS calculator"""
