@@ -333,6 +333,7 @@ class Gene:
             self.promoter = Sequence(promoter)
 
         self.promoter_pos = promoter_pos
+        self.in_operon = False
 
     def __str__(self):
         return self.name

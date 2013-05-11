@@ -4,6 +4,7 @@ Classes dealing with input/output and format changes
 """
 
 import re
+import os
 import csv
 import codecs
 import logging
@@ -14,6 +15,7 @@ except ImportError: from io import StringIO as strIO
 from oligo_design import Gene
 from oligo_design import Sequence
 from helpers import is_inside
+from helpers import extract_circular
 from helpers import cds_to_wobble
 from helpers import seqs_to_degenerate
 from helpers import reverse_complement
@@ -27,7 +29,7 @@ class ParserError(Exception): pass
 
 
 def seqIO_to_genelist(genome, config, include_genes=None, include_genome=False,
-                      leader_len=35):
+                      leader_len=35, promoter_len=200):
     """TODO"""
 
     genes = dict()
@@ -49,38 +51,47 @@ def seqIO_to_genelist(genome, config, include_genes=None, include_genome=False,
             strand = g.location.strand
             cds = g.extract(genome).seq
 
-            #Gene start, and leader start/end
-            if strand == -1:
-                pos = l_start =  g.location.end
-                l_end = l_start + leader_len
+            start = g.location.start
+            end = g.location.end
+
+            if strand not in [1, -1]:
+                raise Exception("Invalid strand: {}. Use 1, or -1".format(strand))
+
+            #Get leader and leader position
+            leader, l_start, l_end = get_leader(genome.seq, start, end, strand, leader_len)
+            leader = find_wobble_seq(genome, leader, l_start, l_end, config["codon_table"], config["dgn_table"])
+
+            #Detect operons
+            in_operon = None
+            if "operons" in config:
+                for operon in config["operons"]:
+                    if locus_tag in config["operons"][operon]["genes"]:
+                        if in_operon is not None:
+                            raise Exception("Gene {}/{} found in more than one operon. "
+                                            "Check your config file.".format(gene_name, locus_tag))
+                        in_operon = config["operons"][operon]
+
+            if in_operon is None:
+                operon_strand = strand
+                operon_start = start
+                operon_end = end
             else:
-                pos = l_end = g.location.start
-                l_start = l_end - leader_len
+                operon_strand = in_operon["strand"]
+                operon_start = in_operon["start"] - 1
+                operon_end = in_operon["end"]
 
-            #Leader in genome context (+1)
-            if l_start >= 0:
-                leader = genome.seq[l_start:l_end]
+            #Extract promoter sequences
+            promoter, p_start, p_end = get_leader(genome.seq, operon_start, operon_end, operon_strand, promoter_len)
+            promoter = find_wobble_seq(genome, promoter, p_start, p_end, config["codon_table"], config["dgn_table"])
+
+            if strand == 1:
+                pos = int(start)
+                promoter_pos = p_start - pos
             else:
-                #In the very unlikely coincidence that leader extends beyond 0
-                leader = genome.seq[l_start:] + genome.seq[:l_end]
-
-            #In the very unlikely coincidence that leader extends beyond len(genome)
-            if l_end > len(genome.seq):
-                leader += genome.seq[:l_end-len(genome.seq)]
-
-            leader = Sequence(leader)
-
-            #Extract wobbles
-            leader = find_wobble_seq(genome, leader, l_start, l_end,
-                                            config["codon_table"],
-                                            config["dgn_table"])
-            if strand == -1:
+                pos = int(end)
+                promoter_pos = pos - p_end
                 leader = leader.reverse_complement()
-                pos = g.location.end
-
-            #TODO
-            promoter = None
-            promoter_pos = None
+                promoter = promoter.reverse_complement()
 
             #If gene is already found and is specifically asked for.
             if name in genes and include_genes and name in include_genes:
@@ -92,6 +103,7 @@ def seqIO_to_genelist(genome, config, include_genes=None, include_genome=False,
                                    promoter, promoter_pos)
                 gene.gene_name = gene_name
                 gene.locus_tag = locus_tag
+                gene.in_operon = in_operon is not None
 
                 genes[name] = gene
                 #Mixing genes and locus_tags are ok
@@ -105,6 +117,30 @@ def seqIO_to_genelist(genome, config, include_genes=None, include_genome=False,
         genes["genome"].cds = genome.seq
 
     return genes
+
+
+def get_leader(parent_seq, start, end, strand, length):
+    """Extract a leader.
+
+    Take strand into account, and wrap-around sequences that are close to
+    either start or end of genome.
+
+    """
+    if strand not in [1, -1]:
+        raise Exception("Invalid strand: {}. Use eiter 1 or -1.".format(strand))
+
+    #Gene start, and leader start/end
+    if strand == 1:
+        leader_end = start
+        leader_start = leader_end - length
+    else:
+        leader_start = end
+        leader_end = leader_start + length
+
+    leader = extract_circular(parent_seq, leader_start, leader_end)
+
+    #Leader in genome context (+1)
+    return Sequence(leader), leader_start, leader_end
 
 
 def find_wobble_seq(genome, leader, l_start, l_end, codon_table, dgn_table):
@@ -126,24 +162,7 @@ def find_wobble_seq(genome, leader, l_start, l_end, codon_table, dgn_table):
                     w_seq = reverse_complement(w_seq)
 
                 start_offset = c.location.start - l_start
-
                 leader.add_wobble(w_seq, start_offset)
-
-                # end_offset = l_end - c.location.start
-
-                # st = ""
-                # ed = ""
-                # if start_offset < 0:
-                #     # st = str(genome.seq[l_start:l_start-start_offset])
-                #     st = "N"*-start_offset
-                #     start_offset = 0
-                # if end_offset > len(w_seq):
-                #     #DOUBLE CHECK!!!
-                #     # ed = str(genome.seq[l_start+start_offset+len(w_seq):l_end])
-                #     ed = "N"*(end_offset-len(w_seq))
-                #     end_offset = len(w_seq)
-
-                # leader_wobble = st + str(w_seq[start_offset:end_offset]) + ed
 
     return leader
 
@@ -222,7 +241,7 @@ def parse_barcode_library(barcode_filehandle):
     return barcodes
 
 
-def create_config_tables(config):
+def create_config_tables(config, cfg_basedir="./"):
     """Create additional lookup tables from the parsed config yaml file."""
     #Translation table
     AAtable = dict() #{AA: [] for AA in amino_acids}
@@ -242,7 +261,42 @@ def create_config_tables(config):
     for AA in AAtable:
         config["dgn_table"][AA] = seqs_to_degenerate(AAtable[AA])
 
+    if "DOOR_operon_source" in config:
+        opr = os.path.join(cfg_basedir, config["DOOR_operon_source"])
+        if not os.path.isfile(opr):
+            raise Exception("Could not find opr file: {}".format(opr))
+        with open(opr) as oprfile:
+            operons = parse_DOOR_oprfile(oprfile)
+        if "operons" not in config:
+            config["operons"] = dict()
+        config["operons"].update(operons)
+
     return config
+
+
+def parse_DOOR_oprfile(oprfilehandle):
+    """Parse an operonfile in DOOR format."""
+    header = None
+    operons = dict()
+    for line in oprfilehandle:
+        if not line.strip(): continue
+        if line[0] == "#": continue
+        if not header:
+            header = [h.lower() for h in line.split()]
+            continue
+        line = dict(zip(header, line.split()))
+        if not line["operonid"] in operons:
+            operons[line["operonid"]] = {"start": float("inf"), "end": float("-inf"),
+                                         "strand": 1, "genes": []}
+        operon = operons[line["operonid"]]
+        #Convert strand
+        operon["strand"] = 1 if line["strand"] == "+" else -1
+        operon["start"] = min(operon["start"], int(line["start"]))
+        operon["end"] = max(operon["end"], int(line["end"]))
+        operon["genes"].append(line["synonym"])
+
+    return operons
+
 
 """
 Oligolist functions

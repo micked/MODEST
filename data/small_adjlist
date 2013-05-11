@@ -1,3 +1,3 @@
-cysE	residue_mutation	ID01,ID02,ID05,ID08	mut=E166G
-cysE	residue_mutation	ID01,ID02,ID05,ID08	mut=M256$
-b0582   RBS_library             ID01                
+#cysE	residue_mutation	ID01,ID02,ID05,ID08	mut=E166G
+#cysE	residue_mutation	ID01,ID02,ID05,ID08	mut=M256$
+b0002   dna_mutation ID01 mut=[GAGTGT=AAAAAA].5

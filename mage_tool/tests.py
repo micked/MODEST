@@ -76,6 +76,19 @@ FEATURES             Location/Qualifiers
                      /codon_start=1
                      /gene_synonym="fak010"
                      /transl_table=11
+     CDS             complement(321..359)
+                     /gene="fakF"
+                     /locus_tag="b0007"
+                     /codon_start=1
+                     /gene_synonym="fak007"
+                     /transl_table=11
+     CDS             complement(381..419)
+                     /gene="fakG"
+                     /locus_tag="b0008"
+                     /codon_start=1
+                     /gene_synonym="fak008"
+                     /transl_table=11
+
 ORIGIN
         1 agcttttcat tctgactgca acgggcaata tgtctctgtg tggattaaaa aaagagtgtc
        61 tgatagcagc ttctgaactg gttacctgcc gtgagtaaat taaaatttta ttgacttagg
@@ -125,8 +138,15 @@ config = {'Definition': 'Escherichia coli str. K-12 substr. MG1655',
 'replication': {'ori': [50, 60],
                'ter': [700, 750],
                'ter extended': [600, 800]},
-'start_codons': ['ATG', 'GTG', 'TTG', 'ATT', 'CTG']}
-
+'start_codons': ['ATG', 'GTG', 'TTG', 'ATT', 'CTG'],
+'operons': {'3781': {'start': 119,
+                     'genes': ['b0002', 'b0003'],
+                     'end': 193,
+                     'strand': 1},
+            '3782': {'start': 320,
+                     'genes': ['b0006', 'b0007'],
+                     'end': 419,
+                     'strand': -1}}}
 
 def testest():
     class Self: pass
@@ -151,13 +171,14 @@ class TestMageTool(unittest.TestCase):
     def setUp(self):
         self.genome = SeqIO.read(strIO.StringIO(genome), "genbank")
         self.config = create_config_tables(config)
-        self.genes = seqIO_to_genelist(self.genome, self.config)
+        self.genes = seqIO_to_genelist(self.genome, self.config, promoter_len=20)
 
     def test_seqIO_to_genelist(self):
         #Default instantiation, with everything.
         self.assertItemsEqual(["fakA", "fakB", "fakC", "fakD", "fakZ", "fakE",
                                "b0001", "b0002", "b0003", "b0004", "b0010",
-                               "b0006", "b0005"], self.genes)
+                               "b0006", "b0005", "b0007", "b0008", "fakF",
+                               "fakG"], self.genes)
 
         #Instantiation with a genelist and genome
         genes = seqIO_to_genelist(self.genome, self.config, ("fakA"), True)
@@ -240,6 +261,22 @@ class TestMageTool(unittest.TestCase):
         # test same on -1 strand
         # test wobbles extending beyond limits
         # test multiple wobble
+
+    def test_promoter_seq(self):
+        #Operons, +1 and -1
+        self.assertEqual(str(self.genes["fakB"].promoter), "ATTAAAATTTTATTGACTTA")
+        self.assertEqual(str(self.genes["fakC"].promoter), "ATTAAAATTTTATTGACTTA")
+        self.assertEqual(self.genes["fakB"].promoter_pos, -20)
+        self.assertEqual(self.genes["fakC"].promoter_pos, -56)
+        self.assertEqual(str(self.genes["fakG"].promoter), "TGGCCACCTGCCCCTGCCTG")
+        self.assertEqual(str(self.genes["fakF"].promoter), "TGGCCACCTGCCCCTGCCTG")
+        self.assertEqual(self.genes["fakG"].promoter_pos, -20)
+        self.assertEqual(self.genes["fakF"].promoter_pos, -80)
+        #Not in operon, +1 and -1
+        self.assertEqual(str(self.genes["fakA"].promoter), "GAAGTCGAGCTTTTCATTCT")
+        self.assertEqual(self.genes["fakA"].promoter_pos, -20)
+        self.assertEqual(str(self.genes["fakD"].promoter), "TACTCACGGCAGGTAACCAG")
+        self.assertEqual(self.genes["fakD"].promoter_pos, -20)
 
     def test_do_mutation(self):
         mut1 = oligo_design.Mutation("eq", "[TG=GT]", 3)

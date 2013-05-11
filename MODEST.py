@@ -25,9 +25,9 @@ from mage_tool.IO import OligoLibraryReport
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("adjustments", help="Adjustment list")
-    parser.add_argument("barcodes", help="Barcode library")
-    parser.add_argument("config", help="Genome configuration")
+    parser.add_argument("adjustments", help="Adjustment list", type=argparse.FileType("r"))
+    parser.add_argument("barcodes", help="Barcode library", type=argparse.FileType("r"))
+    parser.add_argument("config", help="Genome configuration", type=argparse.FileType("r"))
     parser.add_argument("--genome", help="Annotated genome. Leave empty to"
                         " locate automatically.", default=None)
     parser.add_argument("--log", help="Logfile, default <project>.log. "
@@ -67,29 +67,26 @@ if __name__ == '__main__':
         logging.getLogger('').addHandler(console)
 
     print("Reading adjustments..")
-    with open(args.adjustments) as f:
-        adjustlist = f.readlines()
+    adjustlist = args.adjustments.readlines()
 
     include_genes = set([line.split()[0] for line in adjustlist
                          if line.strip() and line[0] != "#"])
 
     print("Loading config file..")
-    with open(args.config) as cfg:
-        config = yaml.safe_load(cfg)
-        config = create_config_tables(config)
+    config = yaml.safe_load(args.config)
+    cfg_basedir = os.path.abspath(os.path.dirname(args.config.name))
+    config = create_config_tables(config, cfg_basedir)
 
     if not args.genome:
-        genome_locations = [os.path.splitext(args.config)[0] + ".gb",
-                            os.path.splitext(args.config)[0] + ".genbank",
+        cfg_basename = os.path.splitext(args.config.name)[0]
+        genome_locations = [cfg_basename + ".gb",
+                            cfg_basename + ".genbank",
                             config["Locus"],
                             config["Locus"] + ".gb",
                             config["Locus"] + ".genbank",
-                            os.path.join(os.path.dirname(
-                                args.config), config["Locus"]),
-                            os.path.join(os.path.dirname(
-                                args.config), config["Locus"] + ".gb"),
-                            os.path.join(os.path.dirname(args.config),
-                                         config["Locus"] + ".genbank")]
+                            os.path.join(cfg_basedir, config["Locus"]),
+                            os.path.join(cfg_basedir, config["Locus"] + ".gb"),
+                            os.path.join(cfg_basedir, config["Locus"] + ".genbank")]
 
         for loc in genome_locations:
             if os.path.isfile(loc):
@@ -118,17 +115,15 @@ if __name__ == '__main__':
         exit(1)
 
     print("Loading barcode file..")
-    with open(args.barcodes) as bcs:
-        barcoding_lib = parse_barcode_library(bcs)
+    #with open(args.barcodes) as bcs:
+    barcoding_lib = parse_barcode_library(args.barcodes)
 
     print("Making oligos..")
     threaded = not args.T
     adj_args = (adjustlist, genes, genome.seq, config, args.project,
                 barcoding_lib, threaded)
-    #if not args.T:
     oligos, errors = run_adjustments(*adj_args)
-    #else:
-    #    oligos, errors = run_adjustments_unthreaded(*adj_args)
+
     if errors:
         print("Computation not started, errors in adjustments file:")
         print("\n".join(errors))

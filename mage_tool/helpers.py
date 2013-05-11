@@ -250,6 +250,25 @@ def is_inside(db_start, db_end, q_start, q_end):
     return False
 
 
+def extract_circular(parent, start, end):
+    """Extract start:end from a circular sequence.
+
+    TODO: Doctest
+
+    """
+    if start >= 0:
+        extr = parent[start:end]
+    else:
+        #Leader extends backwards beyond 0
+        extr = parent[start:] + parent[:end]
+
+    #Leader extends beyond len(genome)
+    if end > len(parent):
+        extr += parent[:end-len(parent)]
+
+    return extr
+
+
 if __name__ == "__main__":
     import doctest
     doctest.testmod()
