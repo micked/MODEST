@@ -279,13 +279,14 @@ class TestMageTool(unittest.TestCase):
         self.assertEqual(self.genes["fakD"].promoter_pos, -20)
 
     def test_do_mutation(self):
-        mut1 = oligo_design.Mutation("eq", "[TG=GT]", 3)
+        mut1 = oligo_design.Mutation("TG", "GT", 3)
         mut1 = self.genes["fakA"].do_mutation(mut1)
         self.assertEqual(str(mut1), "[TG=gt].16")
 
-        mut2 = oligo_design.Mutation("eq", "[CA=GG]", 2)
+        mut2 = oligo_design.Mutation("CA", "GG", 2)
         mut2 = self.genes["fakD"].do_mutation(mut2)
         self.assertEqual(str(mut2), "[TG=cc].73")
+
 
     def test_KO(self):
         mut1 = translation.translational_KO(self.genes["fakA"])

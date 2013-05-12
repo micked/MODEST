@@ -195,32 +195,30 @@ class Oligo:
 
 
 class Mutation:
-    """Mutation object
+    def __init__(self, before, after, pos, ref_seq=None):
+        """A Mutation.
 
-    IMPORTANT: Position must be 0-indexed!
+        Mutation objects are internally 0-indexed.
 
-    mut_format can be:
-    arrow: position required
-        point mutation: A->T, pos, mut_change="Point_Mutation"
-        insertion:      A, pos, mut_change="Insertion"
-        deletion        3, pos, mut_change="Deletion"
-    eq: position required
-        point mutation: A=T, pos
-        insertion:      =AT, pos
-        deletion:       A=, pos
-    genome: search genome for mutation (eq format)
-        AATGATA[ATG=GT]ATGATA
+        """
+        #Parse and set before sequence
+        if len(before) and not valid_dgn(before):
+            raise ValueError("Invalid 'before' sequence: '{}'.".format(before))
+        self.before = str(before).upper()
 
-    """
-    def __init__(self, mut_format, mut, pos=0, mut_type="", ref_genome=False):
-        if mut_format.lower() == "arrow":
-            self._parse_arrow(mut, int(pos), mut_type, ref_genome)
-        elif mut_format.lower() == "eq":
-            self._parse_eq(mut, int(pos))
-        else:
-            raise Exception("Format: \"{}\" unknown".format(mut_format))
+        #Parse and set after sequence
+        if len(after) and not valid_dgn(after):
+            raise ValueError("Invalid 'after' sequence: '{}'.".format(after))
+        self.after = str(after)
 
-        for n in ["a", "t", "g", "c"]:
+        #Parse pos
+        try:
+            self.pos = int(pos)
+        except ValueError:
+            raise ValueError("Invalid position: '{}'.".format(pos))
+
+        #Automatically adjust after to all-lower if no lowercase chars are found.
+        for n in "atgcrymkswbdhvn":
             if n in self.after:
                 return
         self.after = self.after.lower()
@@ -1013,8 +1011,7 @@ class Sequence:
                 after += self.seq[a][b][0].upper()
 
         #Mutation object
-        mut = "[{}={}]".format(before, after)
-        mut = Mutation("eq", mut, start)
+        mut = Mutation(before, after, start)
         return mut
 
     def get_mutated_positions(self):

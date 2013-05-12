@@ -54,7 +54,6 @@ def replace_start_codon(gene, start_codon="ATG"):
         raise ValueError("start_codon must be 3 nucleotides long. Recieved: "
                          "{} ({})".format(start_codon, len(start_codon)))
 
-    #mutation = find_mutation_box(gene.cds[0:3], start_codon)
     seq = gene.cds.copy()
     for i, nt in enumerate(start_codon):
         seq.mutate(nt, i, in_place=True)

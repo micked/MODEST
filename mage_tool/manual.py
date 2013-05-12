@@ -173,8 +173,8 @@ def gene_mutation(gene, mutation):
         return False
 
     #Do mutation
-    mut = "{}={}".format(before, after)
-    mutation = Mutation("eq", mut, offset)
+    #mut = "{}={}".format(before, after)
+    mutation = Mutation(before, after, offset)
     #Return gene mutation.
     return gene.do_mutation(mutation)
 
