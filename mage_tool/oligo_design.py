@@ -17,6 +17,7 @@ from helpers import valid_dgn
 from helpers import dgn_to_nts
 from helpers import nts_to_dgn
 from helpers import reverse_complement
+from helpers import extract_circular
 
 #Define a log
 log = logging.getLogger("MODEST.oligo")
@@ -35,7 +36,8 @@ class Oligo:
         self.optimised = 0
         self.dG_fold = 0
         self.replichore = None
-        self.project = project.replace(" ", "_")
+        self.strand = 1
+        self.project = project.replace(" ", "_") if project else project
         self.number = number
 
         self.barcodes_forward = list()
@@ -60,10 +62,10 @@ class Oligo:
             found = genome[self.mut.pos:self.mut.pos+len(self.mut.before)]
             mutpos = self.mut.pos
             len_bef = len(self.mut.before)
-            extended = "{}({}){}".format(genome[mutpos-5:mutpos],
-                                         found,
+            extended = "{}({}){}".format(genome[mutpos-5:mutpos], found,
                                          genome[mutpos+len_bef:mutpos+len_bef+5])
-            raise Exception("Trying to mutate {}, but found {} in genome. {}".format(self.mut.before, found, extended))
+            raise Exception("Trying to mutate {}, but found {} in genome. "
+                            "{}".format(self.mut.before, found, extended))
 
         #Calculate flanking sequence lengths
         post_seq_len = (self.oligo_len - len(self.mut.after))/2
@@ -71,11 +73,14 @@ class Oligo:
         post_seq_len -= offset
 
         #Fetch pre sequence
-        pre_seq = genome[self.mut.pos-pre_seq_len:self.mut.pos]
+        pre_start = self.mut.pos - pre_seq_len
+        pre_end = self.mut.pos
+        pre_seq = extract_circular(genome, pre_start, pre_end)
 
         #Fetch post sequence
-        post_seq_start = self.mut.pos+len(self.mut.before)
-        post_seq = genome[post_seq_start : post_seq_start+post_seq_len]
+        post_start = self.mut.pos + len(self.mut.before)
+        post_end = post_start + post_seq_len
+        post_seq = extract_circular(genome, post_start, post_end)
 
         return pre_seq + self.mut.after + post_seq
 
@@ -115,41 +120,38 @@ class Oligo:
         return optimised_oligo
 
     def target_lagging_strand(self, ori, ter):
-        """Calculate replichore and target the lagging strand
+        """Calculate replichore and target the lagging strand.
 
-        Returns False if pos is inside oriC or Ter, True otherwise
         ori and ter are ranges: [start, end]
         """
         #Check whether pos is not inside oriC or Ter
         if ori[0] <= self.pos <= ori[1]:
             self.replichore = 0
             log.warning("Oligo: {} inside oriC".format(self.short_id()))
-            return False
         elif ter[0] <= self.pos <= ter[1]:
             self.replichore = 0
             log.warning("Oligo: {} inside termination region".format(self.short_id()))
-            return False
-
         #OriC is on the second half of the genome
-        if ori[1] > ter[0]:
-            #Replichore 1, reverse complement
+        elif ori[1] > ter[0]:
             if not ter[1] < self.pos < ori[0]:
                 self.replichore = 1
-                self.oligo = reverse_complement(self.oligo)
-                return True
             else:
                 self.replichore = 2
-                return True
         #OriC is on the first half of the genome
         else:
-            #Replichore 1, reverse complement
             if ori[1] < self.pos < ter[0]:
                 self.replichore = 1
-                self.oligo = reverse_complement(self.oligo)
-                return True
             else:
                 self.replichore = 2
-                return True
+
+        #Scale replichore to target (strand 2 -> 1 and 1 -> -1)
+        rp = int((self.replichore - 1.5) * 2)
+
+        #Mismatch
+        if self.replichore and rp != self.strand:
+            self.oligo = reverse_complement(self.oligo)
+            self.strand = self.strand * -1
+
 
     def add_barcodes(self, barcode_ids, barcoding_lib):
         """TODO"""

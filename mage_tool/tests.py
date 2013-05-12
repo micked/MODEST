@@ -287,7 +287,63 @@ class TestMageTool(unittest.TestCase):
         mut2 = self.genes["fakD"].do_mutation(mut2)
         self.assertEqual(str(mut2), "[TG=cc].73")
 
+    def test_create_oligo(self):
+        #RP1, inside genome
+        mut1 = oligo_design.Mutation("T", "a", 86)
+        oligo1 = oligo_design.Oligo(mut1, "noGene", oligo_len=30)
+        oligo1.set_oligo(self.genome.seq, optimise=False)
+        self.assertEqual(str(oligo1.output()), "TCTGAACTGGTTACCaGCCGTGAGTAAATT")
 
+        #RP2, inside genome
+        mut2 = oligo_design.Mutation("C", "A", 950)
+        oligo2 = oligo_design.Oligo(mut2, "noGene", oligo_len=30)
+        oligo2.set_oligo(self.genome.seq, optimise=False)
+        self.assertEqual(str(oligo2.output()), "GGTGCTTGGACGCAAaGGTTCCGACTACTC")
+
+        #RP2, extends to -7
+        mut3 = oligo_design.Mutation("A", "C", 8)
+        oligo3 = oligo_design.Oligo(mut3, "noGene", oligo_len=30)
+        oligo3.set_oligo(self.genome.seq, optimise=False)
+        self.assertEqual(str(oligo3.output()), "GAAGTCGAGCTTTTCcTTCTGACTGCAACG")
+
+        #RP2, extends beyond len
+        mut4 = oligo_design.Mutation("G", "C", 1070)
+        oligo4 = oligo_design.Oligo(mut4, "noGene", oligo_len=30)
+        oligo4.set_oligo(self.genome.seq, optimise=False)
+        self.assertEqual(str(oligo4.output()), "GCCCGATGCGAGGTTcTTGAAGTCGAGCTT")
+
+        #RP1, deletion
+        mut5 = oligo_design.Mutation("AGC", "", 201)
+        oligo5 = oligo_design.Oligo(mut5, "noGene", oligo_len=30)
+        oligo5.set_oligo(self.genome.seq, optimise=False)
+        self.assertEqual(str(oligo5.output()), "TCCATGAAACGCATTACCACCATTACCACC")
+
+        #RP1, insertion
+        mut5 = oligo_design.Mutation("", "atgc", 201)
+        oligo5 = oligo_design.Oligo(mut5, "noGene", oligo_len=30)
+        oligo5.set_oligo(self.genome.seq, optimise=False)
+        self.assertEqual(str(oligo5.output()), "CATGAAACGCATTatgcAGCACCACCATTA")
+
+        ori = self.config["replication"]["ori"]
+        ter = self.config["replication"]["ter"]
+        oligo1.target_lagging_strand(ori, ter)
+        self.assertEqual(str(oligo1.output()), "AATTTACTCACGGCtGGTAACCAGTTCAGA")
+        #This could happen
+        oligo1.target_lagging_strand(ori, ter)
+        self.assertEqual(str(oligo1.output()), "AATTTACTCACGGCtGGTAACCAGTTCAGA")
+
+        #RP2
+        oligo2.target_lagging_strand(ori, ter)
+        self.assertEqual(str(oligo2.output()), "GGTGCTTGGACGCAAaGGTTCCGACTACTC")
+
+
+    def test_KO(self):
+        mut1 = translation.translational_KO(self.genes["fakA"])
+        self.assertEqual(str(mut1), "[CAACGG=atAata].18")
+        mut2 = translation.translational_KO(self.genes["fakC"])
+        self.assertEqual(str(mut2), "[GACA=tAgt].157")
+        mut3 = translation.translational_KO(self.genes["fakC"],["TAG", "TAA", "TGA"], 4)
+        self.assertEqual(str(mut3), "[GACAGATAAA=tAgtGATAAt].157")
     def test_KO(self):
         mut1 = translation.translational_KO(self.genes["fakA"])
         self.assertEqual(str(mut1), "[CAACGG=atAata].18")
