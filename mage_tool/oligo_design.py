@@ -246,7 +246,10 @@ class Mutation:
         fpmut_refst = self.pos + len(self.before)
         fpmut_refnd = self.pos + 200 + len(self.before) - len(self.after)
         fpmut_ref = self.after.upper() + extract_circular(ref_genome, fpmut_refst, fpmut_refnd)
-        fpmut = make_primer(fpmut_ref, temp, 200, 203, salt_c, primer_c, 200)
+        fpmut_ref = self.after.upper() + extract_circular(ref_genome, fpmut_refst, fpmut_refnd)
+        if not self.after:
+            fpmut_ref = ref_genome[self.pos-1] + fpmut_ref
+        fpmut = make_primer(fpmut_ref, temp, 0, 3, salt_c, primer_c, 200)
 
         #rpwt: reverse primer(wt)
         rpwt_refst = self.pos + len(self.before) - 200
@@ -257,6 +260,8 @@ class Mutation:
         #rpmut: reverse primer(mut)
         rpmut_refst = self.pos + len(self.after) - 200
         rpmut_ref = extract_circular(ref_genome, rpmut_refst, self.pos) + self.after.upper()
+        if not self.after:
+            rpmut_ref = rpmut_ref + ref_genome[self.pos+len(self.before)]
         rpmut_ref = reverse_complement(rpmut_ref)
         rpmut = make_primer(rpmut_ref, temp, 0, 3, salt_c, primer_c, 200)
 

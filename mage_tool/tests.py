@@ -347,6 +347,12 @@ class TestMageTool(unittest.TestCase):
         self.assertEqual(str(prm["rpwt"][0]), "CTAATGCGTTTC")
         self.assertEqual(str(prm["rpmut"][0]), "GATGCGTTTCA")
         self.assertEqual(str(prm[-100][0]), "AATTTTATTGACTTAG")
+        mut2 = oligo_design.Mutation("TAG", "", 200, self.genome.seq)
+        prm = mut2.MASC_primers(self.genome.seq, lengths=[100], temp=30.0)
+        self.assertEqual(str(prm["fpwt"][0]), "TAGCACCACCA")
+        self.assertEqual(str(prm["fpmut"][0]), "TCACCACCATT")
+        self.assertEqual(str(prm["rpwt"][0]), "CTAATGCGTTTC")
+        self.assertEqual(str(prm["rpmut"][0]), "GATGCGTTTCA")
 
     def test_KO(self):
         mut1 = translation.translational_KO(self.genes["fakA"])
