@@ -1,9 +1,12 @@
+# -*- coding: utf-8 -*-
+
 try:
     from string import maketrans
 except ImportError:
     maketrans = str.maketrans
 
 import re
+from math import log
 
 
 """
@@ -267,6 +270,92 @@ def extract_circular(parent, start, end):
         extr += parent[:end-len(parent)]
 
     return extr
+
+
+default_primer_constants = {
+    #      kcal/mol   cal/k*mol
+    "AA": {"H": -7.9, "S": -22.2},
+    "AT": {"H": -7.2, "S": -20.4},
+    "TA": {"H": -7.2, "S": -21.3},
+    "CA": {"H": -8.5, "S": -22.7},
+    "GT": {"H": -8.4, "S": -22.4},
+    "CT": {"H": -7.8, "S": -21.0},
+    "GA": {"H": -8.2, "S": -22.2},
+    "CG": {"H": -10.6,"S": -27.2},
+    "GC": {"H": -9.8, "S": -24.4},
+    "GG": {"H": -8.0, "S": -19.9},
+    #Initiation w GC
+    "G": {"H": 0.1, "S": -2.8},
+    #Initiation w AT
+    "A": {"H": 2.3, "S":  4.1},
+    #Symmetry penalty
+    "sym": {"H": 0,   "S": -1.4},
+    "dS_salt": 0.368,
+}
+
+
+def primer_tm(primer, salt=0.05, c=5e-8, constants=None):
+    """Calculate primer Tm according to SantaLucia 1998.
+
+    salt is the concentration of monovalent cations in mol/L, and c is the
+    primer concentration in mol/L. constants are given as a dict of neighbors.
+    See default_primer_constants for an example.
+
+    Full citation:
+        SantaLucia, J. A unified view of polymer, dumbbell, and oligonucleotide
+        DNA nearest-neighbor thermodynamics. Proceedings of the National
+        Academy of Sciences of the United States of America 95, 1460–5 (1998).
+
+    """
+    prm = str(primer).upper()
+    #if not valid_dna(prm):
+    #    raise ValueError("A valid DNA sequence (no degenerate NTs) must be used "
+    #                     "with primer_tm. Got: '{}'.".format(primer))
+
+    #Load constants or default constants
+    cnst = constants if constants else default_primer_constants
+
+    #First termial pairing penalty
+    st = prm[0] if prm[0] in cnst else reverse_complement(prm[0])
+    if st in cnst:
+        dH = cnst[st]["H"]
+        dS = cnst[st]["S"]
+
+    #Symmetry penalty
+    half = int(len(prm)/2)
+    if prm[:half] == prm[-half:][::-1]:
+        dH += cnst["sym"]["H"]
+        dS += cnst["sym"]["S"]
+
+    #Nearest neighbors.
+    #Last terminal penalty is included.
+    for i in range(len(prm)):
+        pair = prm[i:i+2]
+        pair = pair if pair in cnst else reverse_complement(pair)
+        if pair not in cnst: continue
+        dH += cnst[pair]["H"]
+        dS += cnst[pair]["S"]
+
+    NN = len(prm) - 1
+    dS_salt = dS + cnst["dS_salt"] * NN * log(salt)
+
+    R = 1.987 #cal/molK
+    return dH*1000/(dS_salt + R*log(c/4)) - 273.15
+
+
+def make_primer(ref_seq, temp, start, end, salt_c=0.05, primer_c=5e-8, max_len=200):
+    """Extract a primer from ref_seq with Tm of temp."""
+    for i in range(max_len):
+        pr = extract_circular(ref_seq, start, end)
+        Tm = primer_tm(pr, salt_c, primer_c)
+        if Tm > temp:
+            break
+        #Keep going
+        end += 1
+    else:
+        raise Exception("Target temp ({}) not reached for forward primer. "
+                        "(Reached: {})".format(temp, Tm))
+    return pr, Tm
 
 
 if __name__ == "__main__":

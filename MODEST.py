@@ -21,6 +21,7 @@ from mage_tool.IO import parse_barcode_library
 from mage_tool.IO import create_config_tables
 from mage_tool.IO import oligolist_to_csv
 from mage_tool.IO import OligoLibraryReport
+from mage_tool.IO import oligolist_to_mascfile
 
 
 if __name__ == '__main__':
@@ -38,6 +39,8 @@ if __name__ == '__main__':
     parser.add_argument("-o", "--output", help="Output file. "
                         "Default <project>.out", default=False)
     parser.add_argument("-T", help="Run unthreaded", action="store_true")
+    parser.add_argument("--MASC", help="Design MASC PCR primers to file", default=False,
+                        nargs="?", metavar="mascfile")
     args = parser.parse_args()
 
     if args.log == "--":
@@ -146,3 +149,11 @@ if __name__ == '__main__':
     report = OligoLibraryReport(args.project)
     report.parse_and_generate(csvlist, csv_file=False)
     report.write_pdf(output_pdf)
+
+    if args.MASC or args.MASC is None:
+        mascfile = args.MASC if args.MASC else args.project + "_masc_primers.csv"
+        print("Designing MASC PCR primers to {}..".format(mascfile))
+        masc_kwargs = {"lengths": [100, 150, 200, 250, 300, 400, 500, 600, 700, 850]}
+        masc_kwargs["ref_genome"] = genome.seq
+        masc_kwargs["temp"] = 62.0
+        masc_primers = oligolist_to_mascfile(oligos, masc_kwargs, mascfile)

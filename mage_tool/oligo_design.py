@@ -18,6 +18,7 @@ from helpers import dgn_to_nts
 from helpers import nts_to_dgn
 from helpers import reverse_complement
 from helpers import extract_circular
+from helpers import make_primer
 
 #Define a log
 log = logging.getLogger("MODEST.oligo")
@@ -152,7 +153,6 @@ class Oligo:
             self.oligo = reverse_complement(self.oligo)
             self.strand = self.strand * -1
 
-
     def add_barcodes(self, barcode_ids, barcoding_lib):
         """TODO"""
         #Add barcode IDs to self.barcode_ids
@@ -203,27 +203,78 @@ class Mutation:
         Mutation objects are internally 0-indexed.
 
         """
-        #Parse and set before sequence
-        if len(before) and not valid_dgn(before):
-            raise ValueError("Invalid 'before' sequence: '{}'.".format(before))
-        self.before = str(before).upper()
-
-        #Parse and set after sequence
-        if len(after) and not valid_dgn(after):
-            raise ValueError("Invalid 'after' sequence: '{}'.".format(after))
-        self.after = str(after)
-
         #Parse pos
         try:
             self.pos = int(pos)
         except ValueError:
             raise ValueError("Invalid position: '{}'.".format(pos))
 
+        #Parse and set before sequence
+        if len(before) and not valid_dgn(before):
+            raise ValueError("Invalid 'before' sequence: '{}'.".format(before))
+        self.before = str(before).upper()
+        if ref_seq:
+            if self.before != str(ref_seq[self.pos:self.pos+len(self.before)]):
+                raise ValueError("Trying to mutate '{}', but found '{}' in reference sequence."
+                                 "".format(self.before, ref_seq[self.pos:self.pos+len(before)]))
+
+        #Parse and set after sequence
+        if len(after) and not valid_dgn(after):
+            raise ValueError("Invalid 'after' sequence: '{}'.".format(after))
+        self.after = str(after)
+
         #Automatically adjust after to all-lower if no lowercase chars are found.
         for n in "atgcrymkswbdhvn":
             if n in self.after:
                 return
         self.after = self.after.lower()
+
+    def MASC_primers(self, ref_genome, lengths=[200], temp=62.0, primer_c=2e-7,
+                     salt_c=0.05):
+        """Design Multiplex Allele Specific Colony PCR primers.
+
+        lengths is a list of PCR fragment lengths, and temp is the target tm.
+
+        primer_c is primer concentration in mol/L, salt_c is monovalent cation
+        concentration in mol/L.
+
+        """
+        #fpwt: forward primer(wt)
+        fpwt = make_primer(ref_genome, temp, self.pos, self.pos+3, salt_c, primer_c, 200)
+
+        #fpmut: forward primer(mut)
+        fpmut_refst = self.pos + len(self.before)
+        fpmut_refnd = self.pos + 200 + len(self.before) - len(self.after)
+        fpmut_ref = self.after.upper() + extract_circular(ref_genome, fpmut_refst, fpmut_refnd)
+        fpmut = make_primer(fpmut_ref, temp, 200, 203, salt_c, primer_c, 200)
+
+        #rpwt: reverse primer(wt)
+        rpwt_refst = self.pos + len(self.before) - 200
+        rpwt_ref = extract_circular(ref_genome, rpwt_refst, rpwt_refst + 200)
+        rpwt_ref = reverse_complement(rpwt_ref)
+        rpwt = make_primer(rpwt_ref, temp, 0, 3, salt_c, primer_c, 200)
+
+        #rpmut: reverse primer(mut)
+        rpmut_refst = self.pos + len(self.after) - 200
+        rpmut_ref = extract_circular(ref_genome, rpmut_refst, self.pos) + self.after.upper()
+        rpmut_ref = reverse_complement(rpmut_ref)
+        rpmut = make_primer(rpmut_ref, temp, 0, 3, salt_c, primer_c, 200)
+
+        primers = {"fpwt": fpwt, "fpmut": fpmut,
+                   "rpwt": rpwt, "rpmut": rpmut}
+        lengths = [lengths] if type(lengths) is int else lengths
+        for l in lengths:
+            if l < 0:
+                st = self.pos + len(self.before) + l
+                pr = make_primer(ref_genome, temp, st, st+3, salt_c, primer_c, 200)
+            else:
+                ref = extract_circular(ref_genome, self.pos+l-200, self.pos+l)
+                ref = reverse_complement(ref)
+                pr = make_primer(ref, temp, 0, 3, salt_c, primer_c, 200)
+
+            primers[l] = pr
+
+        return primers
 
     def __repr__(self):
         return "Mutation: [{}={}] at pos {}".format(
@@ -243,28 +294,6 @@ class Mutation:
             after = after[0:2] + ".." + after[-2:]
 
         return "[{}={}].{}".format(before, after, self.pos+idx)
-
-    def _parse_arrow(self, mut, pos, mut_type, ref_genome=False):
-        """Parse arrow format"""
-        self.pos = pos
-        if mut_type.lower() == "point_mutation":
-            self.before = mut.split("->")[0]
-            self.after = mut.split("->")[1]
-        elif mut_type.lower() == "insertion":
-            self.before = ""
-            self.after = mut
-        elif mut_type.lower() == "deletion" or mut_type.lower() == "large_deletion":
-            if not ref_genome:
-                raise Exception("No reference genome supplied")
-            self.before = ref_genome[pos-1:pos+int(mut)-1]
-            self.after = ""
-        else:
-            raise Exception("Unknown mut_type: " + mut_type)
-
-    def _parse_eq(self, mut, pos):
-        self.pos = pos
-        mut = mut.strip("[]")
-        self.before, self.after = mut.split("=")
 
     def copy(self):
         """Return a copy"""

@@ -342,7 +342,7 @@ def oligolist_to_csv(oligolist, output=None):
     if output:
         cls = False
         if not hasattr("write", output):
-            output = open(output, "w")
+            output = open(output, "wb")
             cls = True
 
         #For Libreoffice Calc
@@ -362,6 +362,50 @@ def oligolist_to_csv(oligolist, output=None):
 
     return [headers] + csvoutlist
 
+
+def oligolist_to_mascfile(oligolist, masc_kwargs, mascfile=None):
+    """Generate MASC PCR primers.
+
+    Write primers to mascfile in plain text format if mascfile is supplied.
+
+    """
+    masc_primers = dict()
+    un_oligos = list()
+    for oligo in oligolist:
+        ID = oligo.short_id().split(".")[0]
+        if ID not in un_oligos:
+            un_oligos.append(ID)
+            masc_primers[ID] = oligo.mut.MASC_primers(**masc_kwargs)
+            masc_primers[ID]["mut"] = oligo.mut
+
+    if mascfile:
+        cls = False
+        if not hasattr(mascfile, "write"):
+            mascfile = open(mascfile, "wb")
+            cls = True
+
+        #For Libreoffice Calc
+        mascfile.write(codecs.BOM_UTF8)
+        csv_w = csv.writer(mascfile)
+
+        headers = ["id", "mut", "forward(wt)", "forward(mut)"]
+        for l in sorted(masc_kwargs["lengths"]):
+            headers.append(str(l))
+        csv_w.writerow(headers)
+
+        for ID in un_oligos:
+            prm = masc_primers[ID]
+            line = [ID, prm["mut"].__str__(idx=1)]
+            line.append(str(prm["fpwt"][0]))
+            line.append(str(prm["fpmut"][0]))
+            for l in sorted(masc_kwargs["lengths"]):
+                line.append(str(prm[l][0]))
+            csv_w.writerow(line)
+
+        if cls:
+            mascfile.close()
+
+    return masc_primers
 
 class OligoLibraryReport:
     """Print a report from a csv report.

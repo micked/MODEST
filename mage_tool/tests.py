@@ -279,47 +279,47 @@ class TestMageTool(unittest.TestCase):
         self.assertEqual(self.genes["fakD"].promoter_pos, -20)
 
     def test_do_mutation(self):
-        mut1 = oligo_design.Mutation("TG", "GT", 3)
+        mut1 = oligo_design.Mutation("TG", "GT", 3, self.genes["fakA"].cds)
         mut1 = self.genes["fakA"].do_mutation(mut1)
         self.assertEqual(str(mut1), "[TG=gt].16")
 
-        mut2 = oligo_design.Mutation("CA", "GG", 2)
+        mut2 = oligo_design.Mutation("CA", "GG", 2, self.genes["fakD"].cds)
         mut2 = self.genes["fakD"].do_mutation(mut2)
         self.assertEqual(str(mut2), "[TG=cc].73")
 
     def test_create_oligo(self):
         #RP1, inside genome
-        mut1 = oligo_design.Mutation("T", "a", 86)
+        mut1 = oligo_design.Mutation("T", "a", 86, self.genome.seq)
         oligo1 = oligo_design.Oligo(mut1, "noGene", oligo_len=30)
         oligo1.set_oligo(self.genome.seq, optimise=False)
         self.assertEqual(str(oligo1.output()), "TCTGAACTGGTTACCaGCCGTGAGTAAATT")
 
         #RP2, inside genome
-        mut2 = oligo_design.Mutation("C", "A", 950)
+        mut2 = oligo_design.Mutation("C", "A", 950, self.genome.seq)
         oligo2 = oligo_design.Oligo(mut2, "noGene", oligo_len=30)
         oligo2.set_oligo(self.genome.seq, optimise=False)
         self.assertEqual(str(oligo2.output()), "GGTGCTTGGACGCAAaGGTTCCGACTACTC")
 
         #RP2, extends to -7
-        mut3 = oligo_design.Mutation("A", "C", 8)
+        mut3 = oligo_design.Mutation("A", "C", 8, self.genome.seq)
         oligo3 = oligo_design.Oligo(mut3, "noGene", oligo_len=30)
         oligo3.set_oligo(self.genome.seq, optimise=False)
         self.assertEqual(str(oligo3.output()), "GAAGTCGAGCTTTTCcTTCTGACTGCAACG")
 
         #RP2, extends beyond len
-        mut4 = oligo_design.Mutation("G", "C", 1070)
+        mut4 = oligo_design.Mutation("G", "C", 1070, self.genome.seq)
         oligo4 = oligo_design.Oligo(mut4, "noGene", oligo_len=30)
         oligo4.set_oligo(self.genome.seq, optimise=False)
         self.assertEqual(str(oligo4.output()), "GCCCGATGCGAGGTTcTTGAAGTCGAGCTT")
 
         #RP1, deletion
-        mut5 = oligo_design.Mutation("AGC", "", 201)
+        mut5 = oligo_design.Mutation("AGC", "", 201, self.genome.seq)
         oligo5 = oligo_design.Oligo(mut5, "noGene", oligo_len=30)
         oligo5.set_oligo(self.genome.seq, optimise=False)
         self.assertEqual(str(oligo5.output()), "TCCATGAAACGCATTACCACCATTACCACC")
 
         #RP1, insertion
-        mut5 = oligo_design.Mutation("", "atgc", 201)
+        mut5 = oligo_design.Mutation("", "atgc", 201, self.genome.seq)
         oligo5 = oligo_design.Oligo(mut5, "noGene", oligo_len=30)
         oligo5.set_oligo(self.genome.seq, optimise=False)
         self.assertEqual(str(oligo5.output()), "CATGAAACGCATTatgcAGCACCACCATTA")
@@ -336,14 +336,18 @@ class TestMageTool(unittest.TestCase):
         oligo2.target_lagging_strand(ori, ter)
         self.assertEqual(str(oligo2.output()), "GGTGCTTGGACGCAAaGGTTCCGACTACTC")
 
+    def test_MASC(self):
+        mut1 = oligo_design.Mutation("TAG", "C", 200, self.genome.seq)
+        prm = mut1.MASC_primers(self.genome.seq, lengths=[100,150,200,-100], temp=30.0)
+        self.assertEqual(str(prm["fpwt"][0]), "TAGCACCACCA")
+        self.assertEqual(str(prm["fpmut"][0]), "CCACCACCATT")
+        self.assertEqual(str(prm[100][0]), "CCCGCACTG")
+        self.assertEqual(str(prm[150][0]), "TTCAACACTCG")
+        self.assertEqual(str(prm[200][0]), "CGGCAACACG")
+        self.assertEqual(str(prm["rpwt"][0]), "CTAATGCGTTTC")
+        self.assertEqual(str(prm["rpmut"][0]), "GATGCGTTTCA")
+        self.assertEqual(str(prm[-100][0]), "AATTTTATTGACTTAG")
 
-    def test_KO(self):
-        mut1 = translation.translational_KO(self.genes["fakA"])
-        self.assertEqual(str(mut1), "[CAACGG=atAata].18")
-        mut2 = translation.translational_KO(self.genes["fakC"])
-        self.assertEqual(str(mut2), "[GACA=tAgt].157")
-        mut3 = translation.translational_KO(self.genes["fakC"],["TAG", "TAA", "TGA"], 4)
-        self.assertEqual(str(mut3), "[GACAGATAAA=tAgtGATAAt].157")
     def test_KO(self):
         mut1 = translation.translational_KO(self.genes["fakA"])
         self.assertEqual(str(mut1), "[CAACGG=atAata].18")
