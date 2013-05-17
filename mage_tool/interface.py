@@ -373,7 +373,27 @@ def RBS_library(gene, op, config, target, n, max_mutations, method, m):
 
     return muts_out
 
+def promoter_library(gene, op, config, targets, max_mutations, matrix):
+    """Create a library of different promoter expression levels.
 
+    """
+    if str(gene) == "genome":
+        log.error(op + " Cannot use promoter_library on genome")
+        return None
+
+    muts = promoter.promoter_library(gene, targets, max_mutations, matrix)
+
+
+    if not muts:
+        return None
+
+    muts_out = list()
+    for i, m in enumerate(muts):
+        code = "promoterlib{}_{:.1f}({})".format(i, m._fold, m._n)
+        l_op = op + " {:.3f})".format(m._fold)
+        muts_out.append((m, code, l_op, [m._fold]))
+
+    return muts_out
 """
 Custom types
 """
@@ -429,9 +449,11 @@ OPERATIONS = {
                                              "method": (rbs_method, "exp"),
                                              "m": (float, 0)}),
     "dna_mutation":           (dna_mutation, {"mut": (dna_mut, None)}),
-    "residue_mutation":       (residue_mutation, {"mut": (residue_mutlist, None)})
+    "residue_mutation":       (residue_mutation, {"mut": (residue_mutlist, None)}),
+    "promoter_library":            (promoter_library, {"targets": (list, ["max"]),
+                                             "max_mutations": (int, 10),
+                                             "matrix": (str, "sigma70")})
     }
-
 
 """
 General options parser

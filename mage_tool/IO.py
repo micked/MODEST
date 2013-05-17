@@ -270,6 +270,13 @@ def create_config_tables(config, cfg_basedir="./"):
         if "operons" not in config:
             config["operons"] = dict()
         config["operons"].update(operons)
+        
+    if "promoters" in config:
+        for prom in config["promoters"]:
+            for i, l in enumerate(config["promoters"][prom]):
+                ntdict = dict()
+                ntdict["A"],ntdict["C"],ntdict["G"],ntdict["T"] = float(l[0]), float(l[1]), float(l[2]), float(l[3])
+                config["promoters"][prom][i] = ntdict
 
     return config
 

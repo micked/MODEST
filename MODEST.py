@@ -137,6 +137,8 @@ if __name__ == '__main__':
     else:
         output = args.project + ".out"
 
+    print(genes["lacZ"].promoter)    
+    
     print("Writing to {}..".format(output))
     oligolist_to_tabfile(oligos, output)
 
