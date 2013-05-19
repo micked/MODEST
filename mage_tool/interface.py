@@ -373,6 +373,12 @@ def RBS_library(gene, op, config, target, n, max_mutations, method, m):
 
     return muts_out
 
+
+"""
+Transcription modifications
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+"""
+
 def promoter_library(gene, op, config, targets, max_mutations, matrix):
     """Create a library of different promoter expression levels.
 
@@ -394,8 +400,11 @@ def promoter_library(gene, op, config, targets, max_mutations, matrix):
         muts_out.append((m, code, l_op, [m._fold]))
 
     return muts_out
+
+
 """
 Custom types
+~~~~~~~~~~~~
 """
 
 def truefalse(t):
@@ -435,8 +444,24 @@ def dna_mut(s):
         raise ValueError("Invalid DNA mutation: {}".format(s))
     return s
 
+
+def fold_list(s):
+    """A list of improvement folds."""
+    s = s.split(";")
+    remax = re.compile(r"^max\d*$")
+    remin = re.compile(r"^min\d*$")
+    for i,f in enumerate(s):
+        f = f.lower()
+        if remax.match(f) or remin.match(f):
+            s[i] = f
+        else:
+            s[ı] = float(f)
+    return s
+
+
 """
-Dict to map all allowed operations and associated options.
+Dict to map all allowed operations and associated options
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 """
 
 OPERATIONS = {
@@ -450,9 +475,9 @@ OPERATIONS = {
                                              "m": (float, 0)}),
     "dna_mutation":           (dna_mutation, {"mut": (dna_mut, None)}),
     "residue_mutation":       (residue_mutation, {"mut": (residue_mutlist, None)}),
-    "promoter_library":            (promoter_library, {"targets": (list, ["max"]),
-                                             "max_mutations": (int, 10),
-                                             "matrix": (str, "sigma70")})
+    "promoter_library":       (promoter_library, {"targets": (fold_list, ["max"]),
+                                                  "max_mutations": (int, 10),
+                                                  "matrix": (str, "sigma70")})
     }
 
 """
