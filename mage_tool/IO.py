@@ -28,6 +28,45 @@ log.addHandler(logging.NullHandler())
 class ParserError(Exception): pass
 
 
+"""
+Adjustment file parsers
+~~~~~~~~~~~~~~~~~~~~~~~
+"""
+
+def raw_adjlist_to_adjlist(adjfilehandle):
+    """Convert an adjustmentlist in raw text to adjustment list dict."""
+    error_list = list()
+    adjlist = list()
+
+    for i, line in enumerate(adjfilehandle, 1):
+        if not line.strip() or line[0] == "#":
+            continue
+
+        line = line.split()
+        if len(line) < 3:
+            #Append error and quit line
+            error_list.append("Too few arguments in line {} in adjustmentlist."
+                              "".format(i))
+            continue
+
+        elif len(line) == 3:
+            options = ""
+        else:
+            options = line[3]
+
+        gene, op, barcodes = line[0:3]
+        barcodes = barcodes.split(",")
+        adjlist.append({"options": options, "gene": gene, "op": op, "barcodes": barcodes, "line_id": i})
+
+    return adjlist, error_list
+
+
+
+"""
+Genelist parsers
+~~~~~~~~~~~~~~~~
+"""
+
 def seqIO_to_genelist(genome, config, include_genes=None, include_genome=False,
                       leader_len=35, promoter_len=200):
     """TODO"""
@@ -166,6 +205,10 @@ def find_wobble_seq(genome, leader, l_start, l_end, codon_table, dgn_table):
 
     return leader
 
+"""
+Barcoding parsers
+~~~~~~~~~~~~~~~~~
+"""
 
 def parse_barcode_library(barcode_filehandle):
     """Parse an open barcoding library file.
@@ -240,6 +283,10 @@ def parse_barcode_library(barcode_filehandle):
 
     return barcodes
 
+"""
+configuration parsers
+~~~~~~~~~~~~~~~~~~~~~
+"""
 
 def create_config_tables(config, cfg_basedir="./"):
     """Create additional lookup tables from the parsed config yaml file."""
@@ -270,7 +317,7 @@ def create_config_tables(config, cfg_basedir="./"):
         if "operons" not in config:
             config["operons"] = dict()
         config["operons"].update(operons)
-        
+
     if "promoters" in config:
         for prom in config["promoters"]:
             for i, l in enumerate(config["promoters"][prom]):
@@ -306,7 +353,8 @@ def parse_DOOR_oprfile(oprfilehandle):
 
 
 """
-Oligolist functions
+Oligolist output
+~~~~~~~~~~~~~~~~
 """
 
 def oligolist_to_tabfile(oligolist, output):
@@ -413,6 +461,7 @@ def oligolist_to_mascfile(oligolist, masc_kwargs, mascfile=None):
             mascfile.close()
 
     return masc_primers
+
 
 class OligoLibraryReport:
     """Print a report from a csv report.

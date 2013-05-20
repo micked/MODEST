@@ -5,4 +5,4 @@ b0002   dna_mutation ID01 mut=[GAGTGT=AAAAAA].5
 genome	dna_mutation	ID01,ID02,ID03,ID08	mut=[TATAAA=CGGCGG].26559559
 genome	dna_mutation	ID01,ID02,ID06,ID08	mut=[TTTTT=].2739273
 malY	translational_knockout	ID01,ID02,ID05,ID07,ID09
-#malY	RBS_library	ID01,ID02,ID05,ID07,ID09	max_mutations=5,n=3
+malY	RBS_library	ID01,ID02,ID05,ID07,ID09	max_mutations=3,n=3,target=0

@@ -30,8 +30,6 @@ if __name__ == '__main__':
     cfg_basedir = os.path.abspath(os.path.dirname(args.config.name))
     config = create_config_tables(config, cfg_basedir)
 
-    print(config["operons"])
-
     if not args.genome:
         cfg_basename = os.path.splitext(args.config.name)[0]
         genome_locations = [cfg_basename + ".gb",

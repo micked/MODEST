@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 """
 General interface to <>
@@ -17,42 +17,35 @@ import manual
 log = logging.getLogger("MODEST")
 log.addHandler(logging.NullHandler())
 
-
 """
-Config
+Config and constants
 """
 NUM_PROCESSES = None
 
 counter = Value('i', 0)
 lock = Lock()
 
+#Operations are gradually added to this dict
+OPERATIONS = dict()
 
-def parse_adjustments(adjfilehandle, genes, barcode_lib=None):
-    """Pass"""
-    error_list = list()
+def parse_adjustments(adjlist, genes, config, barcoding_lib):
+    """Parse an adjlist to operation objects.
+
+    adjlist is a list of dictionaries.
+
+    """
     parsed_operations = list()
-    #Iterate lines:
-    for i, line in enumerate(adjfilehandle, 1):
-        if not line.strip() or line[0] == "#":
-            continue
-        line = line.split()
-        if len(line) < 3:
-            #Append error and quit line
-            error_list.append("Too few arguments in line {} in adjustmentlist."
-                              "".format(i))
-            continue
-        elif len(line) == 3:
-            options = ""
-        else:
-            options = line[3]
+    error_list = list()
 
-        gene_str, op_str, barcodes = line[0:3]
-        barcodes = barcodes.split(",")
-
+    for adj in adjlist:
         #Check existence of gene and operation
+        gene_str = adj["gene"]
+        op_str = adj["op"]
+        i = adj["line_id"]
+
         try:
             gene = genes[gene_str]
-            op, op_kwargs = OPERATIONS[op_str]
+            op = OPERATIONS[op_str]
         except KeyError:
             if op_str not in OPERATIONS:
                 error_list.append("Operation {} not found in line {}."
@@ -63,50 +56,42 @@ def parse_adjustments(adjfilehandle, genes, barcode_lib=None):
             continue
 
         #Validate existance of barcodes
+        barcodes = adj["barcodes"]
         for bc in barcodes:
-            if barcode_lib and bc not in barcode_lib:
+            if bc not in barcoding_lib:
                 error_list.append("Barcode {} not found in barcode lib."
                                   "".format(bc))
 
-        current_operation = {"op": op, "gene": gene, "barcodes": barcodes}
-        options, options_str = parse_options(options, op_kwargs)
+        current_operation = op(i, gene, adj["options"], config, barcodes)
 
-        if options is None:
-            error_list.append("Options parser error line {}: {}"
-                              "".format(i, options_str))
+        if not current_operation:
+            for e in current_operation.errorlist:
+                error_list.append("{} error: {}".format(op, e))
             continue
 
-        op_str = "[{}/{}] line {} {}".format(op_str, gene, i, options_str)
-
-        current_operation.update({"options": options, "op_str": op_str})
-        parsed_operations.append(current_operation)
+        if not error_list:
+            parsed_operations.append(current_operation)
 
     return parsed_operations, error_list
 
 
-def run_adjustments(adjfilehandle, genes, genome, config, project,
-                    barcoding_lib, threaded=True):
-    """Pass"""
-    parser_args = (adjfilehandle, genes, barcoding_lib)
-    parsed_operations, errors = parse_adjustments(*parser_args)
-    if errors:
-        return [], errors
+def run_adjustments(oplist, genome, project, barcoding_lib, threaded=True):
+    """Run a list of operation objects.
 
-    oligo_kwargs = {"genome": genome, "config": config, "project": project,
-                    "barcoding_lib": barcoding_lib}
+    Returns a list of Oligo objects.
 
+    """
     if threaded:
         pool = Pool(NUM_PROCESSES, process_initializer)
 
     results = list()
-    for run_op in parsed_operations:
-        op_kwargs = oligo_kwargs.copy()
-        op_kwargs.update(run_op)
+    for op in oplist:
         if threaded:
-            results.append(pool.apply_async(create_oligos_decorator, (op_kwargs,)))
+            kwargs = {"genome": genome, "project": project, "barcoding_lib": barcoding_lib}
+            results.append(pool.apply_async(create_oligos_decorator, (op, kwargs,)))
         else:
             try:
-                results.append(create_oligos(**op_kwargs))
+                results.append(op.create_oligos(genome, project, barcoding_lib))
             except KeyboardInterrupt:
                 log.error("Computation manually stopped")
                 break
@@ -127,20 +112,20 @@ def run_adjustments(adjfilehandle, genes, genome, config, project,
         except KeyboardInterrupt:
             print
             log.error("Computation manually stopped.")
-            return oligos, []
+            return oligos
 
-    return oligos, []
+    return oligos
 
 
 def process_initializer():
-    """Ignores all exceptions. Useful for subprocesses"""
+    """Ignores KeyboardInterrupt. Useful for subprocesses."""
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
-def create_oligos_decorator(kwargs):
-    """TODO"""
+def create_oligos_decorator(op, kwargs):
+    """Catches all exceptions from create_oligo and prints to screen."""
     try:
-        return create_oligos(**kwargs)
+        return op.create_oligos(**kwargs)
     except Exception:
         import traceback
         print
@@ -148,258 +133,169 @@ def create_oligos_decorator(kwargs):
         return None
 
 
-def create_oligos(genome, op, gene, config, options, op_str, project, barcodes, barcoding_lib):
-    """Run an operation and create oligos"""
-    oligos = list()
-    muts = op(gene, op_str, config, **options)
+class BaseOperation(object):
+    """
+    Sets the basis for an operation. Does nothing by itself, but can be
+    subclassed to create new operations which overload .run().
+    """
 
-    if muts is None:
-        log.warn(op_str + " did not make any mutations.")
-        return []
+    #Default options and type
+    # default_options = {"option": (type, "default_value")}
+    default_options = {}
 
-    for mut, code, operation, values in muts:
-        #reset barcode counter
-        j = 1
-        #increase oligo counter
-        with lock:
-            counter.value += 1
-        number = "{:0>4}".format(counter.value) # + barcoding
-        oligo = Oligo(mut, gene, project, number, oligo_len=90)
-        oligo.set_oligo(genome, optimise=True, threshold=-20.0)
-        oligo.target_lagging_strand(config["replication"]["ori"], config["replication"]["ter"])
-        #Back tracing
-        oligo.code = code
-        oligo.operation = operation
-        oligo.operation_values = values
-        #Add to log
-        log.info(" ".join([operation, ">>", oligo.short_id()]))
-        log.info(oligo.id())
-        #Add barcodes
-        for barcode_ids in barcodes:
-            temp_oligo = oligo.copy()
-            temp_oligo.number = "{}.{}".format(number, j) # + barcoding
-            temp_oligo.add_barcodes(barcode_ids, barcoding_lib)
-            #Add
-            oligos.append(temp_oligo)
-            j += 1
+    #Iterable of required options
+    required = ()
 
-    return oligos
+    #Set this to false to disable operation on whole genome
+    genome_allowed = True
 
+    op_str = "base_operation"
 
-"""
-==================
-Mutation functions
-==================
+    def __init__(self, line_id, gene, opt_str, config, barcodes=[], **options):
+        self.ok = True
+        self.errorlist = list()
+        self.opt_str = "NotEvaluated"
 
-Each function described here must take a gene object, an op string (for logging
-purposes), a strain config dict, and additional kwargs described in global
-OPERATIONS dict.
+        self.barcodes = barcodes
+        self.line_id = line_id
+        self.gene = gene
+        self.config = config
 
-Each function must output a list of tuples, each tuple being a mutation in the
-form: (mut, code, op, valuelist)
+        if opt_str:
+            options.update(self.parse_options(opt_str))
 
-Where:
-    mut       = Mutation object
-    code      = Compressed code string for oligo ID (length ~ 10 chars)
-    op        = String with operation and output status
-    valuelist = Status/output values in form [wt, altered, *other]
+        self.validate_options(options)
 
-List of status/output values can be empty, but wt value must always be at pos
-0, and altered at 1. If wt value is not applicable, return 0 or "" as wt value.
+        if not self.genome_allowed and str(gene) == "genome":
+            self.error("Cannot use on genome")
 
-If an error occured within the function, the function should return None and
-log a message stating the error.
-
-
-Custom Mutations
-~~~~~~~~~~~~~~~~
-"""
-
-def dna_mutation(gene, op, config, mut):
-    """Allows for a desired mutation.
-
-    Options:
-      - ``mut=upstream[before=after]downstream``
-
-    I.e. ``mut=TATCAACGCC[GCTC=A]GCTTTCATGACT`` changes
-    TATCAACGCC\ **GCTCG**\ CTTTCATGACT to TATCAACGCC\ **A**\ GCTTTCATGACT.
+        self.create_opt_str()
+        if self:
+            self.post_init()
 
     """
-    if not mut:
-        log.error(op + " No mutation found.")
+    Overload these
+    """
+
+    def post_init(self):
+        """Called after a successful init."""
+        pass
+
+    def run(self):
         return None
-
-    mut = manual.gene_mutation(gene, mut)
-    if not mut:
-        log.error(op + " Not mutating, did not find mutation box")
-        return None
-
-    code = "DNAMut"
-    return [(mut, code, op, [])]
-
-
-def residue_mutation(gene, op, config, mut):
-    """Allows for a mutating a desired residue
-
-    Options:
-      - ``mut=``
-
-    I.e. ``mut=`` changes
 
     """
-    if str(gene) == "genome":
-        log.error(op + " Cannot use residue_mutation on genome")
-        return None
+    Status
+    """
 
-    if not mut:
-        log.error(op + " No mutation specified!")
-        return None
+    def __nonzero__(self):
+        return self.ok
 
-    mut = manual.residue_mutation(gene, mut, config["codon_table"],
-                                  config["dgn_table"], config["codon_usage"])
-    if not mut:
-        log.error(op + " Not mutating, did not find mutation box")
-        return None
+    def __str__(self):
+        return "[{}/{}] line {} {}".format(self.op_str, self.gene, self.line_id, self.opt_str)
 
-    code = "ResMut"
-    return [(mut, code, op, [])]
-
-
-"""
-Translation modifications
-~~~~~~~~~~~~~~~~~~~~~~~~~
-"""
-
-def start_codon_optimal(gene, op, config):
-    """Mutates a start codon to the optimal start codon.
-
-    Tries to mutate the start codon to the optimal start codon defined in the
-    strain config file (Usually ``ATG``\ ).
-
-    Options and default values:
-      - None
+    def __repr__(self):
+        return self.__str__()
 
     """
-    if str(gene) == "genome":
-        log.error(op + " Cannot use start_codon_optimal on genome")
-        return None
-
-    mut = translation.replace_start_codon(gene, config["start_codons"][0])
-    if not mut:
-        log.debug(op + " Not mutating, optimal start codon found.")
-        return []
-
-    code = "OptStart{}".format(len(mut.before))
-    return [(mut, code, op, [])]
-
-
-def translational_knockout(gene, op, config, ko_mutations, ko_frame):
-    """Gene knock-out by premature stop-codon.
-
-    Tries to knock out a gene by introducing a number of early stop-codons in
-    the CDS with the least amount of mutations possible.
-
-    Options and default values:
-      - ``ko_frame`` Number of codons that are applicable to be mutated.
-        E.g. a value of 10 means the operation will try to mutate stop codons
-        into the CDS within 10 codons of the start codon. Default is within one
-        half of the length of the CDS.
-      - ``ko_mutations`` number of stop codons to introduce. Default (and
-        minimum) is the number of different stop codons available in the genome
-        configuration file (normally 3).
-
+    Option parsing
     """
-    if str(gene) == "genome":
-        log.error(op + " Cannot use translational_knockout on genome")
-        return None
 
-    stop_codons = config["stop_codons"]
-    mut = translation.translational_KO(gene, stop_codons, ko_mutations, ko_frame)
-    code = "TransKO{}".format(mut._codon_offset)
-    return [(mut, code, op, [0, mut._codon_offset])]
+    def parse_options(self, opt_str):
+        """Parse options string."""
+        if not opt_str:
+            options = []
+        else:
+            options = opt_str.split(",")
 
+        #Parse supplied keywords and values
+        parsed_options = dict()
+        for option in options:
+            tmp = option.split("=", 1)
+            if len(tmp) < 2:
+                self.error("Invalid option without value <{}>".format(option))
+                self.ok = False
+            else:
+                parsed_options[tmp[0].lower()] = tmp[1]
 
-def RBS_library(gene, op, config, target, n, max_mutations, method, m):
-    """Create a library of different RBS expression levels.
+        return parsed_options
 
-    Options and default values:
-      - ``target=5000000`` Target expression level to reach for in AU. If
-        target is reached, computation is stopped, and library will be created.
-        if target is not reached within the specified number of mutations, a
-        library of expression levels closest to target as possible will be
-        created.
-      - ``n=10`` Number of library sequences to create.
-      - ``max_mutations=10`` Maximum number of mutations to attempt.
-      - ``method=exp`` How to create the library. Two methods are available:
-        ``exp`` and ``fuzzy``. ``exp`` creates a library where each new
-        sequence is an ``m``-fold improvement over the last. ``m`` can either
-        be supplied via the ``m``-parameter, or calculated automatically to
-        create an evenly spaced library from wt level to target. The ``exp``
-        method runs multiple Monte Carlo simulations to reach each target,
-        however, it uses information from previous runs to more quickly reach
-        subsequent targets. ``fuzzy`` tries to replicate the ``exp`` library,
-        only the Monte Carlo simulation is only run once, and inbetween
-        are collected along the way. This method yields a less precise library,
-        but is quicker. Additionally, ``fuzzy`` enables picking out the best
-        sequences below a certain mutation count by using the ``m`` parameter.
-        Fx. using ``m=6``, ``fuzzy`` will collect the best possible sequences
-        with a maximum of 1, 2, .. 6 mutations. It will then try to fill out
-        the rest of the library with evenly spaced sequences.
-      - ``m=0`` see ``method`` for explanation on ``m``.
+    def validate_options(self, options):
+        """Validate a dictionary of options.
 
-    This operation will run an Monte-Carlo simulation in an attempt to reach
-    the specified target value within a number of mutations. Lower numbers of
-    mutations are tried first and are always prioritised over similar
-    expression levels with a higher mutation count.
+        Fill out remaining options with default options.
 
-    """
-    if str(gene) == "genome":
-        log.error(op + " Cannot use RBS_library on genome")
-        return None
+        """
+        self.options = dict()
 
-    if method == "exp":
-        muts = translation.RBS_library(gene, target, n, max_mutations, m)
-    elif method == "fuzzy":
-        muts = translation.RBS_library_fuzzy(gene, target, n, max_mutations, m)
+        #Iterate default options
+        for o in self.default_options:
+            #Option supplied, parse
+            if o in options:
+                try:
+                    tp = self.default_options[o][0]
+                    self.options[o] = tp(options[o])
+                except ValueError:
+                    self.error("Invalid value '{}' for {}".format(options[o], self.default_options[o][0]))
+            elif o in self.required:
+                self.error("Required option '{}' not found.".format(o))
+            #Use default value
+            else:
+                self.options[o] = self.default_options[o][1]
 
-    if not muts:
-        return None
+    def create_opt_str(self):
+        self.opt_str = ""
+        for o, v in self.options.items():
+            if isinstance(v, list) or isinstance(v, tuple):
+                v = ";".join(v)
+            self.opt_str += "," + o + "=" + str(v)
 
-    muts_out = list()
-    for i, m in enumerate(muts):
-        code = "RBSlib{}_{:.1f}/{:.1f}({})".format(i, m._AU, m._orgAU, m._n)
-        l_op = op + " {:.3f} (wt: {:.2f})".format(m._AU, m._orgAU)
-        muts_out.append((m, code, l_op, [m._orgAU, m._AU]))
+        self.opt_str = self.opt_str.strip(",")
 
-    return muts_out
+    def error(self, e):
+        """Add an error."""
+        self.errorlist.append(e)
+        self.ok = False
 
+    def create_oligos(self, genome, project, barcoding_lib):
+        """Run an operation and create oligos"""
+        muts = self.run()
+        gene = self.gene
+        config = self.config
+        barcodes = self.barcodes
 
-"""
-Transcription modifications
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-"""
+        if muts is None:
+            log.warn(str(self) + " did not make any mutations.")
+            return []
 
-def promoter_library(gene, op, config, targets, max_mutations, matrix):
-    """Create a library of different promoter expression levels.
+        oligos = list()
+        for mut, code, operation, values in muts:
+            #reset barcode counter
+            j = 1
+            #increase oligo counter
+            with lock:
+                counter.value += 1
+            number = "{:0>4}".format(counter.value) # + barcoding
+            oligo = Oligo(mut, gene, project, number, oligo_len=90)
+            oligo.set_oligo(genome, optimise=True, threshold=-20.0)
+            oligo.target_lagging_strand(config["replication"]["ori"], config["replication"]["ter"])
+            #Back tracing
+            oligo.code = code
+            oligo.operation = operation
+            oligo.operation_values = values
+            #Add to log
+            log.info(" ".join([operation, ">>", oligo.short_id()]))
+            log.info(oligo.id())
+            #Add barcodes
+            for barcode_ids in barcodes:
+                temp_oligo = oligo.copy()
+                temp_oligo.number = "{}.{}".format(number, j) # + barcoding
+                temp_oligo.add_barcodes(barcode_ids, barcoding_lib)
+                #Add
+                oligos.append(temp_oligo)
+                j += 1
 
-    """
-    if str(gene) == "genome":
-        log.error(op + " Cannot use promoter_library on genome")
-        return None
-
-    muts = promoter.promoter_library(gene, targets, max_mutations, matrix)
-
-
-    if not muts:
-        return None
-
-    muts_out = list()
-    for i, m in enumerate(muts):
-        code = "promoterlib{}_{:.1f}({})".format(i, m._fold, m._n)
-        l_op = op + " {:.3f})".format(m._fold)
-        muts_out.append((m, code, l_op, [m._fold]))
-
-    return muts_out
+        return oligos
 
 
 """
@@ -455,87 +351,295 @@ def fold_list(s):
         if remax.match(f) or remin.match(f):
             s[i] = f
         else:
-            s[ı] = float(f)
+            s[i] = float(f)
     return s
 
 
 """
-Dict to map all allowed operations and associated options
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Custom mutation operations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 """
 
-OPERATIONS = {
-    "start_codon_optimal":    (start_codon_optimal, {}),
-    "translational_knockout": (translational_knockout, {"ko_frame": (int, 10),
-                                                        "ko_mutations": (int, 3)}),
-    "RBS_library":            (RBS_library, {"target": (float, 5000000.),
-                                             "n": (int, 10),
-                                             "max_mutations": (int, 10),
-                                             "method": (rbs_method, "exp"),
-                                             "m": (float, 0)}),
-    "dna_mutation":           (dna_mutation, {"mut": (dna_mut, None)}),
-    "residue_mutation":       (residue_mutation, {"mut": (residue_mutlist, None)}),
-    "promoter_library":       (promoter_library, {"targets": (fold_list, ["max"]),
-                                                  "max_mutations": (int, 10),
-                                                  "matrix": (str, "sigma70")})
-    }
+class DNAMutation(BaseOperation):
+
+    default_options = {"mut": (dna_mut, None)}
+    required = ("mut",)
+    genome_allowed = True
+    op_str = "dna_mutation"
+
+    def run(self):
+        """Allows for a desired mutation.
+
+        Options:
+        - ``mut=upstream[before=after]downstream``
+
+        I.e. ``mut=TATCAACGCC[GCTC=A]GCTTTCATGACT`` changes
+        TATCAACGCC\ **GCTCG**\ CTTTCATGACT to TATCAACGCC\ **A**\ GCTTTCATGACT.
+
+        """
+        mut = self.options["mut"]
+        mut = manual.gene_mutation(self.gene, mut)
+        if not mut:
+            log.error(str(self) + " Not mutating, did not find mutation box")
+            return None
+
+        code = "DNAMut"
+        return [(mut, code, str(self), [])]
+
+OPERATIONS[DNAMutation.op_str] = DNAMutation
+
+
+class ResidueMutation(BaseOperation):
+
+    default_options = {"mut": (residue_mutlist, None)}
+    required = ("mut",)
+    genome_allowed = False
+    op_str = "residue_mutation"
+
+    def run(self):
+        """``residue_mutation``: Mutating a residue.
+
+        Options:
+        - ``mut=``
+
+        I.e. ``mut=`` changes
+
+        """
+        cdn_tbl = self.config["codon_table"]
+        dgn_tbl = self.config["dgn_table"]
+        cdn_usage = self.config["codon_usage"]
+        mut = self.options["mut"]
+        mut = manual.residue_mutation(self.gene, mut, cdn_tbl, dgn_tbl, cdn_usage)
+        if not mut:
+            log.error(str(self) + " Not mutating.")
+            return None
+
+        code = "ResMut"
+        return [(mut, code, str(self), [])]
+
+OPERATIONS[ResidueMutation.op_str] = ResidueMutation
+
 
 """
-General options parser
+Translation modifications
+~~~~~~~~~~~~~~~~~~~~~~~~~
 """
 
-def parse_options(options, kwds):
-    """Parse options string according to keywords and types, return option dict
+class StartCodonOptimal(BaseOperation):
 
-    kwds is suppled as a dict of "keyword: [type, default_value]"
+    default_options = {}
+    required = ()
+    genome_allowed = False
+    op_str = "start_codon_optimal"
 
-    options string is comma_seperated, no spaces: opt=4,opt2=something
-    Possible values:
-        int: 3
-        float: 3.14
-        string: something
-        truefalse: True|yes|1 or False|no|0
-        int_list: 1;2;3
-        float_list: 3.14;5.13;5.0
-        string_list: some;thing
-        codon_list: ATG;ATC
-        mut: [GTG=ATC].10
-        ...?
-    """
-    if not options:
-        options = []
-    else:
-        options = options.split(",")
+    def run(self):
+        """Mutates a start codon to the optimal start codon.
 
-    #Parse supplied keywords and values
-    supp_opt = dict()
-    for option in options:
-        tmp = option.split("=", 1)
-        if len(tmp) < 2:
-            return None, "Invalid option without value <{}>".format(option)
-        supp_opt[tmp[0].lower()] = "".join(tmp[1:])
+        Tries to mutate the start codon to the optimal start codon defined in the
+        strain config file (Usually ``ATG``\ ).
 
-    opts_out = dict()
+        Options and default values:
+        - None
 
-    #Iterate requested keywords
-    for o in kwds:
-        #Option supplied, parse
-        if o.lower() in supp_opt:
-            try:
-                opts_out[o] = kwds[o][0](supp_opt[o])
-            except ValueError:
-                return None, "Invalid value \"{}\" for {}".format(supp_opt[o], kwds[o][0])
-        #Use default value
-        else:
-            opts_out[o] = kwds[o][1]
+        """
+        mut = translation.replace_start_codon(self.gene, self.config["start_codons"][0])
+        if not mut:
+            log.debug(str(self) + " Not mutating, optimal start codon found.")
+            return []
 
-    opt_str = ""
-    for o, v in opts_out.items():
-        if isinstance(v, list) or isinstance(v, tuple):
-            v = ";".join(v)
-        opt_str += "," + o + "=" + str(v)
+        code = "OptStart{}".format(len(mut.before))
+        return [(mut, code, str(self), [])]
 
-    opt_str = opt_str.strip(",")
-    #opt_str = ",".join([o + "=" + str(v) for o,v in opts_out.items()])
+OPERATIONS[StartCodonOptimal.op_str] = StartCodonOptimal
 
-    return opts_out, opt_str
+
+class TranslationalKnockout(BaseOperation):
+
+    default_options = {"ko_frame": (int, 10),
+                       "ko_mutations": (int, 3)}
+    required = ()
+    genome_allowed = False
+    op_str = "translational_knockout"
+
+    def run(self):
+        """Gene knock-out by premature stop-codon.
+
+        Tries to knock out a gene by introducing a number of early stop-codons in
+        the CDS with the least amount of mutations possible.
+
+        Options and default values:
+        - ``ko_frame`` Number of codons that are applicable to be mutated.
+            E.g. a value of 10 means the operation will try to mutate stop codons
+            into the CDS within 10 codons of the start codon. Default is within one
+            half of the length of the CDS.
+        - ``ko_mutations`` number of stop codons to introduce. Default (and
+            minimum) is the number of different stop codons available in the genome
+            configuration file (normally 3).
+
+        """
+        stop_codons = self.config["stop_codons"]
+        ko_mutations = self.options["ko_mutations"]
+        ko_frame = self.options["ko_frame"]
+        mut = translation.translational_KO(self.gene, stop_codons, ko_mutations, ko_frame)
+        code = "TransKO{}".format(mut._codon_offset)
+        return [(mut, code, str(self), [0, mut._codon_offset])]
+
+OPERATIONS[TranslationalKnockout.op_str] = TranslationalKnockout
+
+
+class RBSLibrary(BaseOperation):
+
+    default_options = {"target": (float, 5000000.),
+                       "n": (int, 10),
+                       "max_mutations": (int, 10),
+                       "method": (rbs_method, "exp"),
+                       "m": (float, 0)}
+    required = ()
+    genome_allowed = False
+    op_str = "RBS_library"
+
+    def post_init(self):
+        #Correct very low target values
+        if self.options["target"] < 0.1:
+            val = self.options["target"]
+            self.options["target"] = 0.1
+            self.create_opt_str()
+            log.debug("{} adjusting very low target value '{}' to 0.1".format(self, val))
+
+    def run(self):
+        """Create a library of different RBS expression levels.
+
+        Options and default values:
+        - ``target=5000000`` Target expression level to reach for in AU. If
+            target is reached, computation is stopped, and library will be created.
+            if target is not reached within the specified number of mutations, a
+            library of expression levels closest to target as possible will be
+            created.
+        - ``n=10`` Number of library sequences to create.
+        - ``max_mutations=10`` Maximum number of mutations to attempt.
+        - ``method=exp`` How to create the library. Two methods are available:
+            ``exp`` and ``fuzzy``. ``exp`` creates a library where each new
+            sequence is an ``m``-fold improvement over the last. ``m`` can either
+            be supplied via the ``m``-parameter, or calculated automatically to
+            create an evenly spaced library from wt level to target. The ``exp``
+            method runs multiple Monte Carlo simulations to reach each target,
+            however, it uses information from previous runs to more quickly reach
+            subsequent targets. ``fuzzy`` tries to replicate the ``exp`` library,
+            only the Monte Carlo simulation is only run once, and inbetween
+            are collected along the way. This method yields a less precise library,
+            but is quicker. Additionally, ``fuzzy`` enables picking out the best
+            sequences below a certain mutation count by using the ``m`` parameter.
+            Fx. using ``m=6``, ``fuzzy`` will collect the best possible sequences
+            with a maximum of 1, 2, .. 6 mutations. It will then try to fill out
+            the rest of the library with evenly spaced sequences.
+        - ``m=0`` see ``method`` for explanation on ``m``.
+
+        This operation will run an Monte-Carlo simulation in an attempt to reach
+        the specified target value within a number of mutations. Lower numbers of
+        mutations are tried first and are always prioritised over similar
+        expression levels with a higher mutation count.
+
+        """
+        method = self.options["method"]
+        target = self.options["target"]
+        n = self.options["n"]
+        m = self.options["m"]
+        max_mutations = self.options["max_mutations"]
+        if method == "exp":
+            muts = translation.RBS_library(self.gene, target, n, max_mutations, m)
+        elif method == "fuzzy":
+            muts = translation.RBS_library_fuzzy(self.gene, target, n, max_mutations, m)
+
+        if not muts:
+            return None
+
+        muts_out = list()
+        for i, m in enumerate(muts):
+            code = "RBSlib{}_{:.1f}/{:.1f}({})".format(i, m._AU, m._orgAU, m._n)
+            l_op = str(self) + " {:.3f} (wt: {:.2f})".format(m._AU, m._orgAU)
+            muts_out.append((m, code, l_op, [m._orgAU, m._AU]))
+
+        return muts_out
+
+OPERATIONS[RBSLibrary.op_str] = RBSLibrary
+
+
+"""
+Transcription modifications
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+"""
+
+class PromoterLibrary(BaseOperation):
+
+    default_options = {"targets": (fold_list, ["max"]),
+                       "max_mutations": (int, 10),
+                       "matrix": (str, "sigma70")}
+    required = ()
+    genome_allowed = False
+    op_str = "promoter_library"
+
+    def run(self):
+        """Create a library of different promoter expression levels.
+
+        """
+        targets = self.options["targets"]
+        max_mutations = self.options["max_mutations"]
+        matrix = self.options["matrix"]
+        muts = promoter.promoter_library(self.gene, targets, max_mutations, matrix)
+
+        if not muts:
+            return None
+
+        muts_out = list()
+        for i, m in enumerate(muts):
+            code = "promoterlib{}_{:.1f}({})".format(i, m._fold, m._n)
+            l_op = "{} {:.3f})".format(self, m._fold)
+            muts_out.append((m, code, l_op, [m._fold]))
+
+        return muts_out
+
+OPERATIONS[PromoterLibrary.op_str] = PromoterLibrary
+
+
+"""
+Unittests
+~~~~~~~~~
+"""
+
+import unittest
+import oligo_design
+
+class InterfaceTests(unittest.TestCase):
+    def setUp(self):
+        gene_cds = ("ATGTCGTGTGAAGAACTGGAAATTGTCTGGAACAATATTAAAGCCGAAGCCAGAACGCTG"
+                    "GCGGACTGTGAGCCAATGCTGGCCAGTTTTTACCACGCGACGCTACTCAAGCACGAAAAC"
+                    "CTTGGCAGTGCACTGAGCTACATGCTGGCGAACAAGCTGTCATCGCCAATTATGCCTGCT"
+                    "ATTGCTATCCGTGAAGTGGTGGAAGAAGCCTACGCCGCTGACCCGGAAATGATCGCCTCT"
+                    "GCGGCCTGTGATATTCAGGCGGTGCGTACCCGCGACCCGGCAGTCGATAAATACTCAACC"
+                    "CCGTTGTTATACCTGAAGGGTTTTCATGCCTTGCAGGCCTATCGCATCGGTCACTGGTTG"
+                    "TGGAATCAGGGGCGTCGCGCACTGGCAATCTTTCTGCAAAACCAGGTTTCTGTGACGTTC"
+                    "CAGGTCGATATTCACCCGGCAGCAAAAATTGGTCGCGGTATCATGCTTGACCACGCGACA"
+                    "GGCATCGTCGTTGGTGAAACGGCGGTGATTGAAAACGACGTATCGATTCTGCAATCTGTG"
+                    "ACGCTTGGCGGTACGGGTAAATCTGGTGGTGACCGTCACCCGAAAATTCGTGAAGGTGTG"
+                    "ATGATTGGCGCGGGCGCGAAAATCCTCGGCAATATTGAAGTTGGGCGCGGCGCGAAGATT"
+                    "GGCGCAGGTTCCGTGGTGCTGCAACCGGTGCCGCCGCATACCACCGCCGCTGGCGTTCCG"
+                    "GCTCGTATTGTCGGTAAACCAGACAGCGATAAGCCATCAATGGATATGGACCAGCATTTC"
+                    "AACGGTATTAACCATACATTTGAGTATGGGGATGGGATCTAA")
+        self.gene = oligo_design.Gene("cysE", 3780585, -1, gene_cds)
+        self.genome = oligo_design.Gene("genome", 0, 1, "A")
+
+    def test_bool(self):
+        op = OPERATIONS["residue_mutation"]
+        config = {}
+        opF1 = op(0, self.gene, "", config)
+        opF2 = op(1, self.gene, "mut=A", config)
+        opT1 = op(2, self.gene, "mut=E166G", config)
+        opT2 = op(3, self.gene, "", config, mut="E166G")
+        self.assertFalse(opF1)
+        self.assertFalse(opF2)
+        self.assertTrue(opT1)
+        self.assertTrue(opT2)
+
+
+if __name__ == "__main__":
+    unittest.main()
