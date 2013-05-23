@@ -362,21 +362,24 @@ Custom mutation operations
 
 class DNAMutation(BaseOperation):
 
+    """
+    ``dna_mutation``: Allows for a desired mutation.
+
+    Options:
+
+    - ``mut=upstream[before=after]downstream``
+
+    I.e. ``mut=TATCAACGCC[GCTC=A]GCTTTCATGACT`` changes
+    TATCAACGCC\ **GCTCG**\ CTTTCATGACT to TATCAACGCC\ **A**\ GCTTTCATGACT.
+
+    """
+
     default_options = {"mut": (dna_mut, None)}
     required = ("mut",)
     genome_allowed = True
     op_str = "dna_mutation"
 
     def run(self):
-        """Allows for a desired mutation.
-
-        Options:
-        - ``mut=upstream[before=after]downstream``
-
-        I.e. ``mut=TATCAACGCC[GCTC=A]GCTTTCATGACT`` changes
-        TATCAACGCC\ **GCTCG**\ CTTTCATGACT to TATCAACGCC\ **A**\ GCTTTCATGACT.
-
-        """
         mut = self.options["mut"]
         mut = manual.gene_mutation(self.gene, mut)
         if not mut:
@@ -391,20 +394,23 @@ OPERATIONS[DNAMutation.op_str] = DNAMutation
 
 class ResidueMutation(BaseOperation):
 
+    """
+    ``residue_mutation``: Mutating a residue.
+
+    Options:
+
+    - ``mut=``
+
+    I.e. ``mut=`` changes
+
+    """
+
     default_options = {"mut": (residue_mutlist, None)}
     required = ("mut",)
     genome_allowed = False
     op_str = "residue_mutation"
 
     def run(self):
-        """``residue_mutation``: Mutating a residue.
-
-        Options:
-        - ``mut=``
-
-        I.e. ``mut=`` changes
-
-        """
         cdn_tbl = self.config["codon_table"]
         dgn_tbl = self.config["dgn_table"]
         cdn_usage = self.config["codon_usage"]
@@ -427,21 +433,24 @@ Translation modifications
 
 class StartCodonOptimal(BaseOperation):
 
+    """
+    ``start_codon_optimal``: Mutates a start codon to the optimal start codon.
+
+    Tries to mutate the start codon to the optimal start codon defined in the
+    strain config file (Usually ``ATG``\ ).
+
+    Options and default values:
+
+    - None
+
+    """
+
     default_options = {}
     required = ()
     genome_allowed = False
     op_str = "start_codon_optimal"
 
     def run(self):
-        """Mutates a start codon to the optimal start codon.
-
-        Tries to mutate the start codon to the optimal start codon defined in the
-        strain config file (Usually ``ATG``\ ).
-
-        Options and default values:
-        - None
-
-        """
         mut = translation.replace_start_codon(self.gene, self.config["start_codons"][0])
         if not mut:
             log.debug(str(self) + " Not mutating, optimal start codon found.")
@@ -454,6 +463,23 @@ OPERATIONS[StartCodonOptimal.op_str] = StartCodonOptimal
 
 
 class TranslationalKnockout(BaseOperation):
+    """
+    ``translational_knockout``: Gene knock-out by premature stop-codon.
+
+    Tries to knock out a gene by introducing a number of early stop-codons in
+    the CDS with the least amount of mutations possible.
+
+    Options and default values:
+
+    - ``ko_frame`` Number of codons that are applicable to be mutated.  E.g. a
+      value of 10 means the operation will try to mutate stop codons into the
+      CDS within 10 codons of the start codon. Default is within one half of
+      the length of the CDS.
+    - ``ko_mutations`` number of stop codons to introduce. Default (and
+      minimum) is the number of different stop codons available in the genome
+      configuration file (normally 3).
+
+    """
 
     default_options = {"ko_frame": (int, 10),
                        "ko_mutations": (int, 3)}
@@ -462,21 +488,6 @@ class TranslationalKnockout(BaseOperation):
     op_str = "translational_knockout"
 
     def run(self):
-        """Gene knock-out by premature stop-codon.
-
-        Tries to knock out a gene by introducing a number of early stop-codons in
-        the CDS with the least amount of mutations possible.
-
-        Options and default values:
-        - ``ko_frame`` Number of codons that are applicable to be mutated.
-            E.g. a value of 10 means the operation will try to mutate stop codons
-            into the CDS within 10 codons of the start codon. Default is within one
-            half of the length of the CDS.
-        - ``ko_mutations`` number of stop codons to introduce. Default (and
-            minimum) is the number of different stop codons available in the genome
-            configuration file (normally 3).
-
-        """
         stop_codons = self.config["stop_codons"]
         ko_mutations = self.options["ko_mutations"]
         ko_frame = self.options["ko_frame"]
@@ -488,6 +499,41 @@ OPERATIONS[TranslationalKnockout.op_str] = TranslationalKnockout
 
 
 class RBSLibrary(BaseOperation):
+
+    """
+    ``RBS_library``: Create a library of different RBS expression levels.
+
+    Options and default values:
+
+    - ``target=5000000`` Target expression level to reach for in AU. If target
+      is reached, computation is stopped, and library will be created.  if
+      target is not reached within the specified number of mutations, a library
+      of expression levels closest to target as possible will be created.
+    - ``n=10`` Number of library sequences to create.
+    - ``max_mutations=10`` Maximum number of mutations to attempt.
+    - ``method=exp`` How to create the library. Two methods are available:
+      ``exp`` and ``fuzzy``. ``exp`` creates a library where each new sequence
+      is an ``m``-fold improvement over the last. ``m`` can either be supplied
+      via the ``m``-parameter, or calculated automatically to create an evenly
+      spaced library from wt level to target. The ``exp`` method runs multiple
+      Monte Carlo simulations to reach each target, however, it uses
+      information from previous runs to more quickly reach subsequent targets.
+      ``fuzzy`` tries to replicate the ``exp`` library, only the Monte Carlo
+      simulation is only run once, and inbetween are collected along the way.
+      This method yields a less precise library, but is quicker. Additionally,
+      ``fuzzy`` enables picking out the best sequences below a certain mutation
+      count by using the ``m`` parameter.  Fx. using ``m=6``, ``fuzzy`` will
+      collect the best possible sequences with a maximum of 1, 2, .. 6
+      mutations. It will then try to fill out the rest of the library with
+      evenly spaced sequences.
+    - ``m=0`` see ``method`` for explanation on ``m``.
+
+    This operation will run an Monte-Carlo simulation in an attempt to reach
+    the specified target value within a number of mutations. Lower numbers of
+    mutations are tried first and are always prioritised over similar
+    expression levels with a higher mutation count.
+
+    """
 
     default_options = {"target": (float, 5000000.),
                        "n": (int, 10),
@@ -507,39 +553,6 @@ class RBSLibrary(BaseOperation):
             log.debug("{} adjusting very low target value '{}' to 0.1".format(self, val))
 
     def run(self):
-        """Create a library of different RBS expression levels.
-
-        Options and default values:
-        - ``target=5000000`` Target expression level to reach for in AU. If
-            target is reached, computation is stopped, and library will be created.
-            if target is not reached within the specified number of mutations, a
-            library of expression levels closest to target as possible will be
-            created.
-        - ``n=10`` Number of library sequences to create.
-        - ``max_mutations=10`` Maximum number of mutations to attempt.
-        - ``method=exp`` How to create the library. Two methods are available:
-            ``exp`` and ``fuzzy``. ``exp`` creates a library where each new
-            sequence is an ``m``-fold improvement over the last. ``m`` can either
-            be supplied via the ``m``-parameter, or calculated automatically to
-            create an evenly spaced library from wt level to target. The ``exp``
-            method runs multiple Monte Carlo simulations to reach each target,
-            however, it uses information from previous runs to more quickly reach
-            subsequent targets. ``fuzzy`` tries to replicate the ``exp`` library,
-            only the Monte Carlo simulation is only run once, and inbetween
-            are collected along the way. This method yields a less precise library,
-            but is quicker. Additionally, ``fuzzy`` enables picking out the best
-            sequences below a certain mutation count by using the ``m`` parameter.
-            Fx. using ``m=6``, ``fuzzy`` will collect the best possible sequences
-            with a maximum of 1, 2, .. 6 mutations. It will then try to fill out
-            the rest of the library with evenly spaced sequences.
-        - ``m=0`` see ``method`` for explanation on ``m``.
-
-        This operation will run an Monte-Carlo simulation in an attempt to reach
-        the specified target value within a number of mutations. Lower numbers of
-        mutations are tried first and are always prioritised over similar
-        expression levels with a higher mutation count.
-
-        """
         method = self.options["method"]
         target = self.options["target"]
         n = self.options["n"]
