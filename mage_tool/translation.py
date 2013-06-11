@@ -215,9 +215,8 @@ def RBS_library(gene, target, n, max_mutations, m=None):
     be less than n.
 
     """
-    if str(gene) == "genome":
-        log.error("Cannot use translational_KO on genome")
-        return None
+    if n < 1:
+        raise ValueError("'n' must be positive integer.")
 
     targetAU = target
     targetdG = AU_to_dG(target)
@@ -227,6 +226,7 @@ def RBS_library(gene, target, n, max_mutations, m=None):
 
     orgdG = RBS_predict(gene.leader, gene.cds)
     orgAU = dG_to_AU(orgdG)
+    orgAU = 1e-3 if not orgAU else orgAU
     bestAU = dG_to_AU(pre_lib[0].dG)
 
     if not m:
@@ -526,7 +526,7 @@ def RBS_predict(pre_seq, cds, nt_cutoff=35, RNAfold=ViennaRNA(), verbose=False):
     """
     mRNA_rRNA_list = RNAfold.subopt([leader, rRNA], e=energy_cutoff, d=2)
     calc_dG_spacing = (mRNA_rRNA_list, optimal_spacing, dG_push, dG_pull)
-    dG_spacing, bps_mRNA_rRNA = RBS_predict_calc_dG_spacing(*calc_dG_spacing)
+    dG_spacing, bps_mRNA_rRNA, spacing = RBS_predict_calc_dG_spacing(*calc_dG_spacing)
     if not bps_mRNA_rRNA:
         return 1e12
 
@@ -630,12 +630,13 @@ def RBS_predict_calc_dG_spacing(mRNA_rRNA_list, optimal_spacing, dG_push, dG_pul
         ... ('......................((((.........&.))))....', -6.1)]
 
         >>> RBS_predict_calc_dG_spacing(l, 4, (12.2, 2.5, 2.0, 3.0), (0.048, 0.24, 0.0))
-        (0.0, [(25, 5), (26, 4), (27, 3), (28, 2)])
+        (0.0, [(25, 5), (26, 4), (27, 3), (28, 2)], 4)
 
     """
     dG_mRNA_rRNA_spc = 1e12
     dG_mRNA_rRNA     = 1e12
     bps_mRNA_rRNA    = []
+    al_spacing       = 0
     for brackets, dG in mRNA_rRNA_list:
         #Calculate spacing penalty
         spacing, bps = RBS_predict_calc_spacing(brackets)
@@ -655,9 +656,9 @@ def RBS_predict_calc_dG_spacing(mRNA_rRNA_list, optimal_spacing, dG_push, dG_pul
             dG_mRNA_rRNA_spc = dG_spacing_penalty
             dG_mRNA_rRNA = dG
             bps_mRNA_rRNA = bps
-            # print("mu", brackets, dG_mRNA_rRNA_spc, dG_mRNA_rRNA, spacing)
+            al_spacing = spacing
 
-    return dG_mRNA_rRNA_spc, bps_mRNA_rRNA
+    return dG_mRNA_rRNA_spc, bps_mRNA_rRNA, al_spacing
 
 
 def RBS_predict_calc_spacing(brackets):

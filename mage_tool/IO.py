@@ -14,6 +14,7 @@ except ImportError: from io import StringIO as strIO
 
 from oligo_design import Gene
 from oligo_design import Sequence
+from oligo_design import WobbleError
 from helpers import is_inside
 from helpers import extract_circular
 from helpers import cds_to_wobble
@@ -67,8 +68,33 @@ Genelist parsers
 ~~~~~~~~~~~~~~~~
 """
 
-def seqIO_to_genelist(genome, config, include_genes=None, include_genome=False,
-                      leader_len=35, promoter_len=200):
+
+generic_cfg = {'Definition': 'Generic',
+    'start_codons': ['ATG', 'GTG', 'TTG', 'ATT', 'CTG'],
+    'replication': {'ter extended': [598894, 2375400],
+                    'ter': [1339769, 1682272], 'ori': [3923767, 3923998]},
+    'stop_codons': ['TAG', 'TAA', 'TGA'],
+    'dgn_table': {'A': 'GCN', 'C': 'TGY', 'E': 'GAR', '$': 'TRR', 'G': 'GGN',
+                  'F': 'TTY', 'I': 'ATH', 'H': 'CAY', 'K': 'AAR', 'M': 'ATG',
+                  'L': 'YTN', 'N': 'AAY', 'Q': 'CAR', 'P': 'CCN', 'S': 'WSN',
+                  'R': 'MGN', 'T': 'ACN', 'W': 'TGG', 'V': 'GTN', 'Y': 'TAY',
+                  'D': 'GAY'},
+    'codon_table': {'CTT': 'L', 'ATG': 'M', 'ACA': 'T', 'ACG': 'T', 'ATC': 'I',
+                    'AAC': 'N', 'ATA': 'I', 'AGG': 'R', 'CCT': 'P', 'CTC': 'L',
+                    'AGC': 'S', 'AAG': 'K', 'AGA': 'R', 'CAT': 'H', 'AAT': 'N',
+                    'ATT': 'I', 'CTG': 'L', 'CTA': 'L', 'ACT': 'T', 'CAC': 'H',
+                    'AAA': 'K', 'CCG': 'P', 'AGT': 'S', 'CCA': 'P', 'CAA': 'Q',
+                    'CCC': 'P', 'TAT': 'Y', 'GGT': 'G', 'TGT': 'C', 'CGA': 'R',
+                    'CAG': 'Q', 'CGC': 'R', 'GAT': 'D', 'CGG': 'R', 'TTT': 'F',
+                    'TGC': 'C', 'GGG': 'G', 'TAG': '$', 'GGA': 'G', 'TAA': '$',
+                    'GGC': 'G', 'TAC': 'Y', 'GAG': 'E', 'TCG': 'S', 'TTA': 'L',
+                    'GAC': 'D', 'CGT': 'R', 'GAA': 'E', 'TGG': 'W', 'GCA': 'A',
+                    'GTA': 'V', 'GCC': 'A', 'GTC': 'V', 'GCG': 'A', 'GTG': 'V',
+                    'TTC': 'F', 'GTT': 'V', 'GCT': 'A', 'ACC': 'T', 'TGA': '$',
+                    'TTG': 'L', 'TCC': 'S', 'TCA': 'S', 'TCT': 'S'}}
+
+def seqIO_to_genelist(genome, config=generic_cfg, include_genes=None, include_genome=False,
+                      exclude_genes=None, leader_len=35, promoter_len=200):
     """TODO"""
 
     genes = dict()
@@ -78,11 +104,16 @@ def seqIO_to_genelist(genome, config, include_genes=None, include_genome=False,
             name = gene_name = g.qualifiers["gene"][0]
             locus_tag = g.qualifiers["locus_tag"][0]
 
+            if exclude_genes:
+                if name in exclude_genes or locus_tag in exclude_genes:
+                    continue
+
             if include_genes and name not in include_genes:
                 if locus_tag in include_genes:
                     name = locus_tag
                 else:
                     continue
+
 
             #Little bit of warning:
             #Bio converts positions to 0-index internally
@@ -98,7 +129,10 @@ def seqIO_to_genelist(genome, config, include_genes=None, include_genome=False,
 
             #Get leader and leader position
             leader, l_start, l_end = get_leader(genome.seq, start, end, strand, leader_len)
-            leader = find_wobble_seq(genome, leader, l_start, l_end, config["codon_table"], config["dgn_table"])
+            try:
+                leader = find_wobble_seq(genome, leader, l_start, l_end, config["codon_table"], config["dgn_table"])
+            except WobbleError as e:
+                log.error("Wobble error in gene: {}; {}".format(name, e))
 
             #Detect operons
             in_operon = None
@@ -121,7 +155,10 @@ def seqIO_to_genelist(genome, config, include_genes=None, include_genome=False,
 
             #Extract promoter sequences
             promoter, p_start, p_end = get_leader(genome.seq, operon_start, operon_end, operon_strand, promoter_len)
-            promoter = find_wobble_seq(genome, promoter, p_start, p_end, config["codon_table"], config["dgn_table"])
+            try:
+                promoter = find_wobble_seq(genome, promoter, p_start, p_end, config["codon_table"], config["dgn_table"])
+            except WobbleError as e:
+                log.error("Wobble error in gene: {}; {}".format(name, e))
 
             if strand == 1:
                 pos = int(start)
@@ -138,8 +175,7 @@ def seqIO_to_genelist(genome, config, include_genes=None, include_genome=False,
                 raise ParserError("Gene {} found more than once. Use locus_tag "
                                   "[{}] instead.".format(name, locus_tag))
             else:
-                gene = Gene(name, pos, strand, cds, leader,
-                                   promoter, promoter_pos)
+                gene = Gene(name, pos, strand, cds, leader, promoter, promoter_pos)
                 gene.gene_name = gene_name
                 gene.locus_tag = locus_tag
                 gene.in_operon = in_operon is not None
@@ -194,7 +230,11 @@ def find_wobble_seq(genome, leader, l_start, l_end, codon_table, dgn_table):
         if c.type == "CDS":
             if is_inside(l_start, l_end, c.location.start, c.location.end):
                 w_cds = c.extract(genome).seq
-                w_seq = cds_to_wobble(w_cds, codon_table, dgn_table)
+                try:
+                    w_seq = cds_to_wobble(w_cds, codon_table, dgn_table)
+                except KeyError as e:
+                    c_name = c.qualifiers["locus_tag"][0]
+                    raise WobbleError("Invalid translation for [{}]: {}".format(c_name, e))
 
                 #Wobble sequence in genome context (+1)
                 if c.location.strand == -1:
@@ -249,13 +289,14 @@ def parse_barcode_library(barcode_filehandle):
         ...     barcodes[id]["forward"],
         ...     barcodes[id]["reverse"])
         ...
+        ('*', '', '')
         ('ID1', 'CTACCTTGCA', 'TAACGGACGG')
         ('ID2', 'GGAATTGAGA', 'CAAGGGAAAT')
         ('ID3', 'CTACCTTGCA', 'CAAGGGAAAT')
 
     """
     primers = dict()
-    barcodes = dict()
+    barcodes = {"*": {"forward": "", "reverse": ""}}
 
     primer_flag = False
     barcodes_flag = False
@@ -425,12 +466,17 @@ def oligolist_to_mascfile(oligolist, masc_kwargs, mascfile=None):
 
     """
     masc_primers = dict()
+    #unique oligos
     un_oligos = list()
     for oligo in oligolist:
         ID = oligo.short_id().split(".")[0]
         if ID not in un_oligos:
-            un_oligos.append(ID)
-            masc_primers[ID] = oligo.mut.MASC_primers(**masc_kwargs)
+            try:
+                masc_primers[ID] = oligo.mut.MASC_primers(**masc_kwargs)
+                un_oligos.append(ID)
+            except Exception as ex:
+                log.warning("Could not create MASC primers for {}/{}: {}".format(ID, oligo.mut, ex))
+                continue
             masc_primers[ID]["mut"] = oligo.mut
 
     if mascfile:

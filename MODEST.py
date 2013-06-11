@@ -59,8 +59,7 @@ if __name__ == '__main__':
                             "%(levelname)-8s %(message)s")
     elif args.log.lower() == "stdout":
         # Everything to stdout
-        logging.basicConfig(
-            level=logging.DEBUG, format=format, datefmt='%Y-%m-%d %H:%M')
+        logging.basicConfig(level=logging.DEBUG, format=format, datefmt='%Y-%m-%d %H:%M')
     else:
         # Log to file and warnings to screen
         logging.basicConfig(level=logging.DEBUG, format=format,

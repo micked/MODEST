@@ -10,6 +10,7 @@ import logging
 from copy import deepcopy
 
 import ViennaRNA
+import run_control as rc
 from helpers import is_inside
 from helpers import valid_dna
 from helpers import valid_rna
@@ -24,11 +25,10 @@ from helpers import make_primer
 log = logging.getLogger("MODEST.oligo")
 log.addHandler(logging.NullHandler())
 
-
 class Oligo:
     """Oligo Object"""
 
-    def __init__(self, mut, gene, project=None, number=0, oligo_len=90):
+    def __init__(self, mut, gene, project=None, number=0, oligo_len=rc.CONF["oligo_length"]):
         self.mut = mut
         self.gene = gene
         self.oligo_len = oligo_len
@@ -40,6 +40,7 @@ class Oligo:
         self.strand = 1
         self.project = project.replace(" ", "_") if project else project
         self.number = number
+        self.custom_id = None
 
         self.barcodes_forward = list()
         self.barcodes_reverse = list()
@@ -162,6 +163,7 @@ class Oligo:
         barcode_ids = barcode_ids.split('+')
         barcode_ids.reverse()
         for barcode in barcode_ids:
+            if barcode == "*": continue
             self.barcodes_forward.insert(0, barcoding_lib[barcode]["forward"].lower())
             self.barcodes_reverse.append(barcoding_lib[barcode]["reverse"].lower())
             self.barcode_ids.insert(0, barcode)
@@ -172,24 +174,49 @@ class Oligo:
         out = map(str, out)
         return "".join(out)
 
-    def id(self):
-        """Calculate an ID based the various self-contained variables"""
-        return "{s_id}{barcodes}_{mut}_{gene}_{code}_RP{rp}{opt}".format(
-            s_id = self.short_id(),
-            barcodes = "_BC:" + "+".join(self.barcode_ids) if self.barcode_ids else "",
-            mut = self.mut.__str__(idx=1),
-            gene = str(self.gene),
-            code = self.code,
-            rp = self.replichore,
-            opt = "_OPT:{}({:.1f})".format(str(self.optimised), self.dG_fold) if self.optimised else ""
-            )
+    def id(self, id_type="auto"):
+        """Calculate an ID based the various self-contained variables.
+
+        id_type can be either full or auto.
+
+        """
+        id_type = id_type.lower()
+
+        #Test id_type
+        if id_type not in ["full", "auto"]:
+            raise Exception("Unknown id_type: {}".format(id_type))
+
+        #Auto
+        if id_type == "auto" and self.custom_id:
+            return self.custom_id
+
+        idlst = [self.short_id()]
+
+        if self.barcode_ids:
+            idlst.append("BC:" + "+".join(self.barcode_ids))
+        #Other stuff
+        idlst.append(self.mut.__str__(idx=1))
+        idlst.append(str(self.gene))
+        idlst.append(self.code)
+        idlst.append("RP" + str(self.replichore))
+        #Custom id
+        if self.custom_id:
+            idlst.append("["+self.custom_id+"]")
+        #Optimised folding
+        if self.optimised:
+            idlst.append("OPT:{}({:.1f})".format(self.optimised, self.dG_fold))
+
+        return "_".join(idlst)
 
     def short_id(self):
         """Return id in the form of projectXXX"""
         return "{prj}{i:0>4}".format(
             prj = self.project if self.project else "",
-            i = self.number
-            )
+            i = self.number)
+
+    def set_custom_id(self, cid):
+        """Set a custom ID."""
+        self.custom_id = cid
 
     def copy(self):
         """Return a copy"""
@@ -210,7 +237,7 @@ class Mutation:
             raise ValueError("Invalid position: '{}'.".format(pos))
 
         #Parse and set before sequence
-        if len(before) and not valid_dgn(before):
+        if len(before) and not valid_dna(before):
             raise ValueError("Invalid 'before' sequence: '{}'.".format(before))
         self.before = str(before).upper()
         if ref_seq:
@@ -229,8 +256,7 @@ class Mutation:
                 return
         self.after = self.after.lower()
 
-    def MASC_primers(self, ref_genome, lengths=[200], temp=62.0, primer_c=2e-7,
-                     salt_c=0.05):
+    def MASC_primers(self, ref_genome, lengths=[200], temp=62.0, primer_c=2e-7, salt_c=0.05):
         """Design Multiplex Allele Specific Colony PCR primers.
 
         lengths is a list of PCR fragment lengths, and temp is the target tm.
@@ -239,6 +265,9 @@ class Mutation:
         concentration in mol/L.
 
         """
+        if self.after and not valid_dna(self.after):
+            raise Exception("Only strictly valid DNA (ATGC) can make MASC primers.")
+
         #fpwt: forward primer(wt)
         fpwt = make_primer(ref_genome, temp, self.pos, self.pos+3, salt_c, primer_c, 200)
 
@@ -488,7 +517,18 @@ class Sequence:
         """Add a wobble sequence to the sequence."""
         wbl = SequenceWobble(wbseq, pos, len(self))
         if not self.test_wobble(wbl):
-            raise ValueError("Wobble does not match seq: {}".format(wbseq))
+            msg="Wobble error output: \n{:<4d} ".format(wbl.start)
+            p_msg, w_msg, e_msg = "", "", ""
+            for i in wbl.range():
+                p_msg += self[i]
+                w_msg += nts_to_dgn[wbl[i]]
+                e_msg += " " if self[i] in wbl[i] else "*"
+                if (i-wbl.start) and (i-wbl.start) % 60 == 0:
+                    msg += "{}\n     {}\n     {}\n\n{:<4d} ".format(p_msg, w_msg, e_msg, i+1)
+                    p_msg, w_msg, e_msg = "", "", ""
+            msg += "{}\n     {}\n     {}".format(p_msg, w_msg, e_msg, i+1)
+            log.debug(msg)
+            raise WobbleError("Wobble does not match seq. Check log for more output.")
 
         for i in range(len(self.wobbles)):
             o_wbl = self.wobbles[i]
@@ -1170,7 +1210,7 @@ class Sequence:
 class SequenceWobble:
     def __init__(self, wbseq, pos, seq_len=None):
         self.seq = str(wbseq).upper()
-        if not valid_dgn(self.seq):
+        if self.seq and not valid_dgn(self.seq):
             raise ValueError("Invalid wobble sequence: {}".format(wbseq))
 
         self.start = pos
@@ -1253,6 +1293,7 @@ class SequenceWobble:
 
 
 class MutationError(ValueError): pass
+class WobbleError(ValueError): pass
 
 
 if __name__ == "__main__":

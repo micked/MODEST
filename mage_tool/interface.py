@@ -9,9 +9,10 @@ import signal
 import logging
 from multiprocessing import Pool, Value, Lock
 
-from oligo_design import Oligo
-import translation
 import manual
+import translation
+import run_control as rc
+from oligo_design import Oligo
 
 #Define a log
 log = logging.getLogger("MODEST")
@@ -82,7 +83,7 @@ def run_adjustments(oplist, genome, project, barcoding_lib, threaded=True):
 
     """
     if threaded:
-        pool = Pool(NUM_PROCESSES, process_initializer)
+        pool = Pool(rc.CONF["processes"], process_initializer)
 
     results = list()
     for op in oplist:
@@ -164,6 +165,11 @@ class BaseOperation(object):
         if opt_str:
             options.update(self.parse_options(opt_str))
 
+        #Set custom ID
+        self.custom_id = None
+        if "id" in options:
+            self.custom_id = options["id"]
+
         self.validate_options(options)
 
         if not self.genome_allowed and str(gene) == "genome":
@@ -214,7 +220,6 @@ class BaseOperation(object):
             tmp = option.split("=", 1)
             if len(tmp) < 2:
                 self.error("Invalid option without value <{}>".format(option))
-                self.ok = False
             else:
                 parsed_options[tmp[0].lower()] = tmp[1]
 
@@ -276,16 +281,22 @@ class BaseOperation(object):
             with lock:
                 counter.value += 1
             number = "{:0>4}".format(counter.value) # + barcoding
-            oligo = Oligo(mut, gene, project, number, oligo_len=90)
+            oligo = Oligo(mut, gene, project, number, oligo_len=rc.CONF["oligo_length"])
             oligo.set_oligo(genome, optimise=True, threshold=-20.0)
             oligo.target_lagging_strand(config["replication"]["ori"], config["replication"]["ter"])
+
             #Back tracing
             oligo.code = code
             oligo.operation = operation
             oligo.operation_values = values
+            #Set custom ID
+            if self.custom_id:
+                oligo.set_custom_id(self.custom_id)
+
             #Add to log
             log.info(" ".join([operation, ">>", oligo.short_id()]))
-            log.info(oligo.id())
+            log.info(oligo.id("full"))
+
             #Add barcodes
             for barcode_ids in barcodes:
                 temp_oligo = oligo.copy()

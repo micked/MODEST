@@ -308,9 +308,9 @@ def primer_tm(primer, salt=0.05, c=5e-8, constants=None):
 
     """
     prm = str(primer).upper()
-    #if not valid_dna(prm):
-    #    raise ValueError("A valid DNA sequence (no degenerate NTs) must be used "
-    #                     "with primer_tm. Got: '{}'.".format(primer))
+    if not valid_dna(prm):
+        raise ValueError("A valid DNA sequence (no degenerate NTs) must be used "
+                         "with primer_tm. Got: '{}'.".format(primer))
 
     #Load constants or default constants
     cnst = constants if constants else default_primer_constants
