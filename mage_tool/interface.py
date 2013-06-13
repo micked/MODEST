@@ -4,13 +4,11 @@
 General interface to <>
 """
 
-import re
 import signal
 import logging
 from multiprocessing import Pool, Value, Lock
 
 import run_control as rc
-from oligo_design import Oligo
 from operations import OPERATIONS
 
 #Define a log

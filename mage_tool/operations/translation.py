@@ -12,13 +12,12 @@ import random
 import logging
 import itertools
 
-from mage_tool.helpers import dgn_to_nts
 from mage_tool.helpers import valid_rna
-from mage_tool.oligo_design import Mutation
 from mage_tool.ViennaRNA import ViennaRNA
 from mage_tool.ViennaRNA import brackets_to_basepairing
 from mage_tool.ViennaRNA import basepairing_to_brackets
 from mage_tool.operations import BaseOperation
+
 
 #Define a log
 log = logging.getLogger("MODEST.trans")
@@ -104,10 +103,6 @@ def translational_KO(gene, stop_codons=["TAG", "TAA", "TGA"],
     for stop codon mutations. Default is half the length of the gene.
 
     """
-    if str(gene) == "genome":
-        log.error("Cannot use translational_KO on genome")
-        return None
-
     if not KO_mutations or KO_mutations < len(stop_codons):
         KO_mutations = len(stop_codons)
 
@@ -208,10 +203,6 @@ def RBS_library_fuzzy(gene, target, n, max_mutations, low_count=0):
     (included) mutations are added before the rest of the library is selected.
 
     """
-    if str(gene) == "genome":
-        log.error("Cannot use RBS_library on genome")
-        return None
-
     #Convert target to dG
     target_dG = AU_to_dG(target)
 

@@ -8,13 +8,10 @@ from __future__ import print_function
 from __future__ import absolute_import
 
 import re
-import math
-import random
 import logging
 from itertools import product
 
 from mage_tool.oligo_design import Mutation
-from mage_tool.helpers import degenerate_nucleotides
 from mage_tool.helpers import dgn_to_nts
 from mage_tool.operations import BaseOperation
 
@@ -249,7 +246,6 @@ def residue_mutation(gene, mutations, codon_table=default_codon_table,
         Mutation: [C=t] at pos 127
 
     """
-    new_dna_string = str(gene.cds)
     mutations = sorted(mutations, key=lambda x: x[1:-1])
     seq = gene.cds.copy()
     offset = 0

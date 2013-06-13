@@ -23,8 +23,6 @@ log.addHandler(logging.NullHandler())
 OPERATIONS = dict()
 
 
-
-
 class BaseOperation(object):
     """
     Sets the basis for an operation. Does nothing by itself, but can be
@@ -210,9 +208,11 @@ def register_module(module):
     OPERATIONS.update(new_ops.OPERATIONS)
 
 
+#Import all internal operations
 pkgpath = os.path.dirname(__file__)
 for _, name, _ in pkgutil.iter_modules([pkgpath]):
     register_module(name)
+
 
 #Import user operations
 for module in rc.CONF["operations"]:
