@@ -5,18 +5,20 @@ Mutation generation routines related to translation initiation
 """
 
 from __future__ import print_function
+from __future__ import absolute_import
 
 import math
 import random
 import logging
 import itertools
 
-from helpers import dgn_to_nts
-from helpers import valid_rna
-from oligo_design import Mutation
-from ViennaRNA import ViennaRNA
-from ViennaRNA import brackets_to_basepairing
-from ViennaRNA import basepairing_to_brackets
+from mage_tool.helpers import dgn_to_nts
+from mage_tool.helpers import valid_rna
+from mage_tool.oligo_design import Mutation
+from mage_tool.ViennaRNA import ViennaRNA
+from mage_tool.ViennaRNA import brackets_to_basepairing
+from mage_tool.ViennaRNA import basepairing_to_brackets
+from mage_tool.operations import BaseOperation
 
 #Define a log
 log = logging.getLogger("MODEST.trans")
@@ -59,6 +61,35 @@ def replace_start_codon(gene, start_codon="ATG"):
         seq.mutate(nt, i, in_place=True)
 
     return gene.do_mutation(seq.get_mutation())
+
+
+class StartCodonOptimal(BaseOperation):
+
+    """
+    ``start_codon_optimal``: Mutates a start codon to the optimal start codon.
+
+    Tries to mutate the start codon to the optimal start codon defined in the
+    strain config file (Usually ``ATG``\ ).
+
+    Options and default values:
+
+    - None
+
+    """
+
+    default_options = {}
+    required = ()
+    genome_allowed = False
+    op_str = "start_codon_optimal"
+
+    def run(self):
+        mut = replace_start_codon(self.gene, self.config["start_codons"][0])
+        if not mut:
+            log.debug(str(self) + " Not mutating, optimal start codon found.")
+            return []
+
+        code = "OptStart{}".format(len(mut.before))
+        return [(mut, code, str(self), [])]
 
 
 def translational_KO(gene, stop_codons=["TAG", "TAA", "TGA"],
@@ -125,6 +156,40 @@ def translational_KO(gene, stop_codons=["TAG", "TAA", "TGA"],
     mutation._codon_offset = offset + 1
 
     return mutation
+
+
+class TranslationalKnockout(BaseOperation):
+    """
+    ``translational_knockout``: Gene knock-out by premature stop-codon.
+
+    Tries to knock out a gene by introducing a number of early stop-codons in
+    the CDS with the least amount of mutations possible.
+
+    Options and default values:
+
+    - ``ko_frame`` Number of codons that are applicable to be mutated.  E.g. a
+      value of 10 means the operation will try to mutate stop codons into the
+      CDS within 10 codons of the start codon. Default is within one half of
+      the length of the CDS.
+    - ``ko_mutations`` number of stop codons to introduce. Default (and
+      minimum) is the number of different stop codons available in the genome
+      configuration file (normally 3).
+
+    """
+
+    default_options = {"ko_frame": (int, 10),
+                       "ko_mutations": (int, 3)}
+    required = ()
+    genome_allowed = False
+    op_str = "translational_knockout"
+
+    def run(self):
+        stop_codons = self.config["stop_codons"]
+        ko_mutations = self.options["ko_mutations"]
+        ko_frame = self.options["ko_frame"]
+        mut = translational_KO(self.gene, stop_codons, ko_mutations, ko_frame)
+        code = "TransKO{}".format(mut._codon_offset)
+        return [(mut, code, str(self), [0, mut._codon_offset])]
 
 
 def RBS_library_fuzzy(gene, target, n, max_mutations, low_count=0):
@@ -735,6 +800,101 @@ def RBS_predict_calc_spacing_old(brackets):
 
     return spacing, bps
 
+
+def rbs_method(s):
+    """RBS library method."""
+    s = s.lower()
+    if s in ["exp", "fuzzy"]:
+        return s
+    else:
+        raise ValueError("Unknown RBS_library method: {}".format(s))
+
+
+class RBSLibrary(BaseOperation):
+
+    """
+    ``RBS_library``: Create a library of different RBS expression levels.
+
+    Options and default values:
+
+    - ``target=5000000`` Target expression level to reach for in AU. If target
+      is reached, computation is stopped, and library will be created.  if
+      target is not reached within the specified number of mutations, a library
+      of expression levels closest to target as possible will be created.
+    - ``n=10`` Number of library sequences to create.
+    - ``max_mutations=10`` Maximum number of mutations to attempt.
+    - ``method=exp`` How to create the library. Two methods are available:
+      ``exp`` and ``fuzzy``. ``exp`` creates a library where each new sequence
+      is an ``m``-fold improvement over the last. ``m`` can either be supplied
+      via the ``m``-parameter, or calculated automatically to create an evenly
+      spaced library from wt level to target. The ``exp`` method runs multiple
+      Monte Carlo simulations to reach each target, however, it uses
+      information from previous runs to more quickly reach subsequent targets.
+      ``fuzzy`` tries to replicate the ``exp`` library, only the Monte Carlo
+      simulation is only run once, and inbetween are collected along the way.
+      This method yields a less precise library, but is quicker. Additionally,
+      ``fuzzy`` enables picking out the best sequences below a certain mutation
+      count by using the ``m`` parameter.  Fx. using ``m=6``, ``fuzzy`` will
+      collect the best possible sequences with a maximum of 1, 2, .. 6
+      mutations. It will then try to fill out the rest of the library with
+      evenly spaced sequences.
+    - ``m=0`` see ``method`` for explanation on ``m``.
+
+    This operation will run an Monte-Carlo simulation in an attempt to reach
+    the specified target value within a number of mutations. Lower numbers of
+    mutations are tried first and are always prioritised over similar
+    expression levels with a higher mutation count.
+
+    """
+
+    default_options = {"target": (float, 5000000.),
+                       "n": (int, 10),
+                       "max_mutations": (int, 10),
+                       "method": (rbs_method, "exp"),
+                       "m": (float, 0)}
+    required = ()
+    genome_allowed = False
+    op_str = "RBS_library"
+
+    def post_init(self):
+        #Correct very low target values
+        if self.options["target"] < 0.1:
+            val = self.options["target"]
+            self.options["target"] = 0.1
+            self.create_opt_str()
+            log.debug("{} adjusting very low target value '{}' to 0.1".format(self, val))
+
+    def run(self):
+        method = self.options["method"]
+        target = self.options["target"]
+        n = self.options["n"]
+        m = self.options["m"]
+        max_mutations = self.options["max_mutations"]
+        if method == "exp":
+            muts = RBS_library(self.gene, target, n, max_mutations, m)
+        elif method == "fuzzy":
+            muts = RBS_library_fuzzy(self.gene, target, n, max_mutations, m)
+
+        if not muts:
+            return None
+
+        muts_out = list()
+        for i, m in enumerate(muts):
+            code = "RBSlib{}_{:.1f}/{:.1f}({})".format(i, m._AU, m._orgAU, m._n)
+            l_op = str(self) + " {:.3f} (wt: {:.2f})".format(m._AU, m._orgAU)
+            muts_out.append((m, code, l_op, [m._orgAU, m._AU]))
+
+        return muts_out
+
+
+OPERATIONS = dict()
+
+def register_operation(op):
+    OPERATIONS[op.op_str] = op
+
+register_operation(StartCodonOptimal)
+register_operation(TranslationalKnockout)
+register_operation(RBSLibrary)
 
 if __name__ == "__main__":
     import doctest

@@ -9,8 +9,9 @@ from __future__ import print_function
 import math
 import logging
 
-from oligo_design import Gene
-from oligo_design import Sequence
+from mage_tool.oligo_design import Gene
+from mage_tool.oligo_design import Sequence
+from mage_tool.operations import BaseOperation
 
 def biggest_difference(promoter, promoterdict, downregulate = False):
     """Calculate single mutation that creates the biggest increase or decrease of promoter activity. Returns None if no mutation is found"""
@@ -124,6 +125,56 @@ def promoter_library(gene, targets, max_mutations, matrix):
 
     return muts
 
+
+def fold_list(s):
+    """A list of improvement folds."""
+    s = s.split(";")
+    remax = re.compile(r"^max\d*$")
+    remin = re.compile(r"^min\d*$")
+    for i,f in enumerate(s):
+        f = f.lower()
+        if remax.match(f) or remin.match(f):
+            s[i] = f
+        else:
+            s[i] = float(f)
+    return s
+
+
+class PromoterLibrary(BaseOperation):
+
+    """
+    Does not work yet
+    """
+
+    default_options = {"targets": (fold_list, ["max"]),
+                       "max_mutations": (int, 10),
+                       "matrix": (str, "sigma70")}
+    required = ()
+    genome_allowed = False
+    op_str = "promoter_library"
+
+    def run(self):
+        """Create a library of different promoter expression levels.
+
+        """
+        targets = self.options["targets"]
+        max_mutations = self.options["max_mutations"]
+        matrix = self.options["matrix"]
+        muts = promoter.promoter_library(self.gene, targets, max_mutations, matrix)
+
+        if not muts:
+            return None
+
+        muts_out = list()
+        for i, m in enumerate(muts):
+            code = "promoterlib{}_{:.1f}({})".format(i, m._fold, m._n)
+            l_op = "{} {:.3f})".format(self, m._fold)
+            muts_out.append((m, code, l_op, [m._fold]))
+
+        return muts_out
+
+
+OPERATIONS = {PromoterLibrary.op_str: PromoterLibrary}
 
 if __name__ == "__main__":
 

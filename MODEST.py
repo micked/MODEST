@@ -41,12 +41,19 @@ if __name__ == '__main__':
     parser.add_argument("-o", "--output", help="Output file. "
                         "Default <project>.out", default=False)
     parser.add_argument("-T", help="Run unthreaded", action="store_true")
-    parser.add_argument("--MASC", help="Design MASC PCR primers to file", default=False,
-                        nargs="?", metavar="mascfile")
+    parser.add_argument("--MASC", help="Design MASC PCR primers to file", default=False, nargs="?", metavar="mascfile")
+    parser.add_argument("--PDF", help="Output report PDF", default=False, nargs="?", metavar="pdffile")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("-Y", action="store_true", help="Continue despite errors")
     group.add_argument("-N", action="store_true", help="Exit on errors")
+    parser.add_argument("--operations", help="Display registered operations and exit", action="store_true")
     args = parser.parse_args()
+
+    if args.operations:
+        from mage_tool.operations import OPERATIONS
+        for op in OPERATIONS:
+            print(op, OPERATIONS[op].__doc__)
+        exit(0)
 
     if args.log == "--":
         args.log = args.project + ".log"
@@ -167,11 +174,12 @@ if __name__ == '__main__':
     print("Writing report CSV to {}..".format(output_csv))
     csvlist = oligolist_to_csv(oligos, output_csv)
 
-    output_pdf = args.project + ".pdf"
-    print("Writing report PDF to {}..".format(output_pdf))
-    report = OligoLibraryReport(args.project)
-    report.parse_and_generate(csvlist, csv_file=False)
-    report.write_pdf(output_pdf)
+    if args.PDF or args.PDF is None:
+        output_pdf = args.project + ".pdf" if not args.PDF else args.pdf
+        print("Writing report PDF to {}..".format(output_pdf))
+        report = OligoLibraryReport(args.project)
+        report.parse_and_generate(csvlist, csv_file=False)
+        report.write_pdf(output_pdf)
 
     if args.MASC or args.MASC is None:
         mascfile = args.MASC if args.MASC else args.project + "_masc_primers.csv"

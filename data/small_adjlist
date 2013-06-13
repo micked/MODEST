@@ -2,7 +2,7 @@ cysE	residue_mutation	ID01,ID02,ID05,ID08	mut=E166G
 cysE	residue_mutation	ID01,ID02,ID05,ID08	mut=M256$
 genome	dna_mutation	ID01,ID08,ID10	mut=[A=AATTGT].2183347
 b0002   dna_mutation ID01 mut=[GAGTGT=AAAAAA].5
-genome	dna_mutation	ID01,ID02,ID03,ID08	mut=[TATAAA=CGGCGG].26559559
+genome	dna_mutation	ID01,ID02,ID03,ID08	mut=[TATAAA=CGGCGG].2659559
 genome	dna_mutation	ID01,ID02,ID06,ID08	mut=[TTTTT=].2739273
 malY	translational_knockout	ID01,ID02,ID05,ID07,ID09
 malY	RBS_library	ID01,ID02,ID05,ID07,ID09	max_mutations=3,n=3,target=0

@@ -5,6 +5,7 @@ Custom mutations
 """
 
 from __future__ import print_function
+from __future__ import absolute_import
 
 import re
 import math
@@ -12,9 +13,10 @@ import random
 import logging
 from itertools import product
 
-from oligo_design import Mutation
-from helpers import degenerate_nucleotides
-from helpers import dgn_to_nts
+from mage_tool.oligo_design import Mutation
+from mage_tool.helpers import degenerate_nucleotides
+from mage_tool.helpers import dgn_to_nts
+from mage_tool.operations import BaseOperation
 
 
 #Define a log
@@ -179,6 +181,45 @@ def gene_mutation(gene, mutation):
     return gene.do_mutation(mutation)
 
 
+def dna_mut(s):
+    """Custom type to verify a DNA mutation."""
+    t1 = re.match(r"^\[(\w*)=(\w*)\]\.(-?\d*)$", s)
+    t2 = re.match(r"^(\w*)\[(\w*)=(\w*)\](\w*)$", s)
+    if not t1 and t2:
+        raise ValueError("Invalid DNA mutation: {}".format(s))
+    return s
+
+
+class DNAMutation(BaseOperation):
+
+    """
+    ``dna_mutation``: Allows for a desired mutation.
+
+    Options:
+
+    - ``mut=upstream[before=after]downstream``
+
+    I.e. ``mut=TATCAACGCC[GCTC=A]GCTTTCATGACT`` changes
+    TATCAACGCC\ **GCTCG**\ CTTTCATGACT to TATCAACGCC\ **A**\ GCTTTCATGACT.
+
+    """
+
+    default_options = {"mut": (dna_mut, None)}
+    required = ("mut",)
+    genome_allowed = True
+    op_str = "dna_mutation"
+
+    def run(self):
+        mut = self.options["mut"]
+        mut = gene_mutation(self.gene, mut)
+        if not mut:
+            log.error(str(self) + " Not mutating, did not find mutation box")
+            return None
+
+        code = "DNAMut"
+        return [(mut, code, str(self), [])]
+
+
 def residue_mutation(gene, mutations, codon_table=default_codon_table,
                      dgn_table=default_dgn_table, usage_table=default_codon_usage):
     """Substitue residue.
@@ -267,6 +308,57 @@ def residue_mutation(gene, mutations, codon_table=default_codon_table,
         return gene.do_mutation(mutation)
     return None
 
+
+def residue_mutlist(s):
+    """Several residue mutations."""
+    muts = s.split(";")
+    for mut in muts:
+        m = re.match("^([A-Z*$])(\d+)([a-z]?)([A-Z*$])$", mut)
+        if not m:
+            raise ValueError("Invalid mutation: {}".format(mut))
+    return muts
+
+
+class ResidueMutation(BaseOperation):
+
+    """
+    ``residue_mutation``: Mutating a residue.
+
+    Options:
+
+    - ``mut=``
+
+    I.e. ``mut=`` changes
+
+    """
+
+    default_options = {"mut": (residue_mutlist, None)}
+    required = ("mut",)
+    genome_allowed = False
+    op_str = "residue_mutation"
+
+    def run(self):
+        cdn_tbl = self.config["codon_table"]
+        dgn_tbl = self.config["dgn_table"]
+        cdn_usage = self.config["codon_usage"]
+        mut = self.options["mut"]
+        mut = residue_mutation(self.gene, mut, cdn_tbl, dgn_tbl, cdn_usage)
+        if not mut:
+            log.error(str(self) + " Not mutating.")
+            return None
+
+        code = "ResMut"
+        return [(mut, code, str(self), [])]
+
+
+OPERATIONS = {}
+def register_operation(op):
+    """Register an operation with the global OPERATIONS dict."""
+    OPERATIONS[op.op_str] = op
+
+
+register_operation(DNAMutation)
+register_operation(ResidueMutation)
 
 if __name__ == "__main__":
     import doctest

@@ -8,11 +8,16 @@ This module contains a dictionary containing the module-wide configuration.
 import yaml
 import os.path
 
+
 CONF = {#Oligo options
         "oligo_length": 90,
 
         #Program options
-        "processes": None}
+        "processes": None,
+
+        #Custom operations
+        "operations": []}
+
 
 def load_rcfile(filepath):
     """Load a mage_tool configuration.
