@@ -12,11 +12,11 @@ except ImportError: from io import StringIO as strIO
 from Bio import SeqIO
 
 import ViennaRNA
-import translation
+from operations import translation
 import IO
 import oligo_design
 import helpers
-import manual
+from operations import manual
 
 from IO import seqIO_to_genelist
 from IO import create_config_tables
