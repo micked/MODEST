@@ -382,9 +382,9 @@ if __name__ == "__main__":
         testest()
 
     from interface import InterfaceTests
-    #suite = unittest.TestLoader().discover("./", pattern="*_tests.py")
     suite = unittest.TestLoader().loadTestsFromTestCase(TestMageTool)
-    suite = unittest.TestLoader().loadTestsFromTestCase(InterfaceTests)
+    if_suite = unittest.TestLoader().loadTestsFromTestCase(InterfaceTests)
+    suite.addTest(if_suite)
 
     suite.addTests(doctest.DocTestSuite(ViennaRNA))
     suite.addTests(doctest.DocTestSuite(translation))

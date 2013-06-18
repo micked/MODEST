@@ -5,6 +5,7 @@ Commandline interface to <>
 
 Yadda yadda yadda
 """
+
 from __future__ import print_function
 import logging
 import argparse
@@ -28,9 +29,9 @@ from mage_tool.interface import run_adjustments
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("adjustments", help="Adjustment list", type=argparse.FileType("r"))
-    parser.add_argument("barcodes", help="Barcode library", type=argparse.FileType("r"))
-    parser.add_argument("config", help="Genome configuration", type=argparse.FileType("r"))
+    parser.add_argument("adjustments", help="Adjustment list", type=argparse.FileType("U"))
+    parser.add_argument("barcodes", help="Barcode library", type=argparse.FileType("U"))
+    parser.add_argument("config", help="Genome configuration", type=argparse.FileType("U"))
     parser.add_argument("--genome", help="Annotated genome. Leave empty to"
                         " locate automatically.", default=None)
     parser.add_argument("--log", help="Logfile, default <project>.log. "

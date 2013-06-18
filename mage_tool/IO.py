@@ -93,6 +93,7 @@ generic_cfg = {'Definition': 'Generic',
                     'TTC': 'F', 'GTT': 'V', 'GCT': 'A', 'ACC': 'T', 'TGA': '$',
                     'TTG': 'L', 'TCC': 'S', 'TCA': 'S', 'TCT': 'S'}}
 
+
 def seqIO_to_genelist(genome, config=generic_cfg, include_genes=None, include_genome=False,
                       exclude_genes=None, leader_len=35, promoter_len=200):
     """TODO"""
@@ -114,7 +115,6 @@ def seqIO_to_genelist(genome, config=generic_cfg, include_genes=None, include_ge
                 else:
                     continue
 
-
             #Little bit of warning:
             #Bio converts positions to 0-index internally
             #This is mostly a good thing
@@ -132,7 +132,7 @@ def seqIO_to_genelist(genome, config=generic_cfg, include_genes=None, include_ge
             try:
                 leader = find_wobble_seq(genome, leader, l_start, l_end, config["codon_table"], config["dgn_table"])
             except WobbleError as e:
-                log.error("Wobble error in gene: {}; {}".format(name, e))
+                log.error("Wobble error in gene.leader: {}; {}".format(name, e))
 
             #Detect operons
             in_operon = None
@@ -158,7 +158,7 @@ def seqIO_to_genelist(genome, config=generic_cfg, include_genes=None, include_ge
             try:
                 promoter = find_wobble_seq(genome, promoter, p_start, p_end, config["codon_table"], config["dgn_table"])
             except WobbleError as e:
-                log.error("Wobble error in gene: {}; {}".format(name, e))
+                log.error("Wobble error in gene.promoter: {}; {}".format(name, e))
 
             if strand == 1:
                 pos = int(start)
@@ -224,7 +224,6 @@ def find_wobble_seq(genome, leader, l_start, l_end, codon_table, dgn_table):
     Returns None if no wobble sequence if found
 
     """
-    #leader_wobble = None
     #Look for CDS in leader
     for c in genome.features:
         if c.type == "CDS":
@@ -240,7 +239,10 @@ def find_wobble_seq(genome, leader, l_start, l_end, codon_table, dgn_table):
                 if c.location.strand == -1:
                     w_seq = reverse_complement(w_seq)
 
-                start_offset = c.location.start - l_start
+                #Exstra offset since genes are sometimes not linear (introns)
+                extra_offset = len(w_cds) - (c.location.end - c.location.start)
+                #Calculate start offset
+                start_offset = c.location.start - l_start - extra_offset
                 leader.add_wobble(w_seq, start_offset)
 
     return leader

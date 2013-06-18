@@ -523,7 +523,7 @@ class Sequence:
                 p_msg += self[i]
                 w_msg += nts_to_dgn[wbl[i]]
                 e_msg += " " if self[i] in wbl[i] else "*"
-                if (i-wbl.start) and (i-wbl.start) % 60 == 0:
+                if (i+1-wbl.start) % 60 == 0:
                     msg += "{}\n     {}\n     {}\n\n{:<4d} ".format(p_msg, w_msg, e_msg, i+1)
                     p_msg, w_msg, e_msg = "", "", ""
             msg += "{}\n     {}\n     {}".format(p_msg, w_msg, e_msg, i+1)
