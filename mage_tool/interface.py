@@ -41,19 +41,18 @@ def parse_adjustments(adjlist, genes, config, barcoding_lib):
             op = OPERATIONS[op_str]
         except KeyError:
             if op_str not in OPERATIONS:
-                error_list.append("Operation {} not found in line {}."
-                                  "".format(op_str, i))
+                error_list.append("Operation {} not found in line {}.".format(op_str, i))
             if gene_str not in genes:
-                error_list.append("Gene {} not found in line {}."
-                                  "".format(gene_str, i))
+                error_list.append("Gene {} not found in line {}.".format(gene_str, i))
             continue
 
         #Validate existance of barcodes
-        barcodes = adj["barcodes"]
-        for bc in barcodes:
-            if bc not in barcoding_lib:
-                error_list.append("Barcode {} not found in barcode lib."
-                                  "".format(bc))
+        barcodes = list()
+        for bc in adj["barcodes"]:
+            if bc not in ["*", "none"]:
+                barcodes.append(bc)
+                if bc not in barcoding_lib:
+                    error_list.append("Barcode {} not found in barcode lib".format(bc))
 
         current_operation = op(i, gene, adj["options"], config, barcodes)
 

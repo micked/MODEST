@@ -64,23 +64,23 @@ List of operations
 
 RBS_library
 ^^^^^^^^^^^
-.. autosimple:: mage_tool.interface.RBSLibrary
+.. autosimple:: mage_tool.operations.translation.RBSLibrary
 
 translational_knockout
 ^^^^^^^^^^^^^^^^^^^^^^
-.. autosimple:: mage_tool.interface.TranslationalKnockout
+.. autosimple:: mage_tool.operations.translation.TranslationalKnockout
 
 start_codon_optimal
 ^^^^^^^^^^^^^^^^^^^
-.. autosimple:: mage_tool.interface.StartCodonOptimal
+.. autosimple:: mage_tool.operations.translation.StartCodonOptimal
 
 dna_mutation
 ^^^^^^^^^^^^
-.. autosimple:: mage_tool.interface.DNAMutation
+.. autosimple:: mage_tool.operations.manual.DNAMutation
 
 residue_mutation
 ^^^^^^^^^^^^^^^^
-.. autosimple:: mage_tool.interface.ResidueMutation
+.. autosimple:: mage_tool.operations.manual.ResidueMutation
 
 
 Barcoding file
@@ -106,8 +106,53 @@ forward and one reverse primer.  ::
     ..  ..   ..
 
 
-Running the program
--------------------
-TDB.
+Running MODEST.py
+-----------------
+MODEST.py take three required arguments: ``adjustments``, ``barcodes`` and ``config``.
+``adjustments`` is is the adjustment list, and ``barcodes`` is
+the barcoding library mentioned above. ``config`` is the genome configuration file.
+Since a genome and a genbank file is linked, MODEST.py will automatically attempt
+to find a ``.gb`` file named after the config file.
 
+The full search path for locating a genome file is:
 
+ * ``<cfg>.(gb|genbank)``
+ * ``<cwd>/<locus>[.gb|.genbank]``
+ * ``<cfg_path>/<locus>[.gb|.genbank]``
+
+Where:
+
+ * ``<cfg>`` is the basename (anything but the extension) of the config file. (I.e. given config file ``path/e_coli.config``, ``<cfg>`` is ``path/e_coli``)
+ * ``(gb|genbank)`` means MODEST.py will look for the two file extensions ``.gb`` or ``.genbank``.
+ * ``<cwd>`` is current working directory
+ * ``<locus>`` is the genbank ID described in the locus field in the config file.
+ * ``<cfg_path>`` is the directory where the config file resides.
+ * ``[.gb|.genbank]`` means either no extension, ``.gb``, or ``.genbank`` extension.
+
+The ``-p`` or ``--project`` flag gives the project a name. This name is used in
+the output id's as well as output filenames.
+
+To output a PDF report, use the ``--PDF`` flag, optionally with an argument which
+will be the pdf file that is written.
+
+Similarly, to output MASC primers, use the ``--MASC`` flag with an optional output file.
+
+How output is logged can be configered with the ``--log`` parameter. Default is
+to output log to a file called <project>.log. Specifying a filename will log output
+to that file. Specifying ``-`` will disable logging and ``stdout`` will print log
+events to screen.
+
+A typical procject folder will look like this::
+
+  Project
+  ├─ data
+  │  ├─ organism.config
+  │  ├─ organism.gb
+  │  ├─ adjustments.txt
+  │  ├─ barcodes.txt
+  │  └─ operon_file.opr
+  └─ <output files>
+
+As ``Project`` as your current working directory, MODEST.py would be invoked like so::
+
+  $ MODEST.py data/adjustments.txt data/organism.config data/barcodes.txt -p project_name

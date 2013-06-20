@@ -105,15 +105,18 @@ def seqIO_to_genelist(genome, config=generic_cfg, include_genes=None, include_ge
             name = gene_name = g.qualifiers["gene"][0]
             locus_tag = g.qualifiers["locus_tag"][0]
 
-            if exclude_genes:
-                if name in exclude_genes or locus_tag in exclude_genes:
-                    continue
-
             if include_genes and name not in include_genes:
                 if locus_tag in include_genes:
                     name = locus_tag
                 else:
                     continue
+            elif exclude_genes:
+                if name in exclude_genes or locus_tag in exclude_genes:
+                    continue
+
+            #Skip pseudo genes unless they are specifically requested
+            if not include_genes and "pseudo" in g.qualifiers:
+                continue
 
             #Little bit of warning:
             #Bio converts positions to 0-index internally
@@ -227,6 +230,9 @@ def find_wobble_seq(genome, leader, l_start, l_end, codon_table, dgn_table):
     #Look for CDS in leader
     for c in genome.features:
         if c.type == "CDS":
+            #Skip all pseudo genes
+            if "pseudo" in c.qualifiers:
+                continue
             if is_inside(l_start, l_end, c.location.start, c.location.end):
                 w_cds = c.extract(genome).seq
                 try:
@@ -239,10 +245,11 @@ def find_wobble_seq(genome, leader, l_start, l_end, codon_table, dgn_table):
                 if c.location.strand == -1:
                     w_seq = reverse_complement(w_seq)
 
-                #Exstra offset since genes are sometimes not linear (introns)
-                extra_offset = len(w_cds) - (c.location.end - c.location.start)
+                #TODO:
+                #If there is disjonted range, this will fail.
+                #I.e. join(3948583..3949566,3949565..3950227)
                 #Calculate start offset
-                start_offset = c.location.start - l_start - extra_offset
+                start_offset = c.location.start - l_start
                 leader.add_wobble(w_seq, start_offset)
 
     return leader
