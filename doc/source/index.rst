@@ -142,17 +142,27 @@ to output log to a file called <project>.log. Specifying a filename will log out
 to that file. Specifying ``-`` will disable logging and ``stdout`` will print log
 events to screen.
 
-A typical procject folder will look like this::
+A typical project folder will look like this::
 
-  Project
-  ├─ data
-  │  ├─ organism.config
-  │  ├─ organism.gb
-  │  ├─ adjustments.txt
-  │  ├─ barcodes.txt
-  │  └─ operon_file.opr
-  └─ <output files>
+ Project
+ |-- data
+ |   |-- organism.config
+ |   |-- organism.gb
+ |   |-- adjustments.txt
+ |   |-- barcodes.txt
+ |   ·-- operon_file.opr
+ ·-- <output files>
 
 As ``Project`` as your current working directory, MODEST.py would be invoked like so::
 
   $ MODEST.py data/adjustments.txt data/organism.config data/barcodes.txt -p project_name
+
+Configuring mage_tool
+~~~~~~~~~~~~~~~~~~~~~
+``mage_tool`` can be configured via rc files. rc files are either placed in
+``~/.conf/mage_tool.rc`` or ``./mage_tool.rc``. rc files are YAML files which
+overrides the default program parameters::
+
+ "oligo_length": 90
+ "processes": None
+ "operations": []
