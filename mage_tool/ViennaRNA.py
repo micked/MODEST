@@ -123,7 +123,7 @@ class ViennaRNA:
             self.versions.append(2)
         except Exception:
             pass
-        
+
         #Try version 1.X
         try:
             self.run_command([self.RNAFOLD, "-noPS"], "CCCCCAAAGGGGG")
@@ -254,7 +254,7 @@ class ViennaRNA:
             return [self.output_to_brackets_and_dG(line) for line in output[1:]]
         else:
             return []
-    
+
     def energy(self, seq, brackets, d=1):
         """RNAeval"""
         if type(seq) is list:
@@ -330,6 +330,37 @@ class ViennaRNA:
         return brackets, dG
 
 
+"""
+Unittests
+~~~~~~~~~
+"""
+
+import unittest
+
+
+class InterfaceTests(unittest.TestCase):
+    def setUp(self):
+        self.rna = ViennaRNA()
+
+    def test_fold(self):
+        fold, mfe = self.rna.fold("ATCGATCGATCGATCG")
+        self.assertIsInstance(mfe, float)
+        self.assertEqual(fold.count("("), fold.count(")"))
+        self.assertRegexpMatches(fold, "[\.\(\)]+")
+
+    def test_cofold(self):
+        fold, mfe = self.rna.cofold("GCATGCAT&ATGCATGC")
+        self.assertEqual(fold, "((((((((&))))))))")
+
+
 if __name__ == "__main__":
     import doctest
+    print("Running doctests..")
     doctest.testmod()
+
+    print()
+    print("Running unittests..")
+    v = ViennaRNA().version
+    print("Testing version:", v)
+
+    unittest.main()
