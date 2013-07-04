@@ -375,12 +375,7 @@ class TestMageTool(unittest.TestCase):
                 raise Exception("aoe")
 
 
-
-
-if __name__ == "__main__":
-    if "t" in sys.argv:
-        testest()
-
+def get_suite():
     from interface import InterfaceTests
     suite = unittest.TestLoader().loadTestsFromTestCase(TestMageTool)
     if_suite = unittest.TestLoader().loadTestsFromTestCase(InterfaceTests)
@@ -392,5 +387,14 @@ if __name__ == "__main__":
     suite.addTests(doctest.DocTestSuite(oligo_design))
     suite.addTests(doctest.DocTestSuite(helpers))
     suite.addTests(doctest.DocTestSuite(manual))
+
+    return suite
+
+
+if __name__ == "__main__":
+    if "t" in sys.argv:
+        testest()
+
+    suite = get_suite()
 
     unittest.TextTestRunner(verbosity=2).run(suite)
