@@ -24,7 +24,6 @@ setup(
     platforms='any',
     install_requires=[
         'biopython>=1.61',
-        'numpy>=1.4', #For matplotlib
         'pdfrw>=0.1',
         'PyYAML>=3.10',
         'matplotlib>=1.2.1',
