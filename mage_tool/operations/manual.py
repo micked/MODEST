@@ -91,7 +91,7 @@ def gene_mutation(gene, mutation):
     mutation can be either be specified as a specific mutation at a specific
     location using the ``[before=after].pos`` notation:
 
-        >>> from oligo_design import Gene
+        >>> from mage_tool.oligo_design import Gene
         >>> gene = Gene("ficX", 100, 1, "ATGATTATAGCACACTA", "AGCAGCATAC")
         >>> gene_mutation(gene, "[ATT=GCC].4")
         Mutation: [ATT=gcc] at pos 103
@@ -223,7 +223,7 @@ def residue_mutation(gene, mutations, codon_table=default_codon_table,
 
     Substitutions are given as a list of amino acid mutations:
 
-        >>> from oligo_design import Gene
+        >>> from mage_tool.oligo_design import Gene
         >>> gene = Gene("ficX", 100, 1, "ATGGCAACAATAAAAGATGTAGCGAAACGA", "")
 
         #Mutate K5 to A and V7 to A

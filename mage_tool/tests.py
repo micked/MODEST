@@ -391,10 +391,24 @@ def get_suite():
     return suite
 
 
+def run_tests():
+
+    suite = get_suite()
+    out = strIO.StringIO()
+
+    unittest.TextTestRunner(stream=out, verbosity=2).run(suite)
+    try:
+        rna_version = ViennaRNA.ViennaRNA().version
+    except Exception:
+        rna_version = "failed"
+    out.write("\nTesting ViennaRNA: {}\n".format(rna_version))
+    out.seek(0)
+    return out.read()
+
+
 if __name__ == "__main__":
     if "t" in sys.argv:
         testest()
 
-    suite = get_suite()
-
-    unittest.TextTestRunner(verbosity=2).run(suite)
+    out = run_tests()
+    print(out)

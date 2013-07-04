@@ -30,7 +30,7 @@ def replace_start_codon(gene, start_codon="ATG"):
     Start codon will be replaced by start_codon, which must be a string with
     length 3. (Default 'ATG')
 
-        >>> from oligo_design import Gene
+        >>> from mage_tool.oligo_design import Gene
         >>> gene = Gene("ficX", 100, 1, "ATTATATAGACT")
         >>> replace_start_codon(gene)
         Mutation: [T=g] at pos 102
