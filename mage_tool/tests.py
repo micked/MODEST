@@ -1,26 +1,25 @@
 #!/usr/bin/env python2
 
 from __future__ import print_function
+from __future__ import absolute_import
 
 import sys
 import doctest
 import unittest
-
-try: import cStringIO as strIO
-except ImportError: from io import StringIO as strIO
+from cStringIO import StringIO
 
 from Bio import SeqIO
 
-import ViennaRNA
-from operations import translation
-import IO
-import oligo_design
-import helpers
-from operations import manual
+from mage_tool import IO
+from mage_tool import helpers
+from mage_tool import ViennaRNA
+from mage_tool import oligo_design
+from mage_tool.IO import find_wobble_seq
+from mage_tool.IO import seqIO_to_genelist
+from mage_tool.IO import create_config_tables
+from mage_tool.operations import manual
+from mage_tool.operations import translation
 
-from IO import seqIO_to_genelist
-from IO import create_config_tables
-from IO import find_wobble_seq
 
 genome = """LOCUS       FK_000001               1080 bp    DNA              BCT 11-JAN-2012
 DEFINITION  Escherichia coli str. K-12 substr. MG1655 chromosome, complete
@@ -151,7 +150,7 @@ config = {'Definition': 'Escherichia coli str. K-12 substr. MG1655',
 def testest():
     class Self: pass
     self = Self()
-    self.genome = SeqIO.read(strIO.StringIO(genome), "genbank")
+    self.genome = SeqIO.read(StringIO(genome), "genbank")
     self.config = create_config_tables(config)
     self.genes = seqIO_to_genelist(self.genome, config)
 
@@ -169,7 +168,7 @@ def testest():
 class TestMageTool(unittest.TestCase):
     """Test cases for the various oligo design routines"""
     def setUp(self):
-        self.genome = SeqIO.read(strIO.StringIO(genome), "genbank")
+        self.genome = SeqIO.read(StringIO(genome), "genbank")
         self.config = create_config_tables(config)
         self.genes = seqIO_to_genelist(self.genome, self.config, promoter_len=20)
 
@@ -376,7 +375,7 @@ class TestMageTool(unittest.TestCase):
 
 
 def get_suite():
-    from interface import InterfaceTests
+    from mage_tool.interface import InterfaceTests
     suite = unittest.TestLoader().loadTestsFromTestCase(TestMageTool)
     if_suite = unittest.TestLoader().loadTestsFromTestCase(InterfaceTests)
     suite.addTest(if_suite)
@@ -394,7 +393,7 @@ def get_suite():
 def run_tests():
 
     suite = get_suite()
-    out = strIO.StringIO()
+    out = StringIO()
 
     unittest.TextTestRunner(stream=out, verbosity=2).run(suite)
     try:

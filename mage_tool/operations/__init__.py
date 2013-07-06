@@ -211,7 +211,7 @@ def register_module(module):
 #Import all internal operations
 pkgpath = os.path.dirname(__file__)
 for _, name, _ in pkgutil.iter_modules([pkgpath]):
-    register_module(name)
+    register_module("mage_tool.operations." + name)
 
 
 #Import user operations
