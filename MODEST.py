@@ -140,9 +140,9 @@ if __name__ == '__main__':
         for e in error_list:
             print("[E]:", e)
             exit(1)
-
-    adj_args = (adjustlist, genes, genome.seq, config, args.project,
-                barcoding_lib, threaded)
+    
+    print(oplist)
+    
     oligos = run_adjustments(oplist, genome.seq, args.project, barcoding_lib, threaded)
 
     if args.output:
