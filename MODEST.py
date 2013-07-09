@@ -77,10 +77,15 @@ if __name__ == '__main__':
         logging.getLogger('').addHandler(console)
 
     print("Reading adjustments..")
-    adjustlist = args.adjustments.readlines()
+    try:
+        adjlist = raw_adjlist_to_adjlist(args.adjustments.readlines())
+    except ParserError as e:
+        print(str(e))
+        for error in e.error_list:
+            print ("[E] - " + error)
+        exit(1)
 
-    include_genes = set([line.split()[0] for line in adjustlist
-                         if line.strip() and line[0] != "#"])
+    include_genes = set([l["gene"] for l in adjlist])
 
     print("Loading config file..")
     cfg_basedir = os.path.abspath(os.path.dirname(args.config.name))
@@ -117,8 +122,7 @@ if __name__ == '__main__':
     incl_gnm = "genome" in include_genes
     #include_genes = None if "all" in include_genes
     try:
-        genes = seqIO_to_genelist(genome, config, include_genes,
-                                  include_genome=incl_gnm)
+        genes = seqIO_to_genelist(genome, config, include_genes, include_genome=incl_gnm)
     except ParserError as e:
         print("Fatal error:", e)
         exit(1)
@@ -130,15 +134,14 @@ if __name__ == '__main__':
 
     print("Making oligos..")
     threaded = not args.T
-    adjlist, error_list = raw_adjlist_to_adjlist(adjustlist)
-    oplist, op_error_list = parse_adjustments(adjlist, genes, config, barcoding_lib)
-    error_list.extend(op_error_list)
-    if error_list:
-        print("Following errors found, exiting:")
-        for e in error_list:
-            print("[E]:", e)
+    try:
+        oplist = parse_adjustments(adjlist, genes, config, barcoding_lib)
+    except ParserError as e:
+        print(str(e))
+        for error in e.error_list:
+            print("[E] - ", error)
             exit(1)
-    
+
     oligos = run_adjustments(oplist, genome.seq, args.project, barcoding_lib, threaded)
 
     if args.output:
