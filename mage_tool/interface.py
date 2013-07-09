@@ -35,6 +35,7 @@ def parse_adjustments(adjlist, genes, config, barcoding_lib):
         gene_str = adj["gene"]
         op_str = adj["op"]
         i = adj["line_id"]
+        old_error_len = len(error_list)
 
         try:
             gene = genes[gene_str]
@@ -61,7 +62,8 @@ def parse_adjustments(adjlist, genes, config, barcoding_lib):
                 error_list.append("{} error: {}".format(op, e))
             continue
 
-        if not error_list:
+        #No new errors
+        if len(error_list) == old_error_len:
             parsed_operations.append(current_operation)
 
     return parsed_operations, error_list
