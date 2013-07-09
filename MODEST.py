@@ -12,14 +12,13 @@ import argparse
 import os.path
 import sys
 
-import yaml
 from Bio import SeqIO
 
 from mage_tool.IO import ParserError
 from mage_tool.IO import seqIO_to_genelist
 from mage_tool.IO import oligolist_to_tabfile
 from mage_tool.IO import parse_barcode_library
-from mage_tool.IO import create_config_tables
+from mage_tool.IO import load_config_file
 from mage_tool.IO import oligolist_to_csv
 from mage_tool.IO import OligoLibraryReport
 from mage_tool.IO import oligolist_to_mascfile
@@ -84,9 +83,7 @@ if __name__ == '__main__':
                          if line.strip() and line[0] != "#"])
 
     print("Loading config file..")
-    config = yaml.safe_load(args.config)
-    cfg_basedir = os.path.abspath(os.path.dirname(args.config.name))
-    config = create_config_tables(config, cfg_basedir)
+    config, cfg_basedir = load_config_file(args.config)
 
     if not args.genome:
         cfg_basename = os.path.splitext(args.config.name)[0]
@@ -140,9 +137,7 @@ if __name__ == '__main__':
         for e in error_list:
             print("[E]:", e)
             exit(1)
-
-    adj_args = (adjustlist, genes, genome.seq, config, args.project,
-                barcoding_lib, threaded)
+    
     oligos = run_adjustments(oplist, genome.seq, args.project, barcoding_lib, threaded)
 
     if args.output:

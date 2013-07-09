@@ -357,6 +357,12 @@ def make_primer(ref_seq, temp, start, end, salt_c=0.05, primer_c=5e-8, max_len=2
                         "(Reached: {})".format(temp, Tm))
     return pr, Tm
 
+def is_number(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
 
 if __name__ == "__main__":
     import doctest

@@ -10,6 +10,8 @@ import os
 import csv
 import codecs
 import logging
+import yaml
+import itertools
 
 try:
     from cStringIO import StringIO
@@ -369,6 +371,31 @@ def parse_barcode_library(barcode_filehandle):
 configuration parsers
 ~~~~~~~~~~~~~~~~~~~~~
 """
+
+def load_config_file(configfile):
+
+    config = yaml.safe_load(configfile)
+    cfg_basedir = os.path.abspath(os.path.dirname(configfile.name))
+    try:
+        config = create_config_tables(config, cfg_basedir)
+    except Exception as ex:
+        raise Exception("{}".format(ex))
+
+    #Verify config table
+    #codon_usage
+    l = list()
+    b = ["A", "C", "G", "T"]
+    b = [b, b, b]
+    for li in itertools.product(*b):
+        l.append("".join(list(li)))
+
+    if set(config["codon_usage"]) == set(l):
+        for k in config["codon_usage"]:
+            if not isinstance(config["codon_usage"][k][0], str) and is_number(config["codon_usage"][k][1]):
+                raise Exception("Error in Codon Usage table at codon {}. See documentation".format(k))
+
+    return config, cfg_basedir
+
 
 def create_config_tables(config, cfg_basedir="./"):
     """Create additional lookup tables from the parsed config yaml file."""
