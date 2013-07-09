@@ -54,18 +54,23 @@ def raw_adjlist_to_adjlist(adjfilehandle):
             continue
 
         line = line.split()
-        if len(line) < 3:
+        if len(line) < 2:
             #Append error and quit line
             error_list.append("Too few arguments in line {}.".format(i))
             continue
 
-        elif len(line) == 3:
+        elif len(line) == 2:
             options = ""
         else:
-            options = line[3]
+            options = line[2]
 
-        gene, op, barcodes = line[0:3]
-        barcodes = barcodes.split(",")
+        gene, op = line[0:2]
+        #barcodes = barcodes.split(",")
+        barcodes = [opt[9:].split(";") for opt in options.split(",") if "barcodes" in opt]
+        print barcodes
+        barcodes = [bcd for bcds in barcodes for bcd in bcds]
+        print barcodes
+        options = ",".join([opt for opt in options.split(",") if "barcodes" not in opt])
         adjlist.append({"options": options, "gene": gene, "op": op, "barcodes": barcodes, "line_id": i})
 
     #Raise ParserError with error_list
