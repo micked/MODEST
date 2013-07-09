@@ -83,7 +83,8 @@ if __name__ == '__main__':
                          if line.strip() and line[0] != "#"])
 
     print("Loading config file..")
-    config, cfg_basedir = load_config_file(args.config)
+    cfg_basedir = os.path.abspath(os.path.dirname(args.config.name))
+    config = load_config_file(args.config, cfg_basedir)
 
     if not args.genome:
         cfg_basename = os.path.splitext(args.config.name)[0]

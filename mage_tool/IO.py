@@ -372,29 +372,29 @@ configuration parsers
 ~~~~~~~~~~~~~~~~~~~~~
 """
 
-def load_config_file(configfile):
+def load_config_file(configfile, cfg_basedir):
 
     config = yaml.safe_load(configfile)
-    cfg_basedir = os.path.abspath(os.path.dirname(configfile.name))
-    try:
-        config = create_config_tables(config, cfg_basedir)
-    except Exception as ex:
-        raise Exception("{}".format(ex))
+    config = create_config_tables(config, cfg_basedir)
 
     #Verify config table
     #codon_usage
-    l = list()
-    b = ["A", "C", "G", "T"]
-    b = [b, b, b]
-    for li in itertools.product(*b):
-        l.append("".join(list(li)))
+    b = [["A", "C", "G", "T"]]*3
+    all_codons = ["".join(li) for li in itertools.product(*b)]
 
-    if set(config["codon_usage"]) == set(l):
-        for k in config["codon_usage"]:
-            if not isinstance(config["codon_usage"][k][0], str) and is_number(config["codon_usage"][k][1]):
-                raise Exception("Error in Codon Usage table at codon {}. See documentation".format(k))
+    codonsdiff = set(all_codons) - set(config["codon_usage"])
+    if codonsdiff:
+        raise ParserError("Missing codons in config file: {}".format(",".join(list(codonsdiff))))
+        
+    error_list = list()
+    for k in config["codon_usage"]:
+        if not isinstance(config["codon_usage"][k][0], str) and is_number(config["codon_usage"][k][1]):
+            error_list.append("Error in codon: '{}'".format(k))
+    
+    if error_list:
+        raise ParserError("Error in 'codon_usage'", error_list)
 
-    return config, cfg_basedir
+    return config
 
 
 def create_config_tables(config, cfg_basedir="./"):
