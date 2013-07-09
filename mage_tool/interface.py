@@ -3,7 +3,7 @@
 """
 General interface to <>
 """
-
+from __future__ import print_function
 import signal
 import logging
 from multiprocessing import Pool, Value, Lock
@@ -90,7 +90,7 @@ def run_adjustments(oplist, genome, project, barcoding_lib, threaded=True):
             except KeyboardInterrupt:
                 log.error("Computation manually stopped")
                 break
-
+    
     oligos = list()
     for r in results:
         try:
@@ -105,7 +105,7 @@ def run_adjustments(oplist, genome, project, barcoding_lib, threaded=True):
             else:
                 oligos.extend(res)
         except KeyboardInterrupt:
-            print
+            print()
             log.error("Computation manually stopped.")
             return oligos
 
@@ -123,7 +123,7 @@ def create_oligos_decorator(op, kwargs):
         return op.create_oligos(**kwargs)
     except Exception:
         import traceback
-        print
+        print()
         traceback.print_exc()
         return None
 

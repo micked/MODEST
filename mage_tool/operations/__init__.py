@@ -157,14 +157,13 @@ class BaseOperation(object):
         gene = self.gene
         config = self.config
         barcodes = self.barcodes
-
+        
         if muts is None:
             log.warn(str(self) + " did not make any mutations.")
             return []
 
         if count is None:
             count = self.line_id
-
         oligos = list()
         for i, (mut, code, operation, values) in enumerate(muts, 1):
             number = "{:0>4}.{}".format(count, i)
@@ -187,14 +186,16 @@ class BaseOperation(object):
             #reset barcode counter
             j = 1
             #Add barcodes
-            for barcode_ids in barcodes:
-                temp_oligo = oligo.copy()
-                temp_oligo.number = "{}.{}".format(number, j)
-                temp_oligo.add_barcodes(barcode_ids, barcoding_lib)
-                #Add
-                oligos.append(temp_oligo)
-                j += 1
-
+            if not barcodes:
+                oligos.append(oligo)
+            else:
+                for barcode_ids in barcodes:
+                    temp_oligo = oligo.copy()
+                    temp_oligo.number = "{}.{}".format(number, j)
+                    temp_oligo.add_barcodes(barcode_ids, barcoding_lib)
+                    #Add
+                    oligos.append(temp_oligo)
+                    j += 1
         return oligos
 
 
