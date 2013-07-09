@@ -375,25 +375,73 @@ configuration parsers
 def load_config_file(configfile, cfg_basedir):
 
     config = yaml.safe_load(configfile)
-    config = create_config_tables(config, cfg_basedir)
+    
+    #Verify configuration table
+    #Check that required elements have been specified.
+    required = ["Locus", "replication", "start_codons", "codon_usage"]
+    missing = [req for req in required if req not in config]
 
-    #Verify config table
-    #codon_usage
+    if missing:
+        raise ParserError("Missing required parameters in genome config file: '{}'. See documentation.".format("', '".join(list(missing))))
+            
+    #Locus must be a string.
+    if not isinstance(config["Locus"], str):
+        raise ParserError("Genome config file: 'Locus' must be a string")
+    
+    #replication
+    #replication is a dictionary that contains ori and ter.
+    missing = [req for req in ["ori", "ter"] if req not in config["replication"]]
+    #Raise error with missing elements.
+    if missing:
+        raise ParserError("Genome config file: 'replication' is missing: {}.".format(", ".join(list(missing))))
+         
+    #start codons
+    #start codons is a list of start codons.
+    error_list = list()
+    if not isinstance(config["start_codons"], list):
+        raise ParserError("Genome config file: 'start_codons' must be a list of codons")
+    #Check that codons are strings with length 3.
+    for cd in config["start_codons"]:
+        if not isinstance(cd, str) and len(cd) != 3:
+            error_list.append("Invalid codon '{}' in start_codons".format(cd))
+    #If any codons are wrong. Raise error with list.
+    if error_list:
+        raise ParserError("Genome config file: Error in 'codon_usage'", error_list)
+        
+    #codon usage
+    #Check that all codons have been specified.    
     b = [["A", "C", "G", "T"]]*3
     all_codons = ["".join(li) for li in itertools.product(*b)]
-
+    #If any codons are missing, raise error with missing codons.
     codonsdiff = set(all_codons) - set(config["codon_usage"])
     if codonsdiff:
-        raise ParserError("Missing codons in config file: {}".format(",".join(list(codonsdiff))))
-        
+        raise ParserError("Genome config file: Missing codons {}".format(", ".join(list(codonsdiff))))
+
     error_list = list()
     for k in config["codon_usage"]:
-        if not isinstance(config["codon_usage"][k][0], str) and is_number(config["codon_usage"][k][1]):
-            error_list.append("Error in codon: '{}'".format(k))
-    
-    if error_list:
-        raise ParserError("Error in 'codon_usage'", error_list)
+        #Verify that the length of usage list is 2, at the codon. Otherwise append error to error_list and continue.
+        if not isinstance(config["codon_usage"][k], list) and len(config["codon_usage"][k]) != 2:
+            error_list.append("Wrong usage list at codon {}".format(k))
+            continue
 
+        #Unpack values from usage list.
+        AA, usage = config["codon_usage"][k]
+        #Check that amino acid is a str of length 1.
+
+        if not isinstance(AA, str) and len(AA) != 1:
+            error_list.append("Invalid amino acid ({]) at codon: '{}'".format(k))
+
+        #Check that usage is a number and float it in config.
+        try:
+            config["codon_usage"][k][1] = float(usage)
+        except ValueError:
+            error_list.append("Error in codon: '{}'".format(k))
+
+    #If anny errors have been caugt during check of codon_usage. Raise error with error_list.
+    if error_list:
+        raise ParserError("Genome config file: Error in 'codon_usage'", error_list)
+
+    config = create_config_tables(config, cfg_basedir)
     return config
 
 

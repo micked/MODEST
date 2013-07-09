@@ -89,8 +89,15 @@ if __name__ == '__main__':
 
     print("Loading config file..")
     cfg_basedir = os.path.abspath(os.path.dirname(args.config.name))
-    config = load_config_file(args.config, cfg_basedir)
-
+ 
+    try:
+        config = load_config_file(args.config, cfg_basedir)
+    except ParserError as e:
+        print(str(e))
+        for error in e.error_list:
+            print("[E] -", error)
+        exit(1)
+            
     if not args.genome:
         cfg_basename = os.path.splitext(args.config.name)[0]
         genome_locations = [cfg_basename + ".gb",
@@ -139,8 +146,8 @@ if __name__ == '__main__':
     except ParserError as e:
         print(str(e))
         for error in e.error_list:
-            print("[E] - ", error)
-            exit(1)
+            print("[E] -", error)
+        exit(1)
 
     oligos = run_adjustments(oplist, genome.seq, args.project, barcoding_lib, threaded)
 
