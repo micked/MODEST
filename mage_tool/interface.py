@@ -8,11 +8,12 @@ import signal
 import logging
 from multiprocessing import Pool, Value, Lock
 
-import run_control as rc
-from operations import OPERATIONS
+import mage_tool.run_control as rc
+from mage_tool.operations import OPERATIONS
+from mage_tool.IO import ParserError
 
 #Define a log
-log = logging.getLogger("MODEST.if")
+log = logging.getLogger("MODEST")
 log.addHandler(logging.NullHandler())
 
 """
@@ -42,9 +43,9 @@ def parse_adjustments(adjlist, genes, config, barcoding_lib):
             op = OPERATIONS[op_str]
         except KeyError:
             if op_str not in OPERATIONS:
-                error_list.append("Operation {} not found in line {}.".format(op_str, i))
+                error_list.append("Operation '{}' not found in line {}.".format(op_str, i))
             if gene_str not in genes:
-                error_list.append("Gene {} not found in line {}.".format(gene_str, i))
+                error_list.append("Gene '{}' not found in line {}.".format(gene_str, i))
             continue
 
         #Validate existance of barcodes
@@ -53,20 +54,23 @@ def parse_adjustments(adjlist, genes, config, barcoding_lib):
             if bc not in ["*", "none"]:
                 barcodes.append(bc)
                 if bc not in barcoding_lib:
-                    error_list.append("Barcode {} not found in barcode lib".format(bc))
+                    error_list.append("Barcode '{}' not found in barcode lib".format(bc))
 
         current_operation = op(i, gene, adj["options"], config, barcodes)
 
         if not current_operation:
             for e in current_operation.errorlist:
-                error_list.append("{} error: {}".format(op, e))
+                error_list.append("{} error: {}".format(current_operation, e))
             continue
 
         #No new errors
         if len(error_list) == old_error_len:
             parsed_operations.append(current_operation)
 
-    return parsed_operations, error_list
+    if error_list:
+        raise ParserError("Error making operations", error_list)
+
+    return parsed_operations
 
 
 def run_adjustments(oplist, genome, project, barcoding_lib, threaded=True):

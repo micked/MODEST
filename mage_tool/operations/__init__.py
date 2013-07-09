@@ -15,7 +15,7 @@ from mage_tool.oligo_design import Oligo
 import mage_tool.run_control as rc
 
 #Define a log
-log = logging.getLogger("MODEST.op")
+log = logging.getLogger("MODEST")
 log.addHandler(logging.NullHandler())
 
 
@@ -130,7 +130,7 @@ class BaseOperation(object):
                     tp = self.default_options[o][0]
                     self.options[o] = tp(options[o])
                 except ValueError:
-                    self.error("Invalid value '{}' for {}".format(options[o], self.default_options[o][0]))
+                    self.error("Invalid value '{}' for '{}'".format(options[o], self.default_options[o][0].__name__))
             elif o in self.required:
                 self.error("Required option '{}' not found.".format(o))
             #Use default value

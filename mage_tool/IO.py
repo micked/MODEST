@@ -3,30 +3,38 @@
 Classes dealing with input/output and format changes
 """
 
+from __future__ import absolute_import
+
 import re
 import os
 import csv
 import codecs
 import logging
 
-try: import cStringIO as strIO
-except ImportError: from io import StringIO as strIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from io import StringIO
 
-from oligo_design import Gene
-from oligo_design import Sequence
-from oligo_design import WobbleError
-from helpers import is_inside
-from helpers import extract_circular
-from helpers import cds_to_wobble
-from helpers import seqs_to_degenerate
-from helpers import reverse_complement
-from helpers import reverse_complement_dgn
+from mage_tool.oligo_design import Gene
+from mage_tool.oligo_design import Sequence
+from mage_tool.oligo_design import WobbleError
+from mage_tool.helpers import is_inside
+from mage_tool.helpers import extract_circular
+from mage_tool.helpers import cds_to_wobble
+from mage_tool.helpers import seqs_to_degenerate
+from mage_tool.helpers import reverse_complement
+from mage_tool.helpers import reverse_complement_dgn
+import mage_tool.run_control as rc
 
-log = logging.getLogger("MODEST.IO")
+log = logging.getLogger("MODEST")
 log.addHandler(logging.NullHandler())
 
 
-class ParserError(Exception): pass
+class ParserError(Exception):
+    def __init__(self, message, error_list=[]):
+        Exception.__init__(self, message)
+        self.error_list = error_list
 
 
 """
@@ -46,8 +54,7 @@ def raw_adjlist_to_adjlist(adjfilehandle):
         line = line.split()
         if len(line) < 3:
             #Append error and quit line
-            error_list.append("Too few arguments in line {} in adjustmentlist."
-                              "".format(i))
+            error_list.append("Too few arguments in line {}.".format(i))
             continue
 
         elif len(line) == 3:
@@ -59,7 +66,11 @@ def raw_adjlist_to_adjlist(adjfilehandle):
         barcodes = barcodes.split(",")
         adjlist.append({"options": options, "gene": gene, "op": op, "barcodes": barcodes, "line_id": i})
 
-    return adjlist, error_list
+    #Raise ParserError with error_list
+    if error_list:
+        raise ParserError("Error parsing list of adjustments.", error_list)
+
+    return adjlist
 
 
 
@@ -69,33 +80,34 @@ Genelist parsers
 """
 
 
-generic_cfg = {'Definition': 'Generic',
-    'start_codons': ['ATG', 'GTG', 'TTG', 'ATT', 'CTG'],
-    'replication': {'ter extended': [598894, 2375400],
-                    'ter': [1339769, 1682272], 'ori': [3923767, 3923998]},
-    'stop_codons': ['TAG', 'TAA', 'TGA'],
-    'dgn_table': {'A': 'GCN', 'C': 'TGY', 'E': 'GAR', '$': 'TRR', 'G': 'GGN',
-                  'F': 'TTY', 'I': 'ATH', 'H': 'CAY', 'K': 'AAR', 'M': 'ATG',
-                  'L': 'YTN', 'N': 'AAY', 'Q': 'CAR', 'P': 'CCN', 'S': 'WSN',
-                  'R': 'MGN', 'T': 'ACN', 'W': 'TGG', 'V': 'GTN', 'Y': 'TAY',
-                  'D': 'GAY'},
-    'codon_table': {'CTT': 'L', 'ATG': 'M', 'ACA': 'T', 'ACG': 'T', 'ATC': 'I',
-                    'AAC': 'N', 'ATA': 'I', 'AGG': 'R', 'CCT': 'P', 'CTC': 'L',
-                    'AGC': 'S', 'AAG': 'K', 'AGA': 'R', 'CAT': 'H', 'AAT': 'N',
-                    'ATT': 'I', 'CTG': 'L', 'CTA': 'L', 'ACT': 'T', 'CAC': 'H',
-                    'AAA': 'K', 'CCG': 'P', 'AGT': 'S', 'CCA': 'P', 'CAA': 'Q',
-                    'CCC': 'P', 'TAT': 'Y', 'GGT': 'G', 'TGT': 'C', 'CGA': 'R',
-                    'CAG': 'Q', 'CGC': 'R', 'GAT': 'D', 'CGG': 'R', 'TTT': 'F',
-                    'TGC': 'C', 'GGG': 'G', 'TAG': '$', 'GGA': 'G', 'TAA': '$',
-                    'GGC': 'G', 'TAC': 'Y', 'GAG': 'E', 'TCG': 'S', 'TTA': 'L',
-                    'GAC': 'D', 'CGT': 'R', 'GAA': 'E', 'TGG': 'W', 'GCA': 'A',
-                    'GTA': 'V', 'GCC': 'A', 'GTC': 'V', 'GCG': 'A', 'GTG': 'V',
-                    'TTC': 'F', 'GTT': 'V', 'GCT': 'A', 'ACC': 'T', 'TGA': '$',
-                    'TTG': 'L', 'TCC': 'S', 'TCA': 'S', 'TCT': 'S'}}
+#generic_cfg = {'Definition': 'Generic',
+    #'start_codons': ['ATG', 'GTG', 'TTG', 'ATT', 'CTG'],
+    #'replication': {'ter extended': [598894, 2375400],
+                    #'ter': [1339769, 1682272], 'ori': [3923767, 3923998]},
+    #'stop_codons': ['TAG', 'TAA', 'TGA'],
+    #'dgn_table': {'A': 'GCN', 'C': 'TGY', 'E': 'GAR', '$': 'TRR', 'G': 'GGN',
+                  #'F': 'TTY', 'I': 'ATH', 'H': 'CAY', 'K': 'AAR', 'M': 'ATG',
+                  #'L': 'YTN', 'N': 'AAY', 'Q': 'CAR', 'P': 'CCN', 'S': 'WSN',
+                  #'R': 'MGN', 'T': 'ACN', 'W': 'TGG', 'V': 'GTN', 'Y': 'TAY',
+                  #'D': 'GAY'},
+    #'codon_table': {'CTT': 'L', 'ATG': 'M', 'ACA': 'T', 'ACG': 'T', 'ATC': 'I',
+                    #'AAC': 'N', 'ATA': 'I', 'AGG': 'R', 'CCT': 'P', 'CTC': 'L',
+                    #'AGC': 'S', 'AAG': 'K', 'AGA': 'R', 'CAT': 'H', 'AAT': 'N',
+                    #'ATT': 'I', 'CTG': 'L', 'CTA': 'L', 'ACT': 'T', 'CAC': 'H',
+                    #'AAA': 'K', 'CCG': 'P', 'AGT': 'S', 'CCA': 'P', 'CAA': 'Q',
+                    #'CCC': 'P', 'TAT': 'Y', 'GGT': 'G', 'TGT': 'C', 'CGA': 'R',
+                    #'CAG': 'Q', 'CGC': 'R', 'GAT': 'D', 'CGG': 'R', 'TTT': 'F',
+                    #'TGC': 'C', 'GGG': 'G', 'TAG': '$', 'GGA': 'G', 'TAA': '$',
+                    #'GGC': 'G', 'TAC': 'Y', 'GAG': 'E', 'TCG': 'S', 'TTA': 'L',
+                    #'GAC': 'D', 'CGT': 'R', 'GAA': 'E', 'TGG': 'W', 'GCA': 'A',
+                    #'GTA': 'V', 'GCC': 'A', 'GTC': 'V', 'GCG': 'A', 'GTG': 'V',
+                    #'TTC': 'F', 'GTT': 'V', 'GCT': 'A', 'ACC': 'T', 'TGA': '$',
+                    #'TTG': 'L', 'TCC': 'S', 'TCA': 'S', 'TCT': 'S'}}
 
 
-def seqIO_to_genelist(genome, config=generic_cfg, include_genes=None, include_genome=False,
-                      exclude_genes=None, leader_len=35, promoter_len=200):
+def seqIO_to_genelist(genome, config, include_genes=None, include_genome=False,
+                      exclude_genes=None, leader_len=rc.CONF["leader_length"],
+                      promoter_len=rc.CONF["promoter_length"]):
     """TODO"""
 
     genes = dict()
@@ -265,23 +277,21 @@ def parse_barcode_library(barcode_filehandle):
     Barcoding library file has the following syntax:
 
         >>> barcode_file = '''#Comments
-        ... #Comments must always begin
-        ... #at the beginning of a line.
         ...
         ... #Empty lines are allowed
         ... #First header is for primers:
         ... >PRIMERS
         ... #ID SEQUENCE
-        ... F1 CTACCTTGCA
-        ... F2 GGAATTGAGA
+        ... F1 CTACCTTGCA #Comment on primer F1
+        ... F2 GGAATTGAGA#Comment on this primer
         ... R1 CCGTCCGTTA
         ... R2 ATTTCCCTTG
         ...
         ... #Second header is for the library
         ... >LIBRARY
         ... #ID FWD REV
-        ... ID1 F1 R1
-        ... ID2 F2 R2
+        ... ID1 F1 R1#Comment on ID1
+        ... ID2 F2 R2 #Comment in ID2
         ... #Primers can be mixed
         ... ID3 F1 R2'''.splitlines()
 
@@ -298,38 +308,60 @@ def parse_barcode_library(barcode_filehandle):
         ...     barcodes[id]["forward"],
         ...     barcodes[id]["reverse"])
         ...
-        ('*', '', '')
         ('ID1', 'CTACCTTGCA', 'TAACGGACGG')
         ('ID2', 'GGAATTGAGA', 'CAAGGGAAAT')
         ('ID3', 'CTACCTTGCA', 'CAAGGGAAAT')
 
     """
     primers = dict()
-    barcodes = {"*": {"forward": "", "reverse": ""}}
+    barcodes = dict()
 
     primer_flag = False
     barcodes_flag = False
 
+    error_list = list()
+
     for line in barcode_filehandle:
         if not line.strip() or line[0] == "#":
             continue
-        elif line.strip() == ">PRIMERS":
+
+        #Filter comments
+        line = line.split("#")[0].strip()
+
+        #Raise parser flags
+        if line == ">PRIMERS":
             primer_flag = True
             continue
-        elif line.strip() == ">LIBRARY":
+        elif line == ">LIBRARY":
             barcodes_flag = True
             continue
 
+        line = line.split()
         if barcodes_flag:
-            line = line.split()
-            forward = primers[line[1]]
-            reverse = reverse_complement(primers[line[2]])
+            #Get forward
+            try:
+                forward = primers[line[1]]
+            except KeyError:
+                error_list.append("Primer '{}' not found in barcode file".format(line[1]))
+                continue
+            #Get reverse
+            try:
+                reverse = reverse_complement(primers[line[2]])
+            except KeyError:
+                error_list.append("Primer '{}' not found in barcode file".format(line[2]))
+                continue
+
+            #Add to library
             barcodes[line[0]] = {"forward": forward, "reverse": reverse}
+
+        #Collect primers
         elif primer_flag:
-            line = line.split()
             primers[line[0]] = line[1]
         else:
-            raise Exception("Primer header not found")
+            raise ParserError("Malformed barcode file")
+
+    if error_list:
+        raise ParserError("Malformed barcode file", error_list)
 
     return barcodes
 
@@ -664,8 +696,8 @@ class OligoLibraryReport:
                 plt.legend([bar_wt, bar_lib, prx_arr], ["wt", "lib", "oligos"],
                     bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., frameon=False)
 
-            imgdata_png = strIO.StringIO()
-            imgdata_pdf = strIO.StringIO()
+            imgdata_png = StringIO()
+            imgdata_pdf = StringIO()
             fig.savefig(imgdata_png, format="PNG", dpi=300)
             fig.savefig(imgdata_pdf, format="PDF")
             imgdata_png.seek(0)

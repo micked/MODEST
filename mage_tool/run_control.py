@@ -16,7 +16,12 @@ CONF = {#Oligo options
         "processes": None,
 
         #Custom operations
-        "operations": []}
+        "operations": [],
+
+        #Gene options
+        "leader_length": 35,
+        "promoter_length": 250,
+        }
 
 
 def load_rcfile(filepath):
@@ -25,15 +30,13 @@ def load_rcfile(filepath):
     Configuration must be in YAML format.
 
     """
-    #print "trying", filepath
     if os.path.isfile(filepath):
-        #print "parsing", filepath
         with open(filepath, "r") as f:
             CONF.update(yaml.safe_load(f))
 
 
-DEFAULT_RC_FILES = ["~/.conf/mage_tool.rc", "./mage_tool.rc",]
+#DEFAULT_RC_FILES = ["~/.conf/mage_tool.rc", "./mage_tool.rc",]
 
-for rcfile in DEFAULT_RC_FILES:
-    load_rcfile(rcfile)
+#for rcfile in DEFAULT_RC_FILES:
+    #load_rcfile(rcfile)
 

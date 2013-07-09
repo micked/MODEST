@@ -314,6 +314,8 @@ def residue_mutlist(s):
             raise ValueError("Invalid mutation: {}".format(mut))
     return muts
 
+residue_mutlist.__str__ = lambda x: "Residue mutationlist"
+
 
 class ResidueMutation(BaseOperation):
 
