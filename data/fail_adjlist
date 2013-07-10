@@ -1,9 +1,0 @@
-cysX	esidue_mutation      ID01,ID02,ID05,ID08	mut=E166G
-cysE	residue_mutation	ID01,ID02,ID05,ID08	mut=M256
-genome	dna_mutation	mut=[A=AATTGT].2183347
-b0002   dna_mutation ID01123 mut=[GAGTGT=AAAAAA].5
-genome	dna_mutation	ID01+ID02,ID03,ID08	mut=[TAA=CGGCGG].2659559
-genome	dna_mutation	ID01,ID02,ID06,ID08	mut=[TTTTT=].2739273
-
-#Fails preliminary check
-#malY	translational_knockout
