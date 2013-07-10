@@ -65,13 +65,7 @@ def raw_adjlist_to_adjlist(adjfilehandle):
             options = line[2]
 
         gene, op = line[0:2]
-        #barcodes = barcodes.split(",")
-        barcodes = [opt[9:].split(";") for opt in options.split(",") if "barcodes" in opt]
-        print barcodes
-        barcodes = [bcd for bcds in barcodes for bcd in bcds]
-        print barcodes
-        options = ",".join([opt for opt in options.split(",") if "barcodes" not in opt])
-        adjlist.append({"options": options, "gene": gene, "op": op, "barcodes": barcodes, "line_id": i})
+        adjlist.append({"options": options, "gene": gene, "op": op, "line_id": i})
 
     #Raise ParserError with error_list
     if error_list:
@@ -85,32 +79,6 @@ def raw_adjlist_to_adjlist(adjfilehandle):
 Genelist parsers
 ~~~~~~~~~~~~~~~~
 """
-
-
-#generic_cfg = {'Definition': 'Generic',
-    #'start_codons': ['ATG', 'GTG', 'TTG', 'ATT', 'CTG'],
-    #'replication': {'ter extended': [598894, 2375400],
-                    #'ter': [1339769, 1682272], 'ori': [3923767, 3923998]},
-    #'stop_codons': ['TAG', 'TAA', 'TGA'],
-    #'dgn_table': {'A': 'GCN', 'C': 'TGY', 'E': 'GAR', '$': 'TRR', 'G': 'GGN',
-                  #'F': 'TTY', 'I': 'ATH', 'H': 'CAY', 'K': 'AAR', 'M': 'ATG',
-                  #'L': 'YTN', 'N': 'AAY', 'Q': 'CAR', 'P': 'CCN', 'S': 'WSN',
-                  #'R': 'MGN', 'T': 'ACN', 'W': 'TGG', 'V': 'GTN', 'Y': 'TAY',
-                  #'D': 'GAY'},
-    #'codon_table': {'CTT': 'L', 'ATG': 'M', 'ACA': 'T', 'ACG': 'T', 'ATC': 'I',
-                    #'AAC': 'N', 'ATA': 'I', 'AGG': 'R', 'CCT': 'P', 'CTC': 'L',
-                    #'AGC': 'S', 'AAG': 'K', 'AGA': 'R', 'CAT': 'H', 'AAT': 'N',
-                    #'ATT': 'I', 'CTG': 'L', 'CTA': 'L', 'ACT': 'T', 'CAC': 'H',
-                    #'AAA': 'K', 'CCG': 'P', 'AGT': 'S', 'CCA': 'P', 'CAA': 'Q',
-                    #'CCC': 'P', 'TAT': 'Y', 'GGT': 'G', 'TGT': 'C', 'CGA': 'R',
-                    #'CAG': 'Q', 'CGC': 'R', 'GAT': 'D', 'CGG': 'R', 'TTT': 'F',
-                    #'TGC': 'C', 'GGG': 'G', 'TAG': '$', 'GGA': 'G', 'TAA': '$',
-                    #'GGC': 'G', 'TAC': 'Y', 'GAG': 'E', 'TCG': 'S', 'TTA': 'L',
-                    #'GAC': 'D', 'CGT': 'R', 'GAA': 'E', 'TGG': 'W', 'GCA': 'A',
-                    #'GTA': 'V', 'GCC': 'A', 'GTC': 'V', 'GCG': 'A', 'GTG': 'V',
-                    #'TTC': 'F', 'GTT': 'V', 'GCT': 'A', 'ACC': 'T', 'TGA': '$',
-                    #'TTG': 'L', 'TCC': 'S', 'TCA': 'S', 'TCT': 'S'}}
-
 
 def seqIO_to_genelist(genome, config, include_genes=None, include_genome=False,
                       exclude_genes=None, leader_len=rc.CONF["leader_length"],
@@ -380,7 +348,7 @@ configuration parsers
 def load_config_file(configfile, cfg_basedir):
 
     config = yaml.safe_load(configfile)
-    
+
     #Verify configuration table
     #Check that required elements have been specified.
     required = ["Locus", "replication", "start_codons", "codon_usage"]
@@ -388,18 +356,18 @@ def load_config_file(configfile, cfg_basedir):
 
     if missing:
         raise ParserError("Missing required parameters in genome config file: '{}'. See documentation.".format("', '".join(list(missing))))
-            
+
     #Locus must be a string.
     if not isinstance(config["Locus"], str):
         raise ParserError("Genome config file: 'Locus' must be a string")
-    
+
     #replication
     #replication is a dictionary that contains ori and ter.
     missing = [req for req in ["ori", "ter"] if req not in config["replication"]]
     #Raise error with missing elements.
     if missing:
         raise ParserError("Genome config file: 'replication' is missing: {}.".format(", ".join(list(missing))))
-         
+
     #start codons
     #start codons is a list of start codons.
     error_list = list()
@@ -412,9 +380,9 @@ def load_config_file(configfile, cfg_basedir):
     #If any codons are wrong. Raise error with list.
     if error_list:
         raise ParserError("Genome config file: Error in 'codon_usage'", error_list)
-        
+
     #codon usage
-    #Check that all codons have been specified.    
+    #Check that all codons have been specified.
     b = [["A", "C", "G", "T"]]*3
     all_codons = ["".join(li) for li in itertools.product(*b)]
     #If any codons are missing, raise error with missing codons.

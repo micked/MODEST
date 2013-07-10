@@ -48,16 +48,14 @@ def parse_adjustments(adjlist, genes, config, barcoding_lib):
                 error_list.append("Gene '{}' not found in line {}.".format(gene_str, i))
             continue
 
+        current_operation = op(i, gene, adj["options"], config)
+
         #Validate existance of barcodes
-        barcodes = list()
-        for bc in adj["barcodes"]:
-            if bc not in ["*", "none"]:
-                barcodes.append(bc)
-                if bc not in barcoding_lib:
-                    error_list.append("Barcode '{}' not found in barcode lib".format(bc))
+        for bc in current_operation.barcodes:
+            if bc not in barcoding_lib:
+                error_list.append("Barcode '{}' not found in barcode lib".format(bc))
 
-        current_operation = op(i, gene, adj["options"], config, barcodes)
-
+        #Operation has an error
         if not current_operation:
             for e in current_operation.errorlist:
                 error_list.append("{} error: {}".format(current_operation, e))
@@ -96,7 +94,7 @@ def run_adjustments(oplist, genome, project, barcoding_lib, threaded=True):
             except KeyboardInterrupt:
                 log.error("Computation manually stopped")
                 break
-    
+
     oligos = list()
     for r in results:
         try:

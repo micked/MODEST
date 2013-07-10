@@ -41,12 +41,11 @@ class BaseOperation(object):
 
     op_str = "base_operation"
 
-    def __init__(self, line_id, gene, opt_str, config, barcodes=[], **options):
+    def __init__(self, line_id, gene, opt_str, config, **options):
         self.ok = True
         self.errorlist = list()
         self.opt_str = "NotEvaluated"
 
-        self.barcodes = barcodes
         self.line_id = line_id
         self.gene = gene
         self.config = config
@@ -58,6 +57,13 @@ class BaseOperation(object):
         self.custom_id = None
         if "id" in options:
             self.custom_id = options["id"]
+
+        #Set barcodes
+        self.barcodes = []
+        if "barcodes" in options:
+            self.barcodes = options["barcodes"]
+            if isinstance(self.barcodes, basestring):
+                self.barcodes = self.barcodes.split(";")
 
         self.validate_options(options)
 
@@ -157,7 +163,7 @@ class BaseOperation(object):
         gene = self.gene
         config = self.config
         barcodes = self.barcodes
-        
+
         if muts is None:
             log.warn(str(self) + " did not make any mutations.")
             return []
