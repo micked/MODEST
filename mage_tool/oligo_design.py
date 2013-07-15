@@ -9,17 +9,17 @@ import random
 import logging
 from copy import deepcopy
 
-import ViennaRNA
-import run_control as rc
-from helpers import is_inside
-from helpers import valid_dna
-from helpers import valid_rna
-from helpers import valid_dgn
-from helpers import dgn_to_nts
-from helpers import nts_to_dgn
-from helpers import reverse_complement
-from helpers import extract_circular
-from helpers import make_primer
+from mage_tool import ViennaRNA
+import mage_tool.run_control as rc
+from mage_tool.helpers import is_inside
+from mage_tool.helpers import valid_dna
+from mage_tool.helpers import valid_rna
+from mage_tool.helpers import valid_dgn
+from mage_tool.helpers import dgn_to_nts
+from mage_tool.helpers import nts_to_dgn
+from mage_tool.helpers import reverse_complement
+from mage_tool.helpers import extract_circular
+from mage_tool.helpers import make_primer
 
 #Define a log
 log = logging.getLogger("MODEST.oligo")

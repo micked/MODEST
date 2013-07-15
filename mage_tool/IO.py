@@ -27,6 +27,8 @@ from mage_tool.helpers import cds_to_wobble
 from mage_tool.helpers import seqs_to_degenerate
 from mage_tool.helpers import reverse_complement
 from mage_tool.helpers import reverse_complement_dgn
+from mage_tool.helpers import default_codon_table
+from mage_tool.helpers import amino_acids
 import mage_tool.run_control as rc
 
 log = logging.getLogger("MODEST")
@@ -39,10 +41,9 @@ class ParserError(Exception):
         self.error_list = error_list
 
 
-"""
-Adjustment file parsers
-~~~~~~~~~~~~~~~~~~~~~~~
-"""
+#
+# Adjustment file parsers
+#
 
 def raw_adjlist_to_adjlist(adjfilehandle):
     """Convert an adjustmentlist in raw text to adjustment list dict."""
@@ -74,11 +75,9 @@ def raw_adjlist_to_adjlist(adjfilehandle):
     return adjlist
 
 
-
-"""
-Genelist parsers
-~~~~~~~~~~~~~~~~
-"""
+#
+# Genelist parsers
+#
 
 def seqIO_to_genelist(genome, config, include_genes=None, include_genome=False,
                       exclude_genes=None, leader_len=rc.CONF["leader_length"],
@@ -241,10 +240,10 @@ def find_wobble_seq(genome, leader, l_start, l_end, codon_table, dgn_table):
 
     return leader
 
-"""
-Barcoding parsers
-~~~~~~~~~~~~~~~~~
-"""
+
+#
+# Barcoding parsers
+#
 
 def parse_barcode_library(barcode_filehandle):
     """Parse an open barcoding library file.
@@ -340,22 +339,28 @@ def parse_barcode_library(barcode_filehandle):
 
     return barcodes
 
-"""
-configuration parsers
-~~~~~~~~~~~~~~~~~~~~~
-"""
 
-def load_config_file(configfile, cfg_basedir):
+#
+# Genome configuration parsers
+#
 
-    config = yaml.safe_load(configfile)
+def load_config_file(config, cfg_basedir='./', skip_table_generation=False):
+    """Load and validate a config file.
+
+    Config can be a genome config dictionary, or a string pointing to a yaml
+    genome config file (.gbcfg).
+
+    """
+    if not isinstance(config, dict):
+        config = yaml.safe_load(config)
 
     #Verify configuration table
     #Check that required elements have been specified.
     required = ["Locus", "replication", "start_codons", "codon_usage"]
-    missing = [req for req in required if req not in config]
+    missing = ', '.join([req for req in required if req not in config])
 
     if missing:
-        raise ParserError("Missing required parameters in genome config file: '{}'. See documentation.".format("', '".join(list(missing))))
+        raise ParserError("Missing required parameters in genome config file: '{}'. See documentation.".format(missing))
 
     #Locus must be a string.
     if not isinstance(config["Locus"], str):
@@ -414,7 +419,10 @@ def load_config_file(configfile, cfg_basedir):
     if error_list:
         raise ParserError("Genome config file: Error in 'codon_usage'", error_list)
 
-    config = create_config_tables(config, cfg_basedir)
+    #Maybe skip the creation of new tables.
+    if not skip_table_generation:
+        config = create_config_tables(config, cfg_basedir)
+
     return config
 
 
@@ -482,10 +490,76 @@ def parse_DOOR_oprfile(oprfilehandle):
     return operons
 
 
-"""
-Oligolist output
-~~~~~~~~~~~~~~~~
-"""
+def make_genomeconfig(seqio, rep_origin=None, rep_ter=None,
+                      codon_table=default_codon_table, start_codons=None):
+    """Create a gbfcg configuration from a biopython SeqIO genome object.
+
+    Calculate codon usage, start codons and if not specified, replication start
+    and stop.
+
+    """
+    gbcfg = dict(Locus=seqio.id)
+    codon_usage = {"".join(li): 0 for li in itertools.product(*[["A", "C", "G", "T"]]*3)}
+
+    stcdns_collect = dict()
+
+    for f in seqio.features:
+        #Real gene
+        if f.type == 'CDS' and 'pseudo' not in f.qualifiers:
+            seq = str(f.extract(seqio).seq)
+            #Collect start codon
+            if not start_codons:
+                stcdns_collect[seq[0:3]] = stcdns_collect.get(seq[0:3], 0) + 1
+
+            #Count codon usage
+            for i in range(0, len(seq), 3):
+                codon_usage[seq[i:i+3]] += 1
+        #Collect oriC if applicable
+        elif not rep_origin and f.type == 'rep_origin':
+            rep_origin = [int(f.location.start), int(f.location.end)]
+
+    #Collect amino acid usage / codon count sums
+    codon_sums = {AA: 0.0 for AA in amino_acids + ['$']}
+    for codon, usage in codon_usage.items():
+        codon_sums[codon_table[codon]] += usage
+
+    #Add codon usage
+    gbcfg['codon_usage'] = dict()
+    for cdn, usg in codon_usage.items():
+        AA = codon_table[cdn]
+        gbcfg['codon_usage'][cdn] = [AA, usg/codon_sums[AA]]
+
+    #Calculate start_codons
+    if not start_codons:
+        #Use codon_usage to find most important start codons
+        start_codons = sorted(stcdns_collect, key=lambda x: stcdns_collect[x], reverse=True)
+
+    #Add start codons
+    gbcfg['start_codons'] = start_codons
+
+    #Add oriC and ter
+    if rep_origin:
+        gbcfg['replication'] = {'ori': rep_origin}
+        if not rep_ter:
+            half_genome = len(seqio.seq)/2
+            ori_middle = sum(rep_origin)/2
+            if ori_middle > half_genome:
+                rep_ter = ori_middle - half_genome
+            else:
+                rep_ter = ori_middle + half_genome
+
+            rep_ter = [int(rep_ter)-100, int(rep_ter)+100]
+
+        gbcfg['replication']['ter'] = rep_ter
+    else:
+        raise ParserError('oriC not found in genome, and not specified')
+
+    return gbcfg
+
+
+#
+# Oligolist output
+#
 
 def oligolist_to_tabfile(oligolist, output):
     """Writeout oligolist to a tab separated file.

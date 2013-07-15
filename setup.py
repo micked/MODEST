@@ -31,6 +31,8 @@ setup(
     ],
     scripts=[
         "MODEST.py",
-        "MODESTcsv2report.py",
+        "MODEST_csv2report.py",
+        "MODEST_genecheck.py",
+        "MODEST_mkgbcfg.py",
     ]
 )
