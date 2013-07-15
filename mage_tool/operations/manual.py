@@ -205,10 +205,6 @@ class DNAMutation(BaseOperation):
     required = ("mut",)
     genome_allowed = True
     op_str = "dna_mutation"
-    #Information for input generator
-    has_position = True
-    mutation_brackets = "[]"
-    option_name = "mut"
 
     def run(self):
         mut = self.options["mut"]
@@ -338,8 +334,6 @@ class ResidueMutation(BaseOperation):
     required = ("mut",)
     genome_allowed = False
     op_str = "residue_mutation"
-    #Information for input generator
-    option_name = "mut"
 
     def run(self):
         cdn_tbl = self.config["codon_table"]
