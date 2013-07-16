@@ -39,6 +39,9 @@ class BaseOperation(object):
     #Set this to false to disable operation on whole genome
     genome_allowed = True
 
+    #If computation is longer than a minute, set this to True
+    heavy = False
+
     op_str = "base_operation"
 
     def __init__(self, line_id, gene, opt_str, config, **options):

@@ -20,7 +20,7 @@ from mage_tool.operations import BaseOperation
 
 
 #Define a log
-log = logging.getLogger("MODEST.trans")
+log = logging.getLogger("Translation")
 log.addHandler(logging.NullHandler())
 
 
@@ -846,6 +846,7 @@ class RBSLibrary(BaseOperation):
     required = ()
     genome_allowed = False
     op_str = "RBS_library"
+    heavy = True
 
     def post_init(self):
         #Correct very low target values
