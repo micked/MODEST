@@ -26,6 +26,9 @@ from mage_tool.IO import raw_adjlist_to_adjlist
 from mage_tool.interface import parse_adjustments
 from mage_tool.interface import run_adjustments
 
+#Define a log
+log = logging.getLogger("MODEST.py")
+log.addHandler(logging.NullHandler())
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -176,4 +179,4 @@ if __name__ == '__main__':
         masc_kwargs["temp"] = 62.0
         masc_primers = oligolist_to_mascfile(oligos, masc_kwargs, mascfile)
 
-    log.info('job done')
+    log.info('Job done')
