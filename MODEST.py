@@ -65,9 +65,7 @@ if __name__ == '__main__':
         logging.basicConfig(level=logging.DEBUG, format=format, datefmt='%Y-%m-%d %H:%M')
     else:
         # Log to file and warnings to screen
-        logging.basicConfig(level=logging.DEBUG, format=format,
-                            datefmt='%Y-%m-%d %H:%M',
-                            filename=args.log, filemode='w')
+        logging.basicConfig(level=logging.DEBUG, format=format, datefmt='%Y-%m-%d %H:%M', filename=args.log)
 
         console = logging.StreamHandler()
         console.setLevel(logging.WARNING)
@@ -89,7 +87,7 @@ if __name__ == '__main__':
 
     print("Loading config file..")
     cfg_basedir = os.path.abspath(os.path.dirname(args.config.name))
- 
+
     try:
         config = load_config_file(args.config, cfg_basedir)
     except ParserError as e:
@@ -97,7 +95,7 @@ if __name__ == '__main__':
         for error in e.error_list:
             print("[E] -", error)
         exit(1)
-            
+
     if not args.genome:
         cfg_basename = os.path.splitext(args.config.name)[0]
         genome_locations = [cfg_basename + ".gb",
@@ -164,7 +162,7 @@ if __name__ == '__main__':
     csvlist = oligolist_to_csv(oligos, output_csv)
 
     if args.PDF or args.PDF is None:
-        output_pdf = args.project + ".pdf" if not args.PDF else args.pdf
+        output_pdf = args.project + ".pdf" if not args.PDF else args.PDF
         print("Writing report PDF to {}..".format(output_pdf))
         report = OligoLibraryReport(args.project)
         report.parse_and_generate(csvlist, csv_file=False)
@@ -177,3 +175,5 @@ if __name__ == '__main__':
         masc_kwargs["ref_genome"] = genome.seq
         masc_kwargs["temp"] = 62.0
         masc_primers = oligolist_to_mascfile(oligos, masc_kwargs, mascfile)
+
+    log.info('job done')

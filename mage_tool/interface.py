@@ -52,8 +52,9 @@ def parse_adjustments(adjlist, genes, config, barcoding_lib):
 
         #Validate existance of barcodes
         for bc in current_operation.barcodes:
-            if bc not in barcoding_lib:
-                error_list.append("Barcode '{}' not found in barcode lib".format(bc))
+            for single_bc in bc.split('+'):
+                if single_bc not in barcoding_lib:
+                    error_list.append("Barcode '{}' not found in barcode lib".format(single_bc))
 
         #Operation has an error
         if not current_operation:

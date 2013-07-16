@@ -75,6 +75,32 @@ def raw_adjlist_to_adjlist(adjfilehandle):
     return adjlist
 
 
+def oplist_to_raw_adjlist(oplist, output_file=None):
+    """Write out an operation list as a adjlist."""
+    genelen = 0
+    oplen = 0
+    ops_out = []
+
+    #Collect operations and their length
+    for op in oplist:
+        genelen = max(genelen, len(str(op.gene)))
+        oplen = max(oplen, len(op.op_str))
+        ops_out.append([op.gene, op.op_str, op.opt_str])
+
+    #Format each line
+    op_formatted = []
+    for op in ops_out:
+        op_formatted.append('{0:<{genelen}} {1:<{oplen}} {2}'.format(*op, genelen=genelen, oplen=oplen))
+
+    #Create file content
+    raw_adjlist = '\n'.join(op_formatted) + '\n'
+
+    if output_file:
+        output_file.write(raw_adjlist)
+
+    return raw_adjlist
+
+
 #
 # Genelist parsers
 #

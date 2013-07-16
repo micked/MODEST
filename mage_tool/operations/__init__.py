@@ -152,6 +152,9 @@ class BaseOperation(object):
 
         self.opt_str = self.opt_str.strip(",")
 
+        if self.barcodes:
+            self.opt_str += ',barcodes=' + ';'.join(self.barcodes)
+
     def error(self, e):
         """Add an error."""
         self.errorlist.append(e)
