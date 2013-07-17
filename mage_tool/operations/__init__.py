@@ -73,6 +73,7 @@ class BaseOperation(object):
         if not self.genome_allowed and str(gene) == "genome":
             self.error("Cannot use on genome")
 
+
         self.create_opt_str()
         if self:
             self.post_init()

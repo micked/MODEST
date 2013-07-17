@@ -17,7 +17,7 @@ from mage_tool.operations import BaseOperation
 
 
 #Define a log
-log = logging.getLogger("MODEST.man")
+log = logging.getLogger("manual")
 log.addHandler(logging.NullHandler())
 
 
@@ -84,7 +84,7 @@ default_codon_usage = {'CTT': ['L', 0.12], 'ATG': ['M', 1.0],
                        'GCA': ['A', 0.21], 'GCC': ['A', 0.31],
                        'GCG': ['A', 0.38], 'GCT': ['A', 0.11]}
 
-
+'''
 def gene_mutation(gene, mutation):
     """Do specified custom mutations.
 
@@ -187,7 +187,7 @@ def dna_mut(s):
     return s
 
 
-class DNAMutation(BaseOperation):
+class OldDNAMutation(BaseOperation):
 
     """
     ``dna_mutation``: Allows for a desired mutation.
@@ -215,6 +215,166 @@ class DNAMutation(BaseOperation):
 
         code = "DNAMut"
         return [(mut, code, str(self), [])]
+'''
+
+class DNAMutation(BaseOperation):
+
+    """
+    ``mutation``: Any kind of nucleotide substitution.
+
+    Options:
+
+    - ``position``: Position of first nucleotide.
+    - ``mutation=BEFORE->AFTER``: mutate BEFORE to AFTER in sequence.
+
+    Substitute BEFORE nucleotides in sequence to AFTER at position.
+
+    Example sequence: ``ATGGCTGAA``.
+
+    Mutate ``GCT`` to ``AAA`` at position 4::
+
+        araC mutation mutation=GCT->AAA,position=4
+        #Sequence after mutation: ATGaaaGAA.
+
+    Insert ``AAA`` as position 4::
+
+        araC mutation mutation=->AAA,position=4
+        #Sequence after mutation: ATGaaaGCTGAA.
+
+    Delete ``GCT`` at position 4::
+
+        araC mutation mutation=GCT->,position=4
+        #Sequence after mutation: ATGGAA.
+
+    Substitute ``GCT`` with ``AAATTT``::
+
+        araC mutation mutation=GCT->AAATTT,position=4
+        #Sequence after mutation: ATGaaatttGAA.
+
+    """
+
+    default_options = {'mutation': (str, ''),
+                       'position': (int, None)}
+    required = ('mutation', 'position')
+    genome_allowed = True
+    op_str  = 'mutation'
+
+    def post_init(self):
+        self.mut = None
+
+        mut_str = self.options['mutation']
+        if mut_str.count('->') != 1:
+            self.error('Invalid mutation format. Use \'BEFORE->AFTER\'')
+            return
+
+        before, after = mut_str.split('->')
+        pos = self.options['position'] - 1
+        found = self.gene[pos:pos+len(before)]
+
+        if found != before:
+            self.error('Trying to mutate \'{}\', but found \'{}\' in sequence at position {}.'.format(before, found, pos+1))
+            return
+
+        self.mut = (before, after, pos)
+
+    def run(self):
+        mut = self.gene.do_mutation(Mutation(*self.mut))
+        return [(mut, 'mutation', str(self), [])]
+
+
+class Deletion(BaseOperation):
+
+    """
+    ``deletion``: Delete nucleotides.
+
+    Options:
+
+    - ``delete``: What to delete. An integer (number of nucleotides) or a
+      string of nucleotides.
+    - ``position``: Position of deletion.
+
+    Delete the nucleotides specified in ``delete`` from a DNA sequence.
+
+    Delete AAC from position 13 in thiD::
+
+        thiD deletion delete=AAC,position=13
+
+    Delete 3 nucleotides from position 13 in thiD::
+
+        thiD deletion delete=3,position=13
+
+    Specifying nucleotides to delete enables error-checking, but when deleting
+    large stretches, an integer is more handy.
+
+    """
+
+    default_options = {'delete': (str, ''),
+                       'position': (int, None)}
+    required = ('delete', 'position')
+    genome_allowed = True
+    op_str = 'deletion'
+
+    def post_init(self):
+        pos = self.options['position'] - 1
+        self.mut = None
+
+        try:
+            #Number of nucleotides to delete
+            n_nts = int(self.options['delete'])
+            #Nucleotides to delete
+            nts = self.gene[pos:pos+n_nts]
+        except ValueError:
+            nts = self.options['delete']
+            n_nts = len(nts)
+
+            #Error Checking
+            found = self.gene[pos:pos+n_nts]
+            if nts != found:
+                self.error("Tried to delete '{}', but found '{}' in sequence.".format(nts, found))
+                return
+
+        self.mut = (nts, '', pos)
+
+    def run(self):
+        if self.mut is None:
+            return None
+
+        #Perform mutation
+        mut = self.gene.do_mutation(Mutation(*self.mut))
+        return [(mut, 'deletion', str(self), [])]
+
+
+class Insertion(BaseOperation):
+
+    """
+    ``insertion``: Insert nucleotides.
+
+    Options:
+
+     - ``insert``: String of nucleotides to insert.
+     - ``position``: Insertion position.
+
+     Examples::
+
+         thiD insertion insert=TTT,position=7 *#Insert TTT as position 7
+         in thiD.*
+
+    I.e. sequence before is ATGAAACGA, and after insertion it is
+    ATGAAAtttCGA.
+
+    """
+
+    default_options = {'insert': (str, ''),
+                       'position': (int, None)}
+    required = ('insert', 'position')
+    genome_allowed = True
+    op_str = 'insertion'
+
+    def run(self):
+        ins = self.options['insert'].upper()
+        pos = self.options['position'] - 1
+        mut = self.gene.do_mutation(Mutation('', ins, pos))
+        return [(mut, 'insertion', str(self), [])]
 
 
 def residue_mutation(gene, mutations, codon_table=default_codon_table,
@@ -357,6 +517,8 @@ def register_operation(op):
 
 register_operation(DNAMutation)
 register_operation(ResidueMutation)
+register_operation(Deletion)
+register_operation(Insertion)
 
 if __name__ == "__main__":
     import doctest

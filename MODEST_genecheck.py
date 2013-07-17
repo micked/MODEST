@@ -14,8 +14,8 @@ from Bio import SeqIO
 
 from mage_tool.IO import seqIO_to_genelist
 from mage_tool.IO import create_config_tables
-from mage_tool.translation import RBS_predict
-from mage_tool.translation import dG_to_AU
+from mage_tool.operations.translation import RBS_predict
+from mage_tool.operations.translation import dG_to_AU
 
 
 if __name__ == '__main__':

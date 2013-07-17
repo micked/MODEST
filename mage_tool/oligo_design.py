@@ -306,13 +306,13 @@ class Mutation:
         return primers
 
     def __repr__(self):
-        return "Mutation: [{}={}] at pos {}".format(
+        return "Mutation: [{}->{}] at pos {}".format(
             self.before,
             self.after,
             self.pos)
 
     def __str__(self, idx=0):
-        return "[{}={}].{}".format(self.before, self.after, self.pos+idx)
+        return "[{}->{}].{}".format(self.before, self.after, self.pos+idx)
 
     def small_str(self, idx=0):
         before = self.before
@@ -322,7 +322,7 @@ class Mutation:
         if len(after) > 6:
             after = after[0:2] + ".." + after[-2:]
 
-        return "[{}={}].{}".format(before, after, self.pos+idx)
+        return "[{}->{}].{}".format(before, after, self.pos+idx)
 
     def copy(self):
         """Return a copy"""
