@@ -864,12 +864,12 @@ class Sequence:
             >>> str(s)
             'AACGGCACAGTTGCTGGACTATTGCAGGAGTTGGCG'
             >>> s.get_mutation()
-            Mutation: [AATT=ctatt] at pos 18
+            Mutation: [AATT->ctatt] at pos 18
             >>> s = s.optimise_mutations()
             >>> str(s)
             'AACGGCACAGTTGCTGGACTATTGCAGGAGTTGGCG'
             >>> s.get_mutation()
-            Mutation: [A=ct] at pos 18
+            Mutation: [A->ct] at pos 18
 
         """
         insr = self.get_insertions()

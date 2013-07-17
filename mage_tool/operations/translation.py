@@ -33,11 +33,11 @@ def replace_start_codon(gene, start_codon="ATG"):
         >>> from mage_tool.oligo_design import Gene
         >>> gene = Gene("ficX", 100, 1, "ATTATATAGACT")
         >>> replace_start_codon(gene)
-        Mutation: [T=g] at pos 102
+        Mutation: [T->g] at pos 102
 
         >>> gene.strand = -1
         >>> replace_start_codon(gene, 'GGG')
-        Mutation: [AAT=ccc] at pos 97
+        Mutation: [AAT->ccc] at pos 97
 
     If start_codon is equal to gene start codon, this function returns False:
 
