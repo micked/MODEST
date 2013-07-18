@@ -211,16 +211,15 @@ class Insertion(BaseOperation):
 
     Options:
 
-     - ``insert``: String of nucleotides to insert.
-     - ``position``: Insertion position.
+    - ``insert``: String of nucleotides to insert.
+    - ``position``: Insertion position.
 
-     Examples::
+    Examples::
 
-         thiD insertion insert=TTT,position=7 *#Insert TTT as position 7
-         in thiD.*
+        thiD insertion insert=TTT,position=7
+        #Insert TTT as position 7 in thiD.
 
-    I.e. sequence before is ATGAAACGA, and after insertion it is
-    ATGAAAtttCGA.
+    Sequence before is ATGAAACGA, and after insertion it is ATGAAAtttCGA.
 
     """
 
