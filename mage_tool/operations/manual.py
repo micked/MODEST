@@ -274,13 +274,18 @@ def residue_mutation(gene, mutations, codon_table=default_codon_table,
         m = re.match("^([A-Z*$])(\d+)([a-z]?)([A-Z*$])$", mut)
 
         if not m:
-            log.debug("Invalid residue mutation: {}.".format(mut))
-            return None
+            #log.debug("Invalid residue mutation: {}.".format(mut))
+            raise Exception("Invalid residue mutation: {}.".format(mut))
 
         old_AA, pos, pos_letter, new_AA = m.groups()
         pos = int(pos)
 
         dna_pos = (pos - 1) * 3 + offset
+        
+        if codon_table[seq[dna_pos:dna_pos+3]] != old_AA :
+            #log.debug("Invalid residue mutation: {}. Old Residue: {} does not match {} found in cds".format(mut, old_AA, codon_table[seq[dna_pos:dna_pos+3]]))
+            raise Exception("Invalid residue mutation: {}. Old Residue: {} does not match {} found in cds".format(mut, old_AA, codon_table[seq[dna_pos:dna_pos+3]]))
+
         #Deletion
         if new_AA == "*":
             for i in range(3):
@@ -348,16 +353,25 @@ class ResidueMutation(BaseOperation):
             m = re.match(r'^([ACDEFGHIKLMNPQRSTVWY*$])(\d+)([a-z]?)([ACDEFGHIKLMNPQRSTVWY*$])$', mut)
             if not m:
                 self.error('Invalid mutation \'{}\' of format \'A10B\' in mut={}'.format(mut, self.options['mut']))
+            else:
+                m = m.groups()
+                if not m[2]:
+                    gene_pos = (int(m[1])-1)*3
+                    expected_codon = self.config["codon_table"][self.gene.cds[gene_pos:gene_pos+3]]
+                    if str(m[0]) != str(expected_codon):
+                        self.error('Invalid residue mutation: {}. Old Residue: {} does not match {} found in cds'.format(mut, m[0], expected_codon))
+                        
 
     def run(self):
         cdn_tbl = self.config["codon_table"]
         dgn_tbl = self.config["dgn_table"]
         cdn_usage = self.config["codon_usage"]
         mut = self.muts
-        mut = residue_mutation(self.gene, mut, cdn_tbl, dgn_tbl, cdn_usage)
-        if not mut:
-            log.error(str(self) + " Not mutating.")
-            return None
+        try:
+            mut = residue_mutation(self.gene, mut, cdn_tbl, dgn_tbl, cdn_usage)
+        except Exception as ex:
+            self.error(ex)
+            return
 
         code = "ResMut"
         return [(mut, code, str(self), [])]
