@@ -261,7 +261,7 @@ def residue_mutation(gene, mutations, codon_table=default_codon_table,
 
     Stop-codons are denoted by $:
 
-        >>> residue_mutation(gene, ["K10$"])
+        >>> residue_mutation(gene, ["R10$"])
         Mutation: [C->t] at pos 127
 
     """
@@ -281,8 +281,8 @@ def residue_mutation(gene, mutations, codon_table=default_codon_table,
         pos = int(pos)
 
         dna_pos = (pos - 1) * 3 + offset
-        
-        if codon_table[seq[dna_pos:dna_pos+3]] != old_AA :
+
+        if not pos_letter and codon_table[seq[dna_pos:dna_pos+3]] != old_AA :
             #log.debug("Invalid residue mutation: {}. Old Residue: {} does not match {} found in cds".format(mut, old_AA, codon_table[seq[dna_pos:dna_pos+3]]))
             raise Exception("Invalid residue mutation: {}. Old Residue: {} does not match {} found in cds".format(mut, old_AA, codon_table[seq[dna_pos:dna_pos+3]]))
 
@@ -360,7 +360,6 @@ class ResidueMutation(BaseOperation):
                     expected_codon = self.config["codon_table"][self.gene.cds[gene_pos:gene_pos+3]]
                     if str(m[0]) != str(expected_codon):
                         self.error('Invalid residue mutation: {}. Old Residue: {} does not match {} found in cds'.format(mut, m[0], expected_codon))
-                        
 
     def run(self):
         cdn_tbl = self.config["codon_table"]

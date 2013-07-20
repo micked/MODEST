@@ -164,8 +164,10 @@ class InterfaceTests(unittest.TestCase):
         self.genome = oligo_design.Gene("genome", 0, 1, "A")
 
     def test_bool(self):
+        load_operations()
         op = OPERATIONS["residue_mutation"]
-        config = {}
+        from mage_tool.helpers import default_codon_table
+        config = {'codon_table': default_codon_table}
         opF1 = op(0, self.gene, "", config)
         opF2 = op(1, self.gene, "mut=A", config)
         opT1 = op(2, self.gene, "mut=E166G", config)
