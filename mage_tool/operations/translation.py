@@ -856,6 +856,9 @@ class RBSLibrary(BaseOperation):
             self.create_opt_str()
             log.debug("{} adjusting very low target value '{}' to 0.1".format(self, val))
 
+        if str(self.gene.cds[0:3]) not in ('ATG', 'GTG', 'TTG', 'CTG'):
+            self.error('Invalid start codon: ' + str(self.gene.cds[0:3]))
+
     def run(self):
         method = self.options["method"]
         target = self.options["target"]
