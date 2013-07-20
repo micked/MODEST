@@ -61,6 +61,7 @@ if __name__ == '__main__':
     parser.add_argument("-T", help="Run unthreaded", action="store_true")
     parser.add_argument("--MASC", help="Design MASC PCR primers to file", default=False, nargs="?", metavar="mascfile")
     parser.add_argument("--PDF", help="Output report PDF", default=False, nargs="?", metavar="pdffile")
+    parser.add_argument("--CSV", help="Output oligos in csv format", default=False, nargs="?", metavar="csvfile")
     parser.add_argument("--operations", help="Display registered operations and exit", action=ListOperations, nargs=0)
     args = parser.parse_args()
 
@@ -174,9 +175,12 @@ if __name__ == '__main__':
     print("Writing to {}..".format(output))
     oligolist_to_tabfile(oligos, output)
 
-    output_csv = args.project + ".csv"
-    print("Writing report CSV to {}..".format(output_csv))
-    csvlist = oligolist_to_csv(oligos, output_csv)
+    if args.CSV or args.CSV is None:
+        output_csv = args.project + ".csv" if not args.CSV else args.CSV
+        print("Writing report CSV to {}..".format(output_csv))
+        csvlist = oligolist_to_csv(oligos, output_csv)
+    else:
+        csvlist = oligolist_to_csv(oligos)
 
     if args.PDF or args.PDF is None:
         output_pdf = args.project + ".pdf" if not args.PDF else args.PDF
