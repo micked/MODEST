@@ -129,7 +129,7 @@ class DNAMutation(BaseOperation):
 
         before, after = mut_str.split('->')
         pos = self.options['position'] - 1
-        found = self.gene[pos:pos+len(before)]
+        found = str(self.gene[pos:pos+len(before)])
 
         if found != before:
             self.error('Trying to mutate \'{}\', but found \'{}\' in sequence at position {}.'.format(before, found, pos+1))
@@ -189,7 +189,7 @@ class Deletion(BaseOperation):
 
             #Error Checking
             found = self.gene[pos:pos+n_nts]
-            if nts != found:
+            if nts != str(found):
                 self.error("Tried to delete '{}', but found '{}' in sequence.".format(nts, found))
                 return
 

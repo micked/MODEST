@@ -10,6 +10,7 @@ from multiprocessing import Pool, Value, Lock
 
 import mage_tool.run_control as rc
 from mage_tool.operations import OPERATIONS
+from mage_tool.operations import load_operations
 from mage_tool.IO import ParserError
 
 #Define a log
@@ -30,6 +31,8 @@ def parse_adjustments(adjlist, genes, config, barcoding_lib):
     """
     parsed_operations = list()
     error_list = list()
+
+    load_operations()
 
     for adj in adjlist:
         #Check existence of gene and operation

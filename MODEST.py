@@ -25,10 +25,27 @@ from mage_tool.IO import oligolist_to_mascfile
 from mage_tool.IO import raw_adjlist_to_adjlist
 from mage_tool.interface import parse_adjustments
 from mage_tool.interface import run_adjustments
+import mage_tool.run_control as rc
 
 #Define a log
 log = logging.getLogger("MODEST.py")
-log.addHandler(logging.NullHandler())
+
+
+class ListOperations(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        if namespace.rc:
+            rc.load_rcfile(namespace.rc)
+
+        from mage_tool.operations import load_operations, OPERATIONS
+        load_operations()
+        for op in OPERATIONS:
+            pass
+            print(op, OPERATIONS[op].__doc__)
+
+        if not namespace.rc:
+            print('', 'To load an rc file before displaying operations, set --rc before --operations.')
+
+        parser.exit()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -38,21 +55,18 @@ if __name__ == '__main__':
     parser.add_argument("--genome", help="Annotated genome. Leave empty to locate automatically.", default=None)
     loghelp = "Logfile, default <project>.log. Use STDOUT to log all messages to screen, use - to disable"
     parser.add_argument("--log", help=loghelp, default="--")
+    parser.add_argument("--rc", help='MODEST conf file', default=None)
     parser.add_argument("-p", "--project", help="Project name", default="Untitled")
     parser.add_argument("-o", "--output", help="Output file. Default <project>.out", default=False)
     parser.add_argument("-T", help="Run unthreaded", action="store_true")
     parser.add_argument("--MASC", help="Design MASC PCR primers to file", default=False, nargs="?", metavar="mascfile")
     parser.add_argument("--PDF", help="Output report PDF", default=False, nargs="?", metavar="pdffile")
-    parser.add_argument("--operations", help="Display registered operations and exit", action="store_true")
-
-    #bypass argparse
-    if "--operations" in sys.argv:
-        from mage_tool.operations import OPERATIONS
-        for op in OPERATIONS:
-            print(op, OPERATIONS[op].__doc__)
-        exit(0)
-
+    parser.add_argument("--operations", help="Display registered operations and exit", action=ListOperations, nargs=0)
     args = parser.parse_args()
+
+    #Load MODEST configuration
+    if args.rc:
+        rc.load_rcfile(args.rc)
 
     if args.log == "--":
         args.log = args.project + ".log"
