@@ -106,15 +106,22 @@ def translational_KO(gene, stop_codons=["TAG", "TAA", "TGA"],
     if not KO_mutations or KO_mutations < len(stop_codons):
         KO_mutations = len(stop_codons)
 
+    #Do not mutate the start codon
     start_offset = 3
+    #Calculate a KO frame if not provided
     if not KO_frame:
         KO_frame = int((len(gene.cds)/3)/2)
 
+    #Sequence to be mutated
     KO = gene.cds[start_offset:KO_frame*3]
+    #List of stop codons and how many mutations each codon require to be
+    #mutated to this stop codon
     codon_muts = list()
+    #Iterate each codon
     for i in range(0, len(KO), 3):
         stop_muts = list()
         parent = KO[i:i+3]
+        #Calculate how many mutations each stop codon require
         for child in stop_codons:
             needed_muts = 0
             for p,m in zip(parent,child):
@@ -125,24 +132,35 @@ def translational_KO(gene, stop_codons=["TAG", "TAA", "TGA"],
 
     stop_codons = frozenset(stop_codons)
     totalmuts_codon = list()
+
+    #Iterate each codon-position
     for i in range(len(codon_muts)-KO_mutations+1):
+        #Find all combinations of stop codons
         combinations = list()
         for lists in itertools.product(*codon_muts[i:i+KO_mutations]):
             combinations.append(list(lists))
+        #Sort combinations by total number of required mutations
         combinations.sort(key=lambda x: sum(e[0] for e in x))
+        #Iterate each combination
         for comb in combinations:
             stops = frozenset([e[1] for e in comb])
-
+            #Find first combination with every stop codon included
+            #TODO: Get smaller window lengths by checking length of stops set
             if stops == stop_codons:
+                #Hom many mutations this combination require
                 muts = sum([e[0] for e in comb])
+                #New sequence
                 after = "".join([e[1] for e in comb])
                 pos = i+1
                 totalmuts_codon.append([muts, after, pos])
                 break
 
+    #Sort all best combinations by number of required mutations
     totalmuts_codon.sort(key=lambda x:x[0])
+    #Choose best candidate
     n_muts, muts, offset = totalmuts_codon[0]
 
+    #Mutate sequence to stop codons
     seq = gene.cds.copy()
     for i, nt in enumerate(muts):
         seq.mutate(nt, i + offset*3, in_place=True)
@@ -358,13 +376,8 @@ def RBS_Monte_Carlo(gene, target, maxmuts=10, collect_library=False, **kwargs):
     calc_start_temp = kwargs.get("calc_start_temp", lambda n: (0.6 / n) * 3)
     end_temp        = kwargs.get("end_temp", 0.01)
 
-    #"Main" mutation period
-    min_mut_period = kwargs.get("min_mut_period", 1000)
-    #Cool mutation period
-    max_mut_period = kwargs.get("max_mut_period", 4000)
-
-    #Number of rejects before bumping to an extra mutation
-    stationary = kwargs.get("stationary", 500)
+    #Rounds per simulation
+    mut_period = kwargs.get("mut_period", 1500)
 
     #Tolerance to target (dG)
     tolerance = kwargs.get("tolerance", 0.25)
@@ -399,12 +412,11 @@ def RBS_Monte_Carlo(gene, target, maxmuts=10, collect_library=False, **kwargs):
         raise Exception("start_mutations ({}) is larger than maxmuts ({})."
                         "".format(start_mutations, maxmuts))
 
-    new_dG = P = total_its = 0
+    new_dG = P = total_its = current_temp = 0
     def status(msg):
         if verbose:
-            fmts = (msg, total_its, best_dG, new_dG, n, P)
-            print("{:<18} {:>2} {:>5.2f} {:>5.2f} {:>2} {:4.2f}".format(*fmts))
-            # print(msg, total_its, new_dG, new_delta)
+            fmts = (msg, total_its, best_dG, new_dG, n, P, current_temp)
+            print("{:<18} {:>2} {:>5.2f} {:>5.2f} {:>2} {:4.2f} {:3.2f}".format(*fmts))
 
     #Number of rejects
     rejects = 0
@@ -413,11 +425,11 @@ def RBS_Monte_Carlo(gene, target, maxmuts=10, collect_library=False, **kwargs):
     for n in range(start_mutations, maxmuts + 1):
         #Temperature control
         start_temp = calc_start_temp(n)
-        temp_step = (start_temp - end_temp) / min_mut_period
+        temp_step = (start_temp - end_temp) / mut_period
         current_temp = start_temp
 
         #TODO: do ALL mutations
-        for i in xrange(max_mut_period):
+        for i in xrange(mut_period):
             #Create candidate
             candidate = best_leader.random_mutation(max_mut=n)
 
@@ -431,7 +443,6 @@ def RBS_Monte_Carlo(gene, target, maxmuts=10, collect_library=False, **kwargs):
             accept_move = False
             if new_delta < best_delta:
                 accept_move = True
-                rejects = 0
                 status("Accepted")
             elif new_delta == best_delta:
                 rejects += 1
@@ -450,10 +461,8 @@ def RBS_Monte_Carlo(gene, target, maxmuts=10, collect_library=False, **kwargs):
                     if P > random.random():
                         #Conditionally accept
                         accept_move = True
-                        rejects = 0
                         status("Cond_accepted")
                     else:
-                        rejects += 1
                         status("Cond_rejected")
 
             #Move is accepted
@@ -484,13 +493,8 @@ def RBS_Monte_Carlo(gene, target, maxmuts=10, collect_library=False, **kwargs):
             if opti_rounds and i % opti_rounds == 0:
                 best_leader.optimise_mutations()
 
-            #Decrease temp while in "hot period"
-            if i < min_mut_period:
-                current_temp -= temp_step
-            #Look for stationary phases in "cold period"
-            elif rejects >= stationary:
-                #Bump number of mutations if we are stationary
-                break
+            #Decrease temp.
+            current_temp -= temp_step
 
             total_its += 1
 
