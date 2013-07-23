@@ -10,6 +10,7 @@ from multiprocessing import Pool, Value, Lock
 
 import mage_tool.run_control as rc
 from mage_tool.operations import OPERATIONS
+from mage_tool.operations import load_operations
 from mage_tool.IO import ParserError
 
 #Define a log
@@ -30,6 +31,8 @@ def parse_adjustments(adjlist, genes, config, barcoding_lib):
     """
     parsed_operations = list()
     error_list = list()
+
+    load_operations()
 
     for adj in adjlist:
         #Check existence of gene and operation
@@ -161,8 +164,10 @@ class InterfaceTests(unittest.TestCase):
         self.genome = oligo_design.Gene("genome", 0, 1, "A")
 
     def test_bool(self):
+        load_operations()
         op = OPERATIONS["residue_mutation"]
-        config = {}
+        from mage_tool.helpers import default_codon_table
+        config = {'codon_table': default_codon_table}
         opF1 = op(0, self.gene, "", config)
         opF2 = op(1, self.gene, "mut=A", config)
         opT1 = op(2, self.gene, "mut=E166G", config)

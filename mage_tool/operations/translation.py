@@ -180,17 +180,17 @@ class TranslationalKnockout(BaseOperation):
 
     Options and default values:
 
-    - ``ko_frame`` Number of codons that are applicable to be mutated.  E.g. a
-      value of 10 means the operation will try to mutate stop codons into the
-      CDS within 10 codons of the start codon. Default is within one half of
-      the length of the CDS.
-    - ``ko_mutations`` number of stop codons to introduce. Default (and
+    - ``ko_frame=0``: Number of codons that are applicable to be mutated.  E.g.
+      a value of 10 means the operation will try to mutate stop codons into the
+      CDS within 10 codons of the start codon. The default of 0 is within one
+      half of the length of the CDS.
+    - ``ko_mutations=3``: number of stop codons to introduce. Default (and
       minimum) is the number of different stop codons available in the genome
       configuration file (normally 3).
 
     """
 
-    default_options = {"ko_frame": (int, 10),
+    default_options = {"ko_frame": (int, 0),
                        "ko_mutations": (int, 3)}
     required = ()
     genome_allowed = False
@@ -859,6 +859,9 @@ class RBSLibrary(BaseOperation):
             self.options["target"] = 0.1
             self.create_opt_str()
             log.debug("{} adjusting very low target value '{}' to 0.1".format(self, val))
+
+        if str(self.gene.cds[0:3]) not in ('ATG', 'GTG', 'TTG', 'CTG'):
+            self.error('Invalid start codon: ' + str(self.gene.cds[0:3]))
 
     def run(self):
         method = self.options["method"]

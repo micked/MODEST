@@ -223,11 +223,11 @@ def register_module(module):
 
 
 #Import all internal operations
-pkgpath = os.path.dirname(__file__)
-for _, name, _ in pkgutil.iter_modules([pkgpath]):
-    register_module("mage_tool.operations." + name)
+#pkgpath = os.path.dirname(__file__)
+#for _, name, _ in pkgutil.iter_modules([pkgpath]):
+#    register_module("mage_tool.operations." + name)
 
-
-#Import user operations
-for module in rc.CONF["operations"]:
-    register_module(module)
+def load_operations():
+    #Import user operations
+    for module in rc.CONF["operations"]:
+        register_module(module)

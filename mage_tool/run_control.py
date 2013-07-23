@@ -15,8 +15,10 @@ CONF = {#Oligo options
         #Program options
         "processes": None,
 
-        #Custom operations
-        "operations": [],
+        #Operations
+        "operations": ['mage_tool.operations.manual',
+                       'mage_tool.operations.translation',
+                       'mage_tool.operations.promoter'],
 
         #Gene options
         "leader_length": 35,

@@ -114,8 +114,12 @@ def seqIO_to_genelist(genome, config, include_genes=None, include_genome=False,
 
     for g in genome.features:
         if g.type == "CDS":
-            name = gene_name = g.qualifiers["gene"][0]
             locus_tag = g.qualifiers["locus_tag"][0]
+            try:
+                name = gene_name = g.qualifiers["gene"][0]
+            except KeyError:
+                name = locus_tag
+                gene_name = ""
 
             if include_genes and name not in include_genes:
                 if locus_tag in include_genes:
@@ -190,7 +194,10 @@ def seqIO_to_genelist(genome, config, include_genes=None, include_genome=False,
                 raise ParserError("Gene {} found more than once. Use locus_tag "
                                   "[{}] instead.".format(name, locus_tag))
             else:
-                gene = Gene(name, pos, strand, cds, leader, promoter, promoter_pos)
+                try:
+                    gene = Gene(name, pos, strand, cds, leader, promoter, promoter_pos)
+                except ValueError:
+                    continue
                 gene.gene_name = gene_name
                 gene.locus_tag = locus_tag
                 gene.in_operon = in_operon is not None
@@ -539,7 +546,10 @@ def make_genomeconfig(seqio, rep_origin=None, rep_ter=None,
 
             #Count codon usage
             for i in range(0, len(seq), 3):
-                codon_usage[seq[i:i+3]] += 1
+                try:
+                    codon_usage[seq[i:i+3]] += 1
+                except KeyError:
+                    continue
         #Collect oriC if applicable
         elif not rep_origin and f.type == 'rep_origin':
             rep_origin = [int(f.location.start), int(f.location.end)]
