@@ -169,9 +169,9 @@ class InterfaceTests(unittest.TestCase):
         from mage_tool.helpers import default_codon_table
         config = {'codon_table': default_codon_table}
         opF1 = op(0, self.gene, "", config)
-        opF2 = op(1, self.gene, "mut=A", config)
-        opT1 = op(2, self.gene, "mut=E166G", config)
-        opT2 = op(3, self.gene, "", config, mut="E166G")
+        opF2 = op(1, self.gene, "mutation=A", config)
+        opT1 = op(2, self.gene, "mutation=E166G", config)
+        opT2 = op(3, self.gene, "", config, mutation="E166G")
         self.assertFalse(opF1)
         self.assertFalse(opF2)
         self.assertTrue(opT1)

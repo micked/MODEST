@@ -367,11 +367,11 @@ class ResidueMutation(BaseOperation):
     op_str = "residue_mutation"
 
     def post_init(self):
-        self.muts = self.options['mut'].split(';')
+        self.muts = self.options['mutation'].split(';')
         for mut in self.muts:
             m = re.match(r'^([ACDEFGHIKLMNPQRSTVWY*$])(\d+)([a-z]?)([ACDEFGHIKLMNPQRSTVWY*$])$', mut)
             if not m:
-                self.error('Invalid mutation \'{}\' of format \'A10B\' in mut={}'.format(mut, self.options['mut']))
+                self.error('Invalid mutation \'{}\' of format \'A10B\' in mut={}'.format(mut, self.options['mutation']))
             else:
                 m = m.groups()
                 if not m[2]:
