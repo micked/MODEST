@@ -79,7 +79,7 @@ class FindMutation(BaseOperation):
             if count == 0:
                 log.error(str(self) + ' \'{}\[{}->{}\]{}\' not found in sequence.'.format(upstream, before, after, downstream))
                 return None
-        elif count > 1:
+        if count > 1:
             if rev_com:
                 log.error(str(self) + ' Ambiguous mutation. \'{}\[{}->{}\]{}\' found more than once.'.format(upstream, before, after, downstream))
             else:
