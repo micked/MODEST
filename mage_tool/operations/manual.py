@@ -17,6 +17,7 @@ from mage_tool.operations import BaseOperation
 from mage_tool.helpers import default_dgn_table
 from mage_tool.helpers import default_codon_usage
 from mage_tool.helpers import default_codon_table
+from mage_tool.helpers import reverse_complement
 
 
 #Define a log
@@ -56,6 +57,7 @@ class FindMutation(BaseOperation):
         self.mut = check.groups()
 
     def run(self):
+        rev_com = False
         upstream, before, after, downstream = self.mut
         seq = str(self.gene.leader) if self.gene.leader else ''
         seq = (seq + str(self.gene.cds)).upper()
@@ -68,10 +70,20 @@ class FindMutation(BaseOperation):
         #Find occurences
         count = seq.count(orig)
         if count == 0:
-            log.error(str(self) + '\'{}\' not found in sequence.'.format(self.options['mutation']))
-            return None
+            #Try reverse complement.
+            upstream, after, before, downstream = [reverse_complement(e) for e in self.mut][::-1]
+            orig = (upstream + before + downstream).upper()
+            count = seq.count(orig)
+            rev_com = True
+            log.info(str(self) + ' \'{}\' not found in sequence. Trying reverse complement'.format(self.options['mutation']))
+            if count == 0:
+                log.error(str(self) + ' \'{}\[{}->{}\]{}\' not found in sequence.'.format(upstream, before, after, downstream))
+                return None
         elif count > 1:
-            log.error(str(self) + 'Ambiguous mutation. \'{}\' found more than once.'.format(self.options['mutation']))
+            if rev_com:
+                log.error(str(self) + ' Ambiguous mutation. \'{}\[{}->{}\]{}\' found more than once.'.format(upstream, before, after, downstream))
+            else:
+                log.error(str(self) + ' Ambiguous mutation. \'{}\' found more than once.'.format(self.options['mutation']))
             return None
 
         pos = seq.find(orig) + offset
@@ -349,8 +361,8 @@ class ResidueMutation(BaseOperation):
 
     """
 
-    default_options = {"mut": (str, None)}
-    required = ("mut",)
+    default_options = {"mutation": (str, None)}
+    required = ("mutation",)
     genome_allowed = False
     op_str = "residue_mutation"
 

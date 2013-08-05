@@ -263,18 +263,16 @@ class Mutation:
         """
         if self.after and not valid_dna(self.after):
             raise Exception("Only strictly valid DNA (ATGC) can make MASC primers.")
-        fpwt = fpmut = ""
+        fpwt = ""
+        fpmut = ""
         fp_offset = 0
-        insert_offset = 0
-        #Offset for insertions
-        if len(self.after) > len(self.before):
-            insert_offset = len(self.after)
+        
+        wtpos = self.pos+len(self.before)
         
         #In loop to shift frame if forward primers are identical.
         while str(fpwt) == str(fpmut):
-            tot_offset = fp_offset + insert_offset
             #fpwt: forward primer(wt)
-            fpwt = make_primer(ref_genome, temp, self.pos-2+tot_offset, self.pos+1+tot_offset, salt_c, primer_c, 200)
+            fpwt = make_primer(ref_genome, temp, wtpos-3+fp_offset, wtpos+fp_offset, salt_c, primer_c, 200)
             #fpmut: forward primer(mut)
             if self.after:
                 if fp_offset > 0:
@@ -289,17 +287,12 @@ class Mutation:
             fpmut = make_primer(fpmut_ref, temp, len(fpmut_ref)-3, len(fpmut_ref), salt_c, primer_c, 200)
             #If primers are identical, shift one nt.
             fp_offset += 1
-        
-        
-        #Adjust offset for reverse primers if needed.
-        if len(self.after) > len(self.before):
-            tot_offset -= 1
             
         avg_fp_len = int(float(len(fpwt[0])+len(fpmut[0]))/2)
         primers = {"fpwt": fpwt, "fpmut": fpmut}
         lengths = [lengths] if type(lengths) is int else lengths
         for l in lengths:
-            ref = extract_circular(ref_genome, self.pos-avg_fp_len+tot_offset, self.pos-avg_fp_len+l+tot_offset)
+            ref = extract_circular(ref_genome, wtpos-1-avg_fp_len, wtpos-1-avg_fp_len+l)
             ref = reverse_complement(ref)
             pr = make_rev_primer(ref, temp, 0, 3, salt_c, primer_c, 200)
 
