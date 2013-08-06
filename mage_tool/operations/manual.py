@@ -336,9 +336,14 @@ class ResidueMutation(BaseOperation):
 
     Options:
 
-    - ``mut=``
+    - ``mut`` Amino acid substitions. Multiple substitions can be separated by a semicolon (;)
 
-    I.e. ``mut=`` changes
+    Examples::
+
+        thiD residue_mutation mut=N5Q
+        #substitue N with Q at residue 5 in thiD.
+
+    Amino acid sequence before is MKRINALTIA, and after insertion it is MKRIQALTIA.
 
     """
 
