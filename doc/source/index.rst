@@ -14,27 +14,27 @@ Dependencies
 
 Program input
 -------------
-The program needs 4 input files:
+The program needs 3 input files or 4 if using barcodes:
  * A file with gene adjustments
  * A genbank file with the whole genome
- * A file with barcode information
  * A config file with information about the organism.
+ * Optional: A file with barcode information
 
 
 Gene adjustment file
 ~~~~~~~~~~~~~~~~~~~~
 The gene adjustment file is a space or tab separated file.  Where every line corresponds to an operation and look as follows::
 
-    Gene-Name    Operation   Barcode-ID   Options
+    Gene-Name    Operation   Options
 
 **Example**: ::
 
-    thiM start_codon_optimal ID1+ID2,ID2+ID3
-    yaaA custom_mutation     ID2              mut=TATCAACGCC[GCTC=]GCTTTCATGACT
-    thiC translational_KO    ID1              KO_frame=10
-    thiE RBS_library         ID1
-    thiF RBS_library         ID3+ID4          max_mutations=5
-    thiS RBS_library         ID1              n=15,passes=3
+    thiM start_codon_optimal barcodes=ID1+ID2,ID2+ID3
+    yaaA custom_mutation     mut=TATCAACGCC[GCTC=]GCTTTCATGACT,barcodes=ID2       
+    thiC translational_KO    KO_frame=10,barcodes=ID1
+    thiE RBS_library         barcodes=ID1
+    thiF RBS_library         max_mutations=5,barcodes=ID3+ID4
+    thiS RBS_library         n=15,passes=3,barcodes=ID1
 
 It is important to notice that there are **NO** spaces in the options
 parameter. **Any option after a space will be omitted.**
@@ -59,7 +59,10 @@ List of operations
    - ``start_codon_optimal``
  - Custom mutations
 
-   - ``dna_mutation``
+   - ``deletion``
+   - ``insertion``
+   - ``find_mutation``
+   - ``mutation``
    - ``residue_mutation``
 
 RBS_library
@@ -74,7 +77,19 @@ start_codon_optimal
 ^^^^^^^^^^^^^^^^^^^
 .. autosimple:: mage_tool.operations.translation.StartCodonOptimal
 
-dna_mutation
+deletion
+^^^^^^^^^^^^
+.. autosimple:: mage_tool.operations.manual.Deletion
+
+insertion
+^^^^^^^^^^^^
+.. autosimple:: mage_tool.operations.manual.Insertion
+
+find_mutation
+^^^^^^^^^^^^
+.. autosimple:: mage_tool.operations.manual.FindMutation
+
+mutation
 ^^^^^^^^^^^^
 .. autosimple:: mage_tool.operations.manual.DNAMutation
 
@@ -146,7 +161,7 @@ A typical project folder will look like this::
 
  Project
  |-- data
- |   |-- organism.config
+ |   |-- organism.gbcfg
  |   |-- organism.gb
  |   |-- adjustments.txt
  |   |-- barcodes.txt
