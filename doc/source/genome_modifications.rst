@@ -3,4 +3,4 @@ MODEST web
 
 Create genome modification oligos.
 
-TBD.
+Documentation for Web Server. Coming soon :sup:`TM`
