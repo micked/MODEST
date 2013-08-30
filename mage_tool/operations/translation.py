@@ -370,7 +370,24 @@ RBS_K = 2500.0
 
 
 def RBS_Monte_Carlo(gene, target, maxmuts=10, collect_library=False, **kwargs):
-    """TODO"""
+    """Run a Monte Carlo simulation on a Gene to reach target (dG, kcal/mol).
+
+    target is supplied in dG [kcal/mol]. Use maxmuts to set an upper limit on
+    how many mutations are allowed. The simulation will attempt to reach target
+    with as few as possible mutations.
+
+    kwargs::
+        verbose=False
+        calc_start_temp=lambda n:(0.6/n)*3
+        end_temp=0.01
+        mut_period=1500
+        tolerance=0.25
+        opti_rounds=25
+        RNA_fold=ViennaRNA()
+
+    Returns a list of Sequence objects.
+
+    """
 
     #Start temp is a function of muts
     calc_start_temp = kwargs.get("calc_start_temp", lambda n: (0.6 / n) * 3)

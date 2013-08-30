@@ -59,7 +59,8 @@ class FindMutation(BaseOperation):
         upstream, before, after, downstream = self.mut
         seq = (str(self.gene.leader) + str(self.gene.cds)).upper()
 
-        offset = len(upstream) - len(self.gene.leader)
+        leader_len = len(self.gene.leader) if self.gene.leader else 0
+        offset = len(upstream) - leader_len
 
         #Original sequence
         orig = (upstream + before + downstream).upper()

@@ -634,6 +634,10 @@ def oligolist_to_csv(oligolist, output=None):
 
     csvoutlist.sort(key=lambda x: (x[1], x[0]))
 
+    #TODO add additional headers
+    headers = ["id", "operation", "gene", "line", "options", "mutation",
+                "barcodes", "oligo", "mfe", "wt", "altered"]
+
     if output:
         cls = False
         if not hasattr("write", output):
@@ -643,10 +647,6 @@ def oligolist_to_csv(oligolist, output=None):
         #For Libreoffice Calc
         output.write(codecs.BOM_UTF8)
         csv_w = csv.writer(output)
-
-        #TODO add additional headers
-        headers = ["id", "operation", "gene", "line", "options", "mutation",
-                   "barcodes", "oligo", "mfe", "wt", "altered"]
         csv_w.writerow(headers)
 
         for n in csvoutlist:
