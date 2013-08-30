@@ -100,7 +100,7 @@ class Oligo:
         if ViennaRNA.mfe(str(oligo)) < threshold:
             #Offset towards 3'-end
             three_end_cap = 15
-            end = self.oligo_len/2 - three_end_cap - len(self.mut.after)
+            end = self.oligo_len/2 - three_end_cap - len(self.mut.after)/2
             for i in range(1, end):
                 candidate = self.make_oligo(genome, offset=i)
                 candidates.append((candidate, ViennaRNA.mfe(str(candidate)), i))
@@ -111,7 +111,7 @@ class Oligo:
             #We are still below threshold. Panic, then offset towards 5'-end
             if optimised_oligo[1] < threshold:
                 five_end_cap = 15
-                start = -self.oligo_len/2 + five_end_cap
+                start = -self.oligo_len/2 + five_end_cap + len(self.mut.after)/2
                 for i in range(start, 0):
                     candidate = self.make_oligo(genome, offset=i)
                     candidates.append((candidate, ViennaRNA.mfe(str(candidate)), i))

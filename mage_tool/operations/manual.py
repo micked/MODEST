@@ -57,7 +57,8 @@ class FindMutation(BaseOperation):
 
     def run(self):
         upstream, before, after, downstream = self.mut
-        seq = (str(self.gene.leader) + str(self.gene.cds)).upper()
+        seq = str(self.gene.leader) if self.gene.leader else ''
+        seq = (seq + str(self.gene.cds)).upper()
 
         leader_len = len(self.gene.leader) if self.gene.leader else 0
         offset = len(upstream) - leader_len
