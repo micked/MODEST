@@ -28,6 +28,7 @@ from mage_tool.helpers import seqs_to_degenerate
 from mage_tool.helpers import reverse_complement
 from mage_tool.helpers import reverse_complement_dgn
 from mage_tool.helpers import default_codon_table
+from mage_tool.helpers import default_dgn_table
 from mage_tool.helpers import amino_acids
 import mage_tool.run_control as rc
 
@@ -149,7 +150,8 @@ def seqIO_to_genelist(genome, config, include_genes=None, include_genome=False,
             #Get leader and leader position
             leader, l_start, l_end = get_leader(genome.seq, start, end, strand, leader_len)
             try:
-                leader = find_wobble_seq(genome, leader, l_start, l_end, config["codon_table"], config["dgn_table"])
+                leader = find_wobble_seq(genome, leader, l_start, l_end,
+                                         default_codon_table, default_dgn_table)
             except WobbleError as e:
                 log.error("Wobble error in gene.leader: {}; {}".format(name, e))
 
@@ -175,7 +177,8 @@ def seqIO_to_genelist(genome, config, include_genes=None, include_genome=False,
             #Extract promoter sequences
             promoter, p_start, p_end = get_leader(genome.seq, operon_start, operon_end, operon_strand, promoter_len)
             try:
-                promoter = find_wobble_seq(genome, promoter, p_start, p_end, config["codon_table"], config["dgn_table"])
+                promoter = find_wobble_seq(genome, promoter, p_start, p_end,
+                                           default_codon_table, default_dgn_table)
             except WobbleError as e:
                 log.error("Wobble error in gene.promoter: {}; {}".format(name, e))
 
@@ -741,8 +744,9 @@ class OligoLibraryReport:
 
         bar_width = 0.3
         #sort by altered
-        sba = lambda gene: max([float(oligo["altered"]) for oligo in self.oplib["RBS_library"][gene]])
-        genes = sorted(self.oplib["RBS_library"].keys(), key=sba, reverse=True)
+        #sba = lambda gene: max([float(oligo["altered"]) for oligo in self.oplib["RBS_library"][gene]])
+        #genes = sorted(self.oplib["RBS_library"].keys(), key=sba, reverse=True)
+        genes = sorted(self.oplib["RBS_library"].keys())
 
         #Genes per plot
         gpp = min(range(6,11), key=lambda i: len(genes) % i)
