@@ -81,7 +81,7 @@ if __name__ == "__main__":
     print('Genome file:       ', gb_filename)
     print('Genome config file:', gbcfg_filename)
 
-    gbcfg = make_genomeconfig(genome, args.o, args.t)
+    gbcfg = make_genomeconfig(args.o, args.t, genome)
 
     with open(gbcfg_filename, 'w') as f:
         f.write(yaml.dump(gbcfg))

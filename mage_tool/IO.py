@@ -389,15 +389,11 @@ def load_config_file(config, cfg_basedir='./', skip_table_generation=False):
 
     #Verify configuration table
     #Check that required elements have been specified.
-    required = ["Locus", "replication", "start_codons", "codon_usage"]
+    required = ["Locus", "replication"]
     missing = ', '.join([req for req in required if req not in config])
 
     if missing:
         raise ParserError("Missing required parameters in genome config file: '{}'. See documentation.".format(missing))
-
-    #Locus must be a string.
-    if not isinstance(config["Locus"], str):
-        raise ParserError("Genome config file: 'Locus' must be a string")
 
     #replication
     #replication is a dictionary that contains ori and ter.
@@ -405,52 +401,6 @@ def load_config_file(config, cfg_basedir='./', skip_table_generation=False):
     #Raise error with missing elements.
     if missing:
         raise ParserError("Genome config file: 'replication' is missing: {}.".format(", ".join(list(missing))))
-
-    #start codons
-    #start codons is a list of start codons.
-    error_list = list()
-    if not isinstance(config["start_codons"], list):
-        raise ParserError("Genome config file: 'start_codons' must be a list of codons")
-    #Check that codons are strings with length 3.
-    for cd in config["start_codons"]:
-        if not isinstance(cd, str) and len(cd) != 3:
-            error_list.append("Invalid codon '{}' in start_codons".format(cd))
-    #If any codons are wrong. Raise error with list.
-    if error_list:
-        raise ParserError("Genome config file: Error in 'codon_usage'", error_list)
-
-    #codon usage
-    #Check that all codons have been specified.
-    b = [["A", "C", "G", "T"]]*3
-    all_codons = ["".join(li) for li in itertools.product(*b)]
-    #If any codons are missing, raise error with missing codons.
-    codonsdiff = set(all_codons) - set(config["codon_usage"])
-    if codonsdiff:
-        raise ParserError("Genome config file: Missing codons {}".format(", ".join(list(codonsdiff))))
-
-    error_list = list()
-    for k in config["codon_usage"]:
-        #Verify that the length of usage list is 2, at the codon. Otherwise append error to error_list and continue.
-        if not isinstance(config["codon_usage"][k], list) and len(config["codon_usage"][k]) != 2:
-            error_list.append("Wrong usage list at codon {}".format(k))
-            continue
-
-        #Unpack values from usage list.
-        AA, usage = config["codon_usage"][k]
-        #Check that amino acid is a str of length 1.
-
-        if not isinstance(AA, str) and len(AA) != 1:
-            error_list.append("Invalid amino acid ({]) at codon: '{}'".format(k))
-
-        #Check that usage is a number and float it in config.
-        try:
-            config["codon_usage"][k][1] = float(usage)
-        except ValueError:
-            error_list.append("Error in codon: '{}'".format(k))
-
-    #If anny errors have been caugt during check of codon_usage. Raise error with error_list.
-    if error_list:
-        raise ParserError("Genome config file: Error in 'codon_usage'", error_list)
 
     #Maybe skip the creation of new tables.
     if not skip_table_generation:
@@ -460,6 +410,28 @@ def load_config_file(config, cfg_basedir='./', skip_table_generation=False):
 
 
 def create_config_tables(config, cfg_basedir="./"):
+    """Create additional lookup tables and parse operon and promoter files."""
+    if "DOOR_operon_source" in config:
+        opr = os.path.join(cfg_basedir, config["DOOR_operon_source"])
+        if not os.path.isfile(opr):
+            raise Exception("Could not find opr file: {}".format(opr))
+        with open(opr) as oprfile:
+            operons = parse_DOOR_oprfile(oprfile)
+        if "operons" not in config:
+            config["operons"] = dict()
+        config["operons"].update(operons)
+
+    if "promoters" in config:
+        for prom in config["promoters"]:
+            for i, l in enumerate(config["promoters"][prom]):
+                ntdict = dict()
+                ntdict["A"],ntdict["C"],ntdict["G"],ntdict["T"] = float(l[0]), float(l[1]), float(l[2]), float(l[3])
+                config["promoters"][prom][i] = ntdict
+
+    return config
+
+
+def create_config_cdntables(config):
     """Create additional lookup tables from the parsed config yaml file."""
     #Translation table
     AAtable = dict() #{AA: [] for AA in amino_acids}
@@ -478,23 +450,6 @@ def create_config_tables(config, cfg_basedir="./"):
     config["dgn_table"] = dict()
     for AA in AAtable:
         config["dgn_table"][AA] = seqs_to_degenerate(AAtable[AA])
-
-    if "DOOR_operon_source" in config:
-        opr = os.path.join(cfg_basedir, config["DOOR_operon_source"])
-        if not os.path.isfile(opr):
-            raise Exception("Could not find opr file: {}".format(opr))
-        with open(opr) as oprfile:
-            operons = parse_DOOR_oprfile(oprfile)
-        if "operons" not in config:
-            config["operons"] = dict()
-        config["operons"].update(operons)
-
-    if "promoters" in config:
-        for prom in config["promoters"]:
-            for i, l in enumerate(config["promoters"][prom]):
-                ntdict = dict()
-                ntdict["A"],ntdict["C"],ntdict["G"],ntdict["T"] = float(l[0]), float(l[1]), float(l[2]), float(l[3])
-                config["promoters"][prom][i] = ntdict
 
     return config
 
@@ -523,8 +478,8 @@ def parse_DOOR_oprfile(oprfilehandle):
     return operons
 
 
-def make_genomeconfig(seqio, rep_origin=None, rep_ter=None,
-                      codon_table=default_codon_table, start_codons=None):
+
+def make_genomeconfig(rep_origin=None, rep_ter=None, seqio=None):
     """Create a gbfcg configuration from a biopython SeqIO genome object.
 
     Calculate codon usage, start codons and if not specified, replication start
@@ -532,46 +487,13 @@ def make_genomeconfig(seqio, rep_origin=None, rep_ter=None,
 
     """
     gbcfg = dict(Locus=seqio.id)
-    codon_usage = {"".join(li): 0 for li in itertools.product(*[["A", "C", "G", "T"]]*3)}
 
-    stcdns_collect = dict()
-
-    for f in seqio.features:
-        #Real gene
-        if f.type == 'CDS' and 'pseudo' not in f.qualifiers:
-            seq = str(f.extract(seqio).seq)
-            #Collect start codon
-            if not start_codons:
-                stcdns_collect[seq[0:3]] = stcdns_collect.get(seq[0:3], 0) + 1
-
-            #Count codon usage
-            for i in range(0, len(seq), 3):
-                try:
-                    codon_usage[seq[i:i+3]] += 1
-                except KeyError:
-                    continue
-        #Collect oriC if applicable
-        elif not rep_origin and f.type == 'rep_origin':
-            rep_origin = [int(f.location.start), int(f.location.end)]
-
-    #Collect amino acid usage / codon count sums
-    codon_sums = {AA: 0.0 for AA in amino_acids + ['$']}
-    for codon, usage in codon_usage.items():
-        codon_sums[codon_table[codon]] += usage
-
-    #Add codon usage
-    gbcfg['codon_usage'] = dict()
-    for cdn, usg in codon_usage.items():
-        AA = codon_table[cdn]
-        gbcfg['codon_usage'][cdn] = [AA, usg/codon_sums[AA]]
-
-    #Calculate start_codons
-    if not start_codons:
-        #Use codon_usage to find most important start codons
-        start_codons = sorted(stcdns_collect, key=lambda x: stcdns_collect[x], reverse=True)
-
-    #Add start codons
-    gbcfg['start_codons'] = start_codons
+    #Look for oric
+    if not rep_origin and seqio:
+        for f in seqio.features:
+            #Collect oriC if applicable
+            if f.type == 'rep_origin':
+                rep_origin = [int(f.location.start), int(f.location.end)]
 
     #Add oriC and ter
     if rep_origin:
@@ -589,6 +511,45 @@ def make_genomeconfig(seqio, rep_origin=None, rep_ter=None,
         gbcfg['replication']['ter'] = rep_ter
     else:
         raise ParserError('oriC not found in genome, and not specified')
+
+    return gbcfg
+
+
+def generate_codon_usage(seqio, gbcfg={}, codon_table=default_codon_table):
+    """Look through all CDS in genome SeqIO and calculate codon usage."""
+    codon_usage = {"".join(li): 0 for li in itertools.product(*[["A", "C", "G", "T"]]*3)}
+    stcdns_collect = dict()
+
+    for f in seqio.features:
+        #Real gene
+        if f.type == 'CDS' and 'pseudo' not in f.qualifiers:
+            seq = str(f.extract(seqio).seq)
+            #Collect start codon
+            stcdns_collect[seq[0:3]] = stcdns_collect.get(seq[0:3], 0) + 1
+
+            #Count codon usage
+            for i in range(0, len(seq), 3):
+                try:
+                    codon_usage[seq[i:i+3]] += 1
+                except KeyError:
+                    continue
+
+    #Collect amino acid usage / codon count sums
+    codon_sums = {AA: 0.0 for AA in amino_acids + ['$']}
+    for codon, usage in codon_usage.items():
+        codon_sums[codon_table[codon]] += usage
+
+    #Add codon usage
+    gbcfg['codon_usage'] = dict()
+    for cdn, usg in codon_usage.items():
+        AA = codon_table[cdn]
+        gbcfg['codon_usage'][cdn] = [AA, usg/codon_sums[AA]]
+
+    #Use codon_usage to find most important start codons
+    start_codons = sorted(stcdns_collect, key=lambda x: stcdns_collect[x], reverse=True)
+
+    #Add start codons
+    gbcfg['start_codons'] = start_codons
 
     return gbcfg
 

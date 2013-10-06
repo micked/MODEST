@@ -23,6 +23,8 @@ from mage_tool.IO import oligolist_to_csv
 from mage_tool.IO import OligoLibraryReport
 from mage_tool.IO import oligolist_to_mascfile
 from mage_tool.IO import raw_adjlist_to_adjlist
+from mage_tool.IO import generate_codon_usage
+from mage_tool.IO import create_config_cdntables
 from mage_tool.interface import parse_adjustments
 from mage_tool.interface import run_adjustments
 import mage_tool.run_control as rc
@@ -69,6 +71,15 @@ if __name__ == '__main__':
     if args.rc:
         rc.load_rcfile(args.rc)
 
+    #Custom printed logging level
+    LOG_OUTPUT=55
+    logging.addLevelName(LOG_OUTPUT, 'OUTPUT')
+
+    def modestprint(self, message, *args, **kws):
+        self.log(LOG_OUTPUT, message, *args, **kws)
+
+    logging.Logger.modestprint = modestprint
+
     if args.log == "--":
         args.log = args.project + ".log"
 
@@ -92,7 +103,7 @@ if __name__ == '__main__':
         console.setFormatter(formatter)
         logging.getLogger('').addHandler(console)
 
-    print("Reading adjustments..")
+    log.modestprint("Reading adjustments..")
     try:
         adjlist = raw_adjlist_to_adjlist(args.adjustments.readlines())
     except ParserError as e:
@@ -103,7 +114,7 @@ if __name__ == '__main__':
 
     include_genes = set([l["gene"] for l in adjlist])
 
-    print("Loading config file..")
+    log.modestprint("Loading config file..")
     cfg_basedir = os.path.abspath(os.path.dirname(args.config.name))
 
     try:
@@ -138,10 +149,16 @@ if __name__ == '__main__':
     else:
         genome_loc = args.genome
 
-    print("Parsing genome ({})..".format(genome_loc))
+    log.modestprint("Parsing genome ({})..".format(genome_loc))
     genome = SeqIO.read(genome_loc, "genbank")
 
-    print("Collecting gene list..")
+    #Make ekstra config tables
+    if 'codon_usage' not in config:
+        log.modestprint('Generating codon usage..')
+        config = generate_codon_usage(genome, config)
+    config = create_config_cdntables(config)
+
+    log.modestprint("Collecting gene list..")
     incl_gnm = "genome" in include_genes
     #include_genes = None if "all" in include_genes
     try:
@@ -152,10 +169,10 @@ if __name__ == '__main__':
 
     barcoding_lib = dict()
     if args.barcodes:
-        print("Loading barcode file..")
+        log.modestprint("Loading barcode file..")
         barcoding_lib = parse_barcode_library(args.barcodes)
 
-    print("Making oligos..")
+    log.modestprint("Making oligos..")
     threaded = not args.T
     try:
         oplist = parse_adjustments(adjlist, genes, config, barcoding_lib)
@@ -172,26 +189,26 @@ if __name__ == '__main__':
     else:
         output = args.project + ".out"
 
-    print("Writing to {}..".format(output))
+    log.modestprint("Writing to {}..".format(output))
     oligolist_to_tabfile(oligos, output)
 
     if args.CSV or args.CSV is None:
         output_csv = args.project + ".csv" if not args.CSV else args.CSV
-        print("Writing report CSV to {}..".format(output_csv))
+        log.modestprint("Writing report CSV to {}..".format(output_csv))
         csvlist = oligolist_to_csv(oligos, output_csv)
     else:
         csvlist = oligolist_to_csv(oligos)
 
     if args.PDF or args.PDF is None:
         output_pdf = args.project + ".pdf" if not args.PDF else args.PDF
-        print("Writing report PDF to {}..".format(output_pdf))
+        log.modestprint("Writing report PDF to {}..".format(output_pdf))
         report = OligoLibraryReport(args.project)
         report.parse_and_generate(csvlist, csv_file=False)
         report.write_pdf(output_pdf)
 
     if args.MASC or args.MASC is None:
         mascfile = args.MASC if args.MASC else args.project + "_masc_primers.csv"
-        print("Designing MASC PCR primers to {}..".format(mascfile))
+        log.modestprint("Designing MASC PCR primers to {}..".format(mascfile))
         masc_kwargs = {"lengths": [100, 150, 200, 250, 300, 400, 500, 600, 700, 850]}
         masc_kwargs["ref_genome"] = genome.seq
         masc_kwargs["temp"] = 62.0
