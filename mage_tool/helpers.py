@@ -405,6 +405,21 @@ def make_primer(ref_seq, temp, start, end, salt_c=0.05, primer_c=5e-8, max_len=2
         if Tm > temp:
             break
         #Keep going
+        start -= 1
+    else:
+        raise Exception("Target temp ({}) not reached for forward primer. "
+                        "(Reached: {})".format(temp, Tm))
+    return pr, Tm
+    
+
+def make_rev_primer(ref_seq, temp, start, end, salt_c=0.05, primer_c=5e-8, max_len=200):
+    """Extract a primer from ref_seq with Tm of temp."""
+    for i in range(max_len):
+        pr = extract_circular(ref_seq, start, end)
+        Tm = primer_tm(pr, salt_c, primer_c)
+        if Tm > temp:
+            break
+        #Keep going
         end += 1
     else:
         raise Exception("Target temp ({}) not reached for forward primer. "

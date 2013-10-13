@@ -16,6 +16,8 @@ from mage_tool import ViennaRNA
 from mage_tool import oligo_design
 from mage_tool.IO import find_wobble_seq
 from mage_tool.IO import seqIO_to_genelist
+from mage_tool.IO import generate_codon_usage
+from mage_tool.IO import create_config_cdntables
 from mage_tool.IO import create_config_tables
 from mage_tool.operations import manual
 from mage_tool.operations import translation
@@ -170,6 +172,9 @@ class TestMageTool(unittest.TestCase):
     def setUp(self):
         self.genome = SeqIO.read(StringIO(genome), "genbank")
         self.config = create_config_tables(config)
+        if 'codon_usage' not in self.config:
+            self.config = generate_codon_usage(genome, self.config)
+        self.config = create_config_cdntables(self.config)
         self.genes = seqIO_to_genelist(self.genome, self.config, promoter_len=20)
 
     def test_seqIO_to_genelist(self):
@@ -337,21 +342,26 @@ class TestMageTool(unittest.TestCase):
 
     def test_MASC(self):
         mut1 = oligo_design.Mutation("TAG", "C", 200, self.genome.seq)
-        prm = mut1.MASC_primers(self.genome.seq, lengths=[100,150,200,-100], temp=30.0)
-        self.assertEqual(str(prm["fpwt"][0]), "TAGCACCACCA")
-        self.assertEqual(str(prm["fpmut"][0]), "CCACCACCATT")
-        self.assertEqual(str(prm[100][0]), "CCCGCACTG")
-        self.assertEqual(str(prm[150][0]), "TTCAACACTCG")
-        self.assertEqual(str(prm[200][0]), "CGGCAACACG")
-        self.assertEqual(str(prm["rpwt"][0]), "CTAATGCGTTTC")
-        self.assertEqual(str(prm["rpmut"][0]), "GATGCGTTTCA")
-        self.assertEqual(str(prm[-100][0]), "AATTTTATTGACTTAG")
+        prm = mut1.MASC_primers(self.genome.seq, lengths=[100,150,200], temp=30.0)
+        self.assertEqual(str(prm["fpwt"][0]), "TGAAACGCATT")
+        self.assertEqual(str(prm["fpmut"][0]), "TGAAACGCATC")
+        self.assertEqual(str(prm[100][0]), "AGGTGCGGG")
+        self.assertEqual(str(prm[150][0]), "CATGGTTGTTAC")
+        self.assertEqual(str(prm[200][0]), "AGAAAACGTTCT")
         mut2 = oligo_design.Mutation("TAG", "", 200, self.genome.seq)
         prm = mut2.MASC_primers(self.genome.seq, lengths=[100], temp=30.0)
-        self.assertEqual(str(prm["fpwt"][0]), "TAGCACCACCA")
-        self.assertEqual(str(prm["fpmut"][0]), "TCACCACCATT")
-        self.assertEqual(str(prm["rpwt"][0]), "CTAATGCGTTTC")
-        self.assertEqual(str(prm["rpmut"][0]), "GATGCGTTTCA")
+        self.assertEqual(str(prm["fpwt"][0]), "TGAAACGCATT")
+        self.assertEqual(str(prm["fpmut"][0]), "TGAAACGCATC")
+        mut3 = oligo_design.Mutation("T", "", 199, self.genome.seq)
+        prm = mut3.MASC_primers(self.genome.seq, lengths=[100], temp=30.0)
+        self.assertEqual(str(prm["fpwt"][0]), "TGAAACGCATT")
+        self.assertEqual(str(prm["fpmut"][0]), "ATGAAACGCATA")
+        mut4 = oligo_design.Mutation("TAG", "TAGCCCCCC", 200, self.genome.seq)
+        prm = mut4.MASC_primers(self.genome.seq, lengths=[100, 150], temp=30.0)
+        self.assertEqual(str(prm["fpwt"][0]), "TTAGCACCACC")
+        self.assertEqual(str(prm["fpmut"][0]), "TTAGCCCCCC")
+        self.assertEqual(str(prm[100][0]), "CGCACTGTCA")
+        self.assertEqual(str(prm[150][0]), "CAACACTCGC")
 
     def test_KO(self):
         mut1 = translation.translational_KO(self.genes["fakA"])

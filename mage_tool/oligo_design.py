@@ -20,6 +20,7 @@ from mage_tool.helpers import nts_to_dgn
 from mage_tool.helpers import reverse_complement
 from mage_tool.helpers import extract_circular
 from mage_tool.helpers import make_primer
+from mage_tool.helpers import make_rev_primer
 
 #Define a log
 log = logging.getLogger("MODEST.oligo")
@@ -262,44 +263,45 @@ class Mutation:
         """
         if self.after and not valid_dna(self.after):
             raise Exception("Only strictly valid DNA (ATGC) can make MASC primers.")
-
-        #fpwt: forward primer(wt)
-        fpwt = make_primer(ref_genome, temp, self.pos, self.pos+3, salt_c, primer_c, 200)
-
-        #fpmut: forward primer(mut)
-        fpmut_refst = self.pos + len(self.before)
-        fpmut_refnd = self.pos + 200 + len(self.before) - len(self.after)
-        fpmut_ref = self.after.upper() + extract_circular(ref_genome, fpmut_refst, fpmut_refnd)
-        fpmut_ref = self.after.upper() + extract_circular(ref_genome, fpmut_refst, fpmut_refnd)
-        if not self.after:
-            fpmut_ref = ref_genome[self.pos-1] + fpmut_ref
-        fpmut = make_primer(fpmut_ref, temp, 0, 3, salt_c, primer_c, 200)
-
-        #rpwt: reverse primer(wt)
-        rpwt_refst = self.pos + len(self.before) - 200
-        rpwt_ref = extract_circular(ref_genome, rpwt_refst, rpwt_refst + 200)
-        rpwt_ref = reverse_complement(rpwt_ref)
-        rpwt = make_primer(rpwt_ref, temp, 0, 3, salt_c, primer_c, 200)
-
-        #rpmut: reverse primer(mut)
-        rpmut_refst = self.pos + len(self.after) - 200
-        rpmut_ref = extract_circular(ref_genome, rpmut_refst, self.pos) + self.after.upper()
-        if not self.after:
-            rpmut_ref = rpmut_ref + ref_genome[self.pos+len(self.before)]
-        rpmut_ref = reverse_complement(rpmut_ref)
-        rpmut = make_primer(rpmut_ref, temp, 0, 3, salt_c, primer_c, 200)
-
-        primers = {"fpwt": fpwt, "fpmut": fpmut,
-                   "rpwt": rpwt, "rpmut": rpmut}
+        fpwt = fpmut = ""
+        fp_offset = 0
+        insert_offset = 0
+        #Offset for insertions
+        if len(self.after) > len(self.before):
+            insert_offset = len(self.after)
+        
+        #In loop to shift frame if forward primers are identical.
+        while str(fpwt) == str(fpmut):
+            tot_offset = fp_offset + insert_offset
+            #fpwt: forward primer(wt)
+            fpwt = make_primer(ref_genome, temp, self.pos-2+tot_offset, self.pos+1+tot_offset, salt_c, primer_c, 200)
+            #fpmut: forward primer(mut)
+            if self.after:
+                if fp_offset > 0:
+                    fpmut_ref = extract_circular(ref_genome, self.pos-200, self.pos)+self.after.upper()+extract_circular(ref_genome, self.pos, self.pos+fp_offset)
+                else:
+                    fpmut_ref = extract_circular(ref_genome, self.pos-200, self.pos)+self.after.upper()
+                    #if len(self.after) > len(self.before):
+                    #    fpmut_ref = fpmut_ref + ref_genome[self.pos+len(self.before)]
+            else:
+                fpmut_ref = extract_circular(ref_genome, self.pos-200+fp_offset, self.pos+fp_offset)+ref_genome[self.pos+fp_offset+len(self.before)]
+            
+            fpmut = make_primer(fpmut_ref, temp, len(fpmut_ref)-3, len(fpmut_ref), salt_c, primer_c, 200)
+            #If primers are identical, shift one nt.
+            fp_offset += 1
+        
+        
+        #Adjust offset for reverse primers if needed.
+        if len(self.after) > len(self.before):
+            tot_offset -= 1
+            
+        avg_fp_len = int(float(len(fpwt[0])+len(fpmut[0]))/2)
+        primers = {"fpwt": fpwt, "fpmut": fpmut}
         lengths = [lengths] if type(lengths) is int else lengths
         for l in lengths:
-            if l < 0:
-                st = self.pos + len(self.before) + l
-                pr = make_primer(ref_genome, temp, st, st+3, salt_c, primer_c, 200)
-            else:
-                ref = extract_circular(ref_genome, self.pos+l-200, self.pos+l)
-                ref = reverse_complement(ref)
-                pr = make_primer(ref, temp, 0, 3, salt_c, primer_c, 200)
+            ref = extract_circular(ref_genome, self.pos-avg_fp_len+tot_offset, self.pos-avg_fp_len+l+tot_offset)
+            ref = reverse_complement(ref)
+            pr = make_rev_primer(ref, temp, 0, 3, salt_c, primer_c, 200)
 
             primers[l] = pr
 
