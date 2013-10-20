@@ -102,6 +102,7 @@ class ViennaRNA:
         self.RNACOFOLD  = os.path.join(prefix, "RNAcofold")
         self.RNASUBOPT  = os.path.join(prefix, "RNAsubopt")
         self.RNAEVAL    = os.path.join(prefix, "RNAeval")
+        self.RNADUPLEX  = os.path.join(prefix, "RNAduplex")
 
         self.versions = list()
         #Try native version
@@ -200,6 +201,34 @@ class ViennaRNA:
         options = self.versionize_kwargs(kwargs)
 
         output = self.run_command([self.RNACOFOLD] + options, seqs)
+        output = output.splitlines()
+
+        if len(output) > 1:
+            return self.output_to_brackets_and_dG(output[1])
+        else:
+            return None, None
+
+
+    def duplex(self, seqs, d=1):
+        """RNAcofold"""
+        try:
+            seqs = seqs.split("&")
+        except AttributeError:
+            pass
+
+        if len(seqs) != 2:
+            raise Exception('Duplexfold can only fold 2 sequences')
+
+        if self.version == "native":
+            self.RNA.cvar.dangles   = d
+            f = self.RNA.duplexfold(*seqs)
+            return f.structure,f.energy
+
+        kwargs = {"noPS": True, "d": d}
+
+        options = self.versionize_kwargs(kwargs)
+
+        output = self.run_command([self.RNADUPLEX] + options, '\n'.join(seqs))
         output = output.splitlines()
 
         if len(output) > 1:
