@@ -74,14 +74,15 @@ class FindMutation(BaseOperation):
             upstream, after, before, downstream = [reverse_complement(e) for e in self.mut][::-1]
             orig = (upstream + before + downstream).upper()
             count = seq.count(orig)
+            offset = len(upstream)
             rev_com = True
             log.info(str(self) + ' \'{}\' not found in sequence. Trying reverse complement'.format(self.options['mutation']))
             if count == 0:
-                log.error(str(self) + ' \'{}\[{}->{}\]{}\' not found in sequence.'.format(upstream, before, after, downstream))
+                log.error(str(self) + ' Mutation not found in sequence.'.format(upstream, before, after, downstream))
                 return None
         if count > 1:
             if rev_com:
-                log.error(str(self) + ' Ambiguous mutation. \'{}\[{}->{}\]{}\' found more than once.'.format(upstream, before, after, downstream))
+                log.error(str(self) + ' Ambiguous mutation. \'{}[{}->{}]{}\' found more than once.'.format(upstream, before, after, downstream))
             else:
                 log.error(str(self) + ' Ambiguous mutation. \'{}\' found more than once.'.format(self.options['mutation']))
             return None
