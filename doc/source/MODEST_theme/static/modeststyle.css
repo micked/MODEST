@@ -1,0 +1,191 @@
+body, html{
+    background: #eee;
+    margin: 0;
+    padding: 0;
+    font: 1em/1.2 'Georgia', serif;
+    color: #444;
+}
+
+#master{
+    //width: 800px;
+    //margin: 0 30px 30px 30px;
+    //margin-bottom: 30px;
+    //max-width: 800px;
+}
+
+h1, h2{
+    font-family: sans-serif;
+    //clear:both;
+}
+
+h2{
+    margin-top: 90px;
+    font-weight: normal;
+}
+
+a{
+    text-decoration:none;
+    color: #4f813c;
+}
+
+a:hover{
+    color: #9fd15c;
+}
+
+#header{
+    padding: 10px 20px;
+    background: #9fd15c;
+    color: #222;
+}
+
+#header h1{
+    margin: 0 0 5px 0;
+    padding: 0;
+    font-size: 40px;
+}
+
+#header a{
+    color: #222;
+    display:block;
+    height:100%;
+}
+
+#main-wrapper{
+    background-color: #eee;
+    float: left;
+    margin-left: 400px;
+}
+
+#main{
+    float: left;
+    padding: 0 20px 20px 20px;
+}
+
+#sidebar-wrapper{
+    float: left;
+    background-color: #ccc;
+}
+
+#sidebar{
+    float: left;
+    width: 360px;
+    //background-color:#ccc;
+    margin-left: -400px;
+    padding: 0 20px 20px 20px;
+}
+
+#footer{
+    clear:both;
+    text-align:right;
+    background-color:#9fd15c;
+    padding:4px;
+}
+#messages div{
+    padding: 3px;
+}
+
+#messages .error{
+    background-color: #900;
+    color: #fff;
+}
+
+#messages .message{
+    background-color: #090;
+    color: #fff;
+}
+
+label{
+    display: block;
+    float:left;
+    width: 450px;
+    font-style: italic;
+    font-size: 0.8em;
+}
+
+input.nml_field{
+    width: 300px;
+}
+
+textarea{
+    width: 100%;
+    height: 10em;
+}
+
+.literal, .literal-block{
+    font-family: "Courier new", monospace;
+    font-size: small;
+}
+
+ul.simple{
+    margin-left: 0;
+    padding-left: 1em;
+}
+
+/* =====
+
+Sphinx
+
+===== */
+
+div.related{
+    background-color: #fff;
+    margin: 0;
+    padding: 0;
+    clear: both;
+}
+div.related h3{display: none;}
+div.related ul{
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+div.related ul li{
+    padding: 3px;
+}
+
+.right{float: right;}
+.topless{margin-top: 0}
+
+.section h2{margin-top: 1.5em;}
+.section pre{margin-left: 1em}
+
+.sphinxsidebarwrapper h3{margin: 0.5em 0.1em 0.2em 0.1em}
+.sphinxsidebarwrapper h4{margin: 0.5em 0.1em 0.2em 0.1em}
+
+#sidebar{
+    width: 260px;
+    margin-left: -280px;
+    padding: 0 10px 20px 10px;
+    font-size: small;
+}
+
+#sidebar ul{
+    padding-left: 1em;
+}
+
+#main-wrapper{
+    margin-left: 280px;
+}
+
+ul.search{
+    margin: 0;
+    padding: 0;
+}
+ul.search .context{
+    margin: 0 10px 10px 20px;
+    color: #aaa;
+}
+
+ul.search .context .highlighted{
+    background-color: #ff0;
+}
+
+.contents ul{list-style: none;}
+.contents ul.simple{padding: 0;}
+.contents{
+    background-color: #fff;
+    float: right;
+    padding: 0 20px;
+    margin: 0 0 20px 20px;
+    border: 1px solid #000;
+}

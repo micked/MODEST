@@ -1,0 +1,34 @@
+{%- extends "basic/layout.html" -%}
+
+{%- block doctype -%}
+<!doctype html>
+{%- endblock %}
+
+{% set html_show_sourcelink=False %}
+
+{% block header %}
+<div id="header"><a href="/"><h1>MODEST</h1>Mage Oligo Design Tool</a></div>
+{%- endblock %}
+
+{%- block content %}
+<div id="master">
+
+  <div id="sidebar-wrapper">
+      <div id="main-wrapper">
+        <div id="sidebar">{% block sidebar1 %}{{ sidebar() }}{%endblock%}</div>
+        <div id="main">{% block body %}{%endblock%}</div>
+    </div>
+  </div>
+
+{%- endblock %}
+
+{%- block relbar2 %}{% endblock %}
+
+{%- block footer %}
+    <div id="footer">
+      {%- if show_sphinx -%}
+        {% trans sphinx_version=sphinx_version|e %}Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> {{ sphinx_version }}{% endtrans %}
+      {%- endif -%}
+    </div>
+    </div>
+{%- endblock %}
