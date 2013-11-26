@@ -108,7 +108,7 @@ def oplist_to_raw_adjlist(oplist, output_file=None):
 
 def seqIO_to_genelist(genome, config, include_genes=None, include_genome=False,
                       exclude_genes=None, leader_len=rc.CONF["leader_length"],
-                      promoter_len=rc.CONF["promoter_length"]):
+                      promoter_len=rc.CONF["promoter_length"], only_ltag=False):
     """TODO"""
 
     genes = dict()
@@ -205,10 +205,13 @@ def seqIO_to_genelist(genome, config, include_genes=None, include_genome=False,
                 gene.locus_tag = locus_tag
                 gene.in_operon = in_operon is not None
 
-                genes[name] = gene
-                #Mixing genes and locus_tags are ok
-                #If no include_genes are supplied, duplicate all genes
-                if not include_genes or locus_tag in include_genes:
+                if not only_ltag:
+                    genes[name] = gene
+                    #Mixing genes and locus_tags are ok
+                    #If no include_genes are supplied, duplicate all genes
+                    if not include_genes or locus_tag in include_genes:
+                        genes[locus_tag] = gene
+                else:
                     genes[locus_tag] = gene
 
     if include_genome:

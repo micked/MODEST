@@ -184,6 +184,10 @@ class TestMageTool(unittest.TestCase):
                                "b0006", "b0005", "b0007", "b0008", "fakF",
                                "fakG"], self.genes)
 
+        genes = seqIO_to_genelist(self.genome, self.config, only_ltag=True)
+        self.assertItemsEqual(["b0001", "b0002", "b0003", "b0004", "b0010",
+                               "b0006", "b0005", "b0007", "b0008"], genes)
+
         #Instantiation with a genelist and genome
         genes = seqIO_to_genelist(self.genome, self.config, ("fakA"), True)
         self.assertItemsEqual(genes, ["fakA", "genome"])
