@@ -377,7 +377,11 @@ class ResidueMutation(BaseOperation):
                 m = m.groups()
                 if not m[2]:
                     gene_pos = (int(m[1])-1)*3
-                    expected_codon = self.config["codon_table"][self.gene.cds[gene_pos:gene_pos+3]]
+                    try:
+                        codon_table = self.config['codon_table']
+                    except KeyError:
+                        codon_table = default_codon_table
+                    expected_codon = codon_table[self.gene.cds[gene_pos:gene_pos+3]]
                     if str(m[0]) != str(expected_codon):
                         self.error('Invalid residue mutation: {}. Old Residue: {} does not match {} found in cds'.format(mut, m[0], expected_codon))
 
