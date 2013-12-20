@@ -11,6 +11,7 @@ import logging
 import argparse
 import os.path
 import sys
+import re
 
 from Bio import SeqIO
 
@@ -64,6 +65,7 @@ if __name__ == '__main__':
     parser.add_argument("--MASC", help="Design MASC PCR primers to file", default=False, nargs="?", metavar="mascfile")
     parser.add_argument("--PDF", help="Output report PDF", default=False, nargs="?", metavar="pdffile")
     parser.add_argument("--CSV", help="Output oligos in csv format", default=False, nargs="?", metavar="csvfile")
+    parser.add_argument("--HTML", help="Output report HTML", default=False, nargs="?", metavar="htmlfile")
     parser.add_argument("--operations", help="Display registered operations and exit", action=ListOperations, nargs=0)
     args = parser.parse_args()
 
@@ -199,12 +201,20 @@ if __name__ == '__main__':
     else:
         csvlist = oligolist_to_csv(oligos)
 
+    if args.PDF or args.PDF is None or args.HTML or args.HTML is None:
+        report = OligoLibraryReport(args.project)
+        report.parse_and_generate(csvlist, csv_file=False)
+
     if args.PDF or args.PDF is None:
         output_pdf = args.project + ".pdf" if not args.PDF else args.PDF
         log.modestprint("Writing report PDF to {}..".format(output_pdf))
-        report = OligoLibraryReport(args.project)
-        report.parse_and_generate(csvlist, csv_file=False)
         report.write_pdf(output_pdf)
+
+    if args.HTML or args.HTML is None:
+        output_html = args.project if not args.HTML else args.HTML
+        output_html = re.sub(r'\.html$', '', output_html, flags=re.IGNORECASE)
+        log.modestprint("Writing report PDF to {}.html..".format(output_html))
+        report.write_html(output_html)
 
     if args.MASC or args.MASC is None:
         mascfile = args.MASC if args.MASC else args.project + "_masc_primers.csv"

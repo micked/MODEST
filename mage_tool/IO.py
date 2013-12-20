@@ -743,7 +743,8 @@ class OligoLibraryReport:
         if "RBS_library" not in self.oplib:
             return
 
-        elements = [("p", "Ribosome binding sites libraries.")]
+        elements = [("p", "The following graphs is an overview over the designed ribosome binding sites libraries."),
+                    ('p', 'Each gene is depicted with the wildtype expression level (light green), the extent of the library (dark green) and each oligo in the library as gray arrows.')]
 
         bar_width = 0.3
         #sort by altered
@@ -824,7 +825,7 @@ class OligoLibraryReport:
 
             imgdata_png = StringIO()
             imgdata_pdf = StringIO()
-            fig.savefig(imgdata_png, format="PNG", dpi=300)
+            fig.savefig(imgdata_png, format="PNG", dpi=300, transparent=True)
             fig.savefig(imgdata_pdf, format="PDF")
             imgdata_png.seek(0)
             imgdata_pdf.seek(0)
@@ -876,6 +877,42 @@ class OligoLibraryReport:
                     elements.append(img)
 
         doc.build(elements)
+
+    def write_html(self, htmlbase):
+        """Write a HTML report."""
+        title = 'Project report: ' + self.project
+        image_dir = htmlbase + '_images'
+        output = list()
+        for h in sorted(self.sections):
+            header = h.lstrip("0123456789 ")
+            output.append('<h2>{}</h2>'.format(header))
+
+            e = self.sections[h]
+            #Image counter
+            imgc = 0
+            for t in e:
+                if t[0] == "p":
+                    output.append('<p>{}</p>'.format(t[1]))
+                if t[0] == "png/pdf":
+                    #Set up image dir
+                    if not os.path.exists(image_dir):
+                        os.makedirs(image_dir)
+                    imgc += 1
+                    imgname = 'img{}.png'.format(imgc)
+                    imgsrc = os.path.join(os.path.basename(image_dir), imgname)
+                    with open(os.path.join(image_dir, imgname), 'wb') as fh:
+                        t[1].seek(0)
+                        fh.write(t[1].getvalue())
+                    output.append('<img src="{}" width="800" />'.format(imgsrc))
+
+        with open(htmlbase + '.html', 'w') as fh:
+            fh.write('<!doctype html>\n')
+            fh.write('<html lang="en">\n')
+            fh.write('<head><title>{}</title></head>\n'.format(title))
+            fh.write('<body>\n')
+            fh.write('<h1>{}</h1>'.format(title))
+            fh.write('\n'.join(output))
+            fh.write('</body>\n</html>')
 
     def PdfImage(self):
         """PDF flowable for report lab

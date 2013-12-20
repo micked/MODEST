@@ -177,6 +177,10 @@ class BaseOperation(object):
 
         if count is None:
             count = self.line_id
+
+        if muts:
+            log.info('DONE: ' + str(self))
+
         oligos = list()
         for i, (mut, code, operation, values) in enumerate(muts, 1):
             number = "{:0>4}.{}".format(count, i)
@@ -193,7 +197,7 @@ class BaseOperation(object):
                 oligo.set_custom_id(self.custom_id)
 
             #Add to log
-            log.info(" ".join([operation, ">>", oligo.short_id()]))
+            #log.info(" ".join([operation, ">>", oligo.short_id()]))
             log.info(oligo.id("full"))
 
             #reset barcode counter

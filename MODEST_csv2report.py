@@ -16,16 +16,24 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("csvfile", help="CSV project report")
     parser.add_argument("-o", help="PDF output", default=None)
+    parser.add_argument("--HTML", help="Generate HTML output instead", action='store_true')
     args = parser.parse_args()
 
     if args.o:
         output_pdf = args.o
     else:
-        output_pdf = os.path.splitext(args.csvfile)[0] + ".pdf"
+        output_pdf = os.path.splitext(args.csvfile)[0]
 
-    print("Writing report PDF to {}..".format(output_pdf))
+    if not args.HTML:
+        output_pdf += '.pdf'
+
+    print("Writing report to {}..".format(output_pdf))
+
 
     project = os.path.basename(os.path.splitext(args.csvfile)[0])
     report = OligoLibraryReport(project)
     report.parse_and_generate(args.csvfile, csv_file=True)
-    report.write_pdf(output_pdf)
+    if args.HTML:
+        report.write_html(output_pdf)
+    else:
+        report.write_pdf(output_pdf)
