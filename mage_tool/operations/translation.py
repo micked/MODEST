@@ -167,6 +167,7 @@ def translational_KO(gene, stop_codons=["TAG", "TAA", "TGA"],
 
     mutation = gene.do_mutation(seq.get_mutation())
     mutation._codon_offset = offset + 1
+    mutation._n_muts = n_muts
 
     return mutation
 

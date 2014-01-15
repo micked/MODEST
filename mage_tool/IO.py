@@ -575,7 +575,7 @@ def oligolist_to_tabfile(oligolist, output):
         output = open(output, "w")
         cls = True
 
-    for o in sorted(oligolist, key=lambda x:x.number):
+    for o in oligolist:
         output.write(o.id() + "\t" + o.output() + "\n")
 
     if cls:
@@ -599,7 +599,7 @@ def oligolist_to_csv(oligolist, output=None):
                            str(o.mut), "+".join(o.barcode_ids), o.output(),
                            o.dG_fold] + o.operation_values)
 
-    csvoutlist.sort(key=lambda x: (x[1], x[0]))
+    #csvoutlist.sort(key=lambda x: (x[1], x[0]))
 
     #TODO add additional headers
     headers = ["id", "operation", "gene", "line", "options", "mutation",
@@ -631,19 +631,21 @@ def oligolist_to_mascfile(oligolist, masc_kwargs, mascfile=None):
     Write primers to mascfile in plain text format if mascfile is supplied.
 
     """
-    masc_primers = dict()
+    masc_primers = list()
     #unique oligos
-    un_oligos = list()
+    un_oligos = set()
     for oligo in oligolist:
-        ID = oligo.short_id().split(".")[0]
-        if ID not in un_oligos:
+        ID = oligo.short_id()
+        if str(oligo.oligo) not in un_oligos:
             try:
-                masc_primers[ID] = oligo.mut.MASC_primers(**masc_kwargs)
-                un_oligos.append(ID)
+                prm = oligo.mut.MASC_primers(**masc_kwargs)
+                prm['id'] = ID
+                prm['mut'] = oligo.mut
+                masc_primers.append(prm)
+                un_oligos.add(str(oligo.oligo))
             except Exception as ex:
                 log.warning("Could not create MASC primers for {}/{}: {}".format(ID, oligo.mut, ex))
                 continue
-            masc_primers[ID]["mut"] = oligo.mut
 
     if mascfile:
         cls = False
@@ -660,8 +662,8 @@ def oligolist_to_mascfile(oligolist, masc_kwargs, mascfile=None):
             headers.append(str(l))
         csv_w.writerow(headers)
 
-        for ID in un_oligos:
-            prm = masc_primers[ID]
+        for prm in masc_primers:
+            ID = prm['id']
             line = [ID, prm["mut"].__str__(idx=1)]
             line.append(str(prm["fpwt"][0]))
             line.append(str(prm["fpmut"][0]))
