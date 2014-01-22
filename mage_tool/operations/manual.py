@@ -197,7 +197,7 @@ class Deletion(BaseOperation):
             #Number of nucleotides to delete
             n_nts = int(self.options['delete'])
             #Nucleotides to delete
-            nts = self.gene[pos:pos+n_nts]
+            nts = str(self.gene[pos:pos+n_nts])
         except ValueError:
             nts = self.options['delete']
             n_nts = len(nts)
