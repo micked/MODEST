@@ -202,11 +202,14 @@ class Deletion(BaseOperation):
             nts = self.options['delete']
             n_nts = len(nts)
 
-            #Error Checking
-            found = self.gene[pos:pos+n_nts]
-            if nts != str(found):
-                self.error("Tried to delete '{}', but found '{}' in sequence.".format(nts, found))
-                return
+        #Error Checking
+        if  pos < 0 or pos + n_nts > len(self.gene.cds):
+            self.error('It is not (yet) possible to delete nucleotides beyond gene CDS, use genome deletion instead.')
+            return
+        found = self.gene[pos:pos+n_nts]
+        if nts != str(found):
+            self.error("Tried to delete '{}', but found '{}' in sequence.".format(nts, found))
+            return
 
         self.mut = (nts, '', pos)
 

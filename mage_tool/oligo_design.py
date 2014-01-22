@@ -232,10 +232,12 @@ class Mutation:
         except ValueError:
             raise ValueError("Invalid position: '{}'.".format(pos))
 
+        before = str(before)
+        after  = str(after)
         #Parse and set before sequence
         if len(before) and not valid_dna(before):
             raise ValueError("Invalid 'before' sequence: '{}'.".format(before))
-        self.before = str(before).upper()
+        self.before = before.upper()
         if ref_seq:
             if self.before != str(ref_seq[self.pos:self.pos+len(self.before)]):
                 raise ValueError("Trying to mutate '{}', but found '{}' in reference sequence."
@@ -244,7 +246,7 @@ class Mutation:
         #Parse and set after sequence
         if len(after) and not valid_dgn(after):
             raise ValueError("Invalid 'after' sequence: '{}'.".format(after))
-        self.after = str(after)
+        self.after = after
 
         #Automatically adjust after to all-lower if no lowercase chars are found.
         for n in "atgcrymkswbdhvn":
@@ -266,9 +268,9 @@ class Mutation:
         fpwt = ""
         fpmut = ""
         fp_offset = 0
-        
+
         wtpos = self.pos+len(self.before)
-        
+
         #In loop to shift frame if forward primers are identical.
         while str(fpwt) == str(fpmut):
             #fpwt: forward primer(wt)
@@ -283,11 +285,11 @@ class Mutation:
                     #    fpmut_ref = fpmut_ref + ref_genome[self.pos+len(self.before)]
             else:
                 fpmut_ref = extract_circular(ref_genome, self.pos-200+fp_offset, self.pos+fp_offset)+ref_genome[self.pos+fp_offset+len(self.before)]
-            
+
             fpmut = make_primer(fpmut_ref, temp, len(fpmut_ref)-3, len(fpmut_ref), salt_c, primer_c, 200)
             #If primers are identical, shift one nt.
             fp_offset += 1
-            
+
         avg_fp_len = int(float(len(fpwt[0])+len(fpmut[0]))/2)
         primers = {"fpwt": fpwt, "fpmut": fpmut}
         lengths = [lengths] if type(lengths) is int else lengths
