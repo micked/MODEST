@@ -439,6 +439,8 @@ class Gene:
                 return self.leader[st:] + self.cds[:end]
             elif st >= 0 and end > 0:
                 return self.cds[st:end]
+            elif st == end:
+                return ''
             else:
                 raise ValueError("Invalid tuple for Gene: {}".format(slc))
         else:
