@@ -21,7 +21,7 @@ corresponds to an operation and look as follows::
 
 **Example**: ::
 
-    thiM start_codon_optimal barcodes=ID1+ID2,ID2+ID3
+    thiM start_codon_optimal barcodes=ID1+ID2;ID2+ID3
     yaaA custom_mutation     mut=TATCAACGCC[GCTC=]GCTTTCATGACT,barcodes=ID2       
     thiC translational_KO    KO_frame=10,barcodes=ID1
     thiE RBS_library         barcodes=ID1
@@ -34,8 +34,8 @@ parameter. **Any option after a space will be omitted.**
 Some operations will suppert the ``genome`` "gene" as input, such as ``mutation``,
 ``deletion`` and ``insertion``.
 
-Multiple barcodes are supported, they should be separated by a comma (\ ``,``\
-) or a plus (\ ``+``\ ). Comma separated ID’s give multiple oligos with
+Multiple barcodes are supported, they should be separated by a semicolon (\ ``;``\
+) or a plus (\ ``+``\ ). Semicolon separated ID’s give multiple oligos with
 different barcodes, whereas plus separated ID’s result in multiple barcodes on
 the same oligo.
 
