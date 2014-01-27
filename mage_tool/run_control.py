@@ -11,6 +11,7 @@ import os.path
 
 CONF = {#Oligo options
         "oligo_length": 90,
+        "min_homology": 15,
 
         #Program options
         "processes": None,

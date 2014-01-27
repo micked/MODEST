@@ -51,7 +51,7 @@ class Oligo:
         self.operation_values = list()
 
     def set_oligo(self, genome, optimise=True, threshold=-20):
-        if optimise:
+        if optimise and len(self.mut.after) <= self.oligo_len - 2*rc.CONF['min_homology']:
             self.oligo, self.dG_fold, self.optimised = self.optimise_folding(genome, threshold)
         else:
             self.oligo = self.make_oligo(genome, offset=0)
@@ -59,7 +59,6 @@ class Oligo:
 
     def make_oligo(self, genome, offset=0):
         """Make oligo from mutation"""
-
         #Make sure what is being mutated is actually being mutated
         if str(genome[self.mut.pos:self.mut.pos+len(self.mut.before)]) != str(self.mut.before):
             found = genome[self.mut.pos:self.mut.pos+len(self.mut.before)]
@@ -70,10 +69,15 @@ class Oligo:
             raise Exception("Trying to mutate {}, but found {} in genome. "
                             "{}".format(self.mut.before, found, extended))
 
-        #Calculate flanking sequence lengths
-        post_seq_len = (self.oligo_len - len(self.mut.after))/2
-        pre_seq_len = self.oligo_len - post_seq_len - len(self.mut.after) + offset
-        post_seq_len -= offset
+        #In case an insertion is longer than the oligo size
+        if len(self.mut.after) > self.oligo_len - 2*rc.CONF['min_homology']:
+            post_seq_len = rc.CONF['min_homology']
+            pre_seq_len = rc.CONF['min_homology']
+        else:
+            #Calculate flanking sequence lengths
+            post_seq_len = (self.oligo_len - len(self.mut.after))/2
+            pre_seq_len = self.oligo_len - post_seq_len - len(self.mut.after) + offset
+            post_seq_len -= offset
 
         #Fetch pre sequence
         pre_start = self.mut.pos - pre_seq_len
@@ -100,7 +104,7 @@ class Oligo:
 
         if ViennaRNA.mfe(str(oligo)) < threshold:
             #Offset towards 3'-end
-            three_end_cap = 15
+            three_end_cap = rc.CONF['min_homology']
             end = self.oligo_len/2 - three_end_cap - len(self.mut.after)/2
             for i in range(1, end):
                 candidate = self.make_oligo(genome, offset=i)
@@ -111,7 +115,7 @@ class Oligo:
 
             #We are still below threshold. Panic, then offset towards 5'-end
             if optimised_oligo[1] < threshold:
-                five_end_cap = 15
+                five_end_cap = rc.CONF['min_homology']
                 start = -self.oligo_len/2 + five_end_cap + len(self.mut.after)/2
                 for i in range(start, 0):
                     candidate = self.make_oligo(genome, offset=i)

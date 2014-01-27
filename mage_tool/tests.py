@@ -21,6 +21,7 @@ from mage_tool.IO import create_config_cdntables
 from mage_tool.IO import create_config_tables
 from mage_tool.operations import manual
 from mage_tool.operations import translation
+import mage_tool.run_control as rc
 
 
 genome = """LOCUS       FK_000001               1080 bp    DNA              BCT 11-JAN-2012
@@ -297,6 +298,7 @@ class TestMageTool(unittest.TestCase):
 
     def test_create_oligo(self):
         #RP1, inside genome
+        rc.CONF['min_homology'] = 0
         mut1 = oligo_design.Mutation("T", "a", 86, self.genome.seq)
         oligo1 = oligo_design.Oligo(mut1, "noGene", oligo_len=30)
         oligo1.set_oligo(self.genome.seq, optimise=False)
@@ -343,6 +345,13 @@ class TestMageTool(unittest.TestCase):
         #RP2
         oligo2.target_lagging_strand(ori, ter)
         self.assertEqual(str(oligo2.output()), "GGTGCTTGGACGCAAaGGTTCCGACTACTC")
+
+        #Long insertion
+        rc.CONF['min_homology'] = 15
+        mut1 = oligo_design.Mutation("", "atgctgtagact", 86, self.genome.seq)
+        oligo1 = oligo_design.Oligo(mut1, "noGene", oligo_len=30)
+        oligo1.set_oligo(self.genome.seq, optimise=False)
+        self.assertEqual(str(oligo1.output()), "TCTGAACTGGTTACCatgctgtagactTGCCGTGAGTAAATT")
 
     def test_MASC(self):
         mut1 = oligo_design.Mutation("TAG", "C", 200, self.genome.seq)
