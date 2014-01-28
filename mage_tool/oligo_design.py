@@ -71,8 +71,8 @@ class Oligo:
 
         #In case an insertion is longer than the oligo size
         if len(self.mut.after) > self.oligo_len - 2*rc.CONF['min_homology']:
-            post_seq_len = rc.CONF['min_homology']
-            pre_seq_len = rc.CONF['min_homology']
+            post_seq_len = rc.CONF['long_homology']
+            pre_seq_len = rc.CONF['long_homology']
         else:
             #Calculate flanking sequence lengths
             post_seq_len = (self.oligo_len - len(self.mut.after))/2
