@@ -8,7 +8,6 @@ Contents:
 
    modest_general
    modest_online
-   modest_cmd
    operations
    genome_config
    barcoding_libraries
