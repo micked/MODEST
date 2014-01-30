@@ -361,7 +361,7 @@ class ResidueMutation(BaseOperation):
         thiD residue_mutation mut=N5Q
         #substitue N with Q at residue 5 in thiD.
 
-    Amino acid sequence before is MKRINALTIA, and after insertion it is MKRIQALTIA.
+    Amino acid sequence before is MKRINALTIA, and after substitution it is MKRIQALTIA.
 
     """
 
