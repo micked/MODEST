@@ -348,10 +348,11 @@ class TestMageTool(unittest.TestCase):
 
         #Long insertion
         rc.CONF['min_homology'] = 15
+        rc.CONF['long_homology'] = 14
         mut1 = oligo_design.Mutation("", "atgctgtagact", 86, self.genome.seq)
         oligo1 = oligo_design.Oligo(mut1, "noGene", oligo_len=30)
         oligo1.set_oligo(self.genome.seq, optimise=False)
-        self.assertEqual(str(oligo1.output()), "TCTGAACTGGTTACCatgctgtagactTGCCGTGAGTAAATT")
+        self.assertEqual(str(oligo1.output()), "CTGAACTGGTTACCatgctgtagactTGCCGTGAGTAAAT")
 
     def test_MASC(self):
         mut1 = oligo_design.Mutation("TAG", "C", 200, self.genome.seq)
