@@ -333,7 +333,7 @@ class Mutation:
     @classmethod
     def parse(cls, mut):
         """Parse and return a mutation from string format."""
-        r=re.match(r'^\[(\w+)->(\w+)\]\.(\d+)$', mut)
+        r=re.match(r'^\[(\w*)->(\w*)\]\.(\d+)$', mut)
         if r:
             before,after,pos = r.groups()
             pos=int(pos)
