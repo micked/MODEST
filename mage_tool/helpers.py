@@ -410,7 +410,7 @@ def make_primer(ref_seq, temp, start, end, salt_c=0.05, primer_c=5e-8, max_len=2
         raise Exception("Target temp ({}) not reached for forward primer. "
                         "(Reached: {})".format(temp, Tm))
     return pr, Tm
-    
+
 
 def make_rev_primer(ref_seq, temp, start, end, salt_c=0.05, primer_c=5e-8, max_len=200):
     """Extract a primer from ref_seq with Tm of temp."""
@@ -426,12 +426,14 @@ def make_rev_primer(ref_seq, temp, start, end, salt_c=0.05, primer_c=5e-8, max_l
                         "(Reached: {})".format(temp, Tm))
     return pr, Tm
 
+
 def is_number(s):
     try:
         float(s)
         return True
     except ValueError:
         return False
+
 
 if __name__ == "__main__":
     import doctest
