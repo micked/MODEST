@@ -331,13 +331,13 @@ class Mutation:
         return deepcopy(self)
 
     @classmethod
-    def parse(cls, mut):
+    def parse(cls, mut, idx0, ref_seq):
         """Parse and return a mutation from string format."""
         r=re.match(r'^\[(\w*)->(\w*)\]\.(\d+)$', mut)
         if r:
             before,after,pos = r.groups()
-            pos=int(pos)
-            return cls(before, after, pos)
+            pos=int(pos)-idx0
+            return cls(before, after, pos, ref_seq)
         raise ValueError('Invalid mutation format: \'{}\''.format(mut))
 
 
