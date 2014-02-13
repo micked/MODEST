@@ -3,3 +3,4 @@ src/*
 *~
 doc/build/*
 *.swp
+mage_tool.egg-info
