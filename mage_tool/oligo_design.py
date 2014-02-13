@@ -5,6 +5,7 @@ Module for designing DNA oligos from mutation objects
 
 from __future__ import print_function
 
+import re
 import random
 import logging
 from copy import deepcopy
@@ -328,6 +329,16 @@ class Mutation:
     def copy(self):
         """Return a copy"""
         return deepcopy(self)
+
+    @classmethod
+    def parse(cls, mut):
+        """Parse and return a mutation from string format."""
+        r=re.match(r'^\[(\w*)->(\w*)\]\.(\d+)$', mut)
+        if r:
+            before,after,pos = r.groups()
+            pos=int(pos)
+            return cls(before, after, pos)
+        raise ValueError('Invalid mutation format: \'{}\''.format(mut))
 
 
 class Gene:
