@@ -363,6 +363,24 @@ class ResidueMutation(BaseOperation):
 
     Amino acid sequence before is MKRINALTIA, and after substitution it is MKRIQALTIA.
 
+    Deletions are denoted with a ``*``::
+
+        thiD residue_mutation mut=N5*
+
+    Insertions are denoted as a star followed by an insertion number, lower-case
+    suffix letter and then the inserted amino acid::
+
+        thiD residue_mutation mut=*5aA
+        #insert alanine in thiD after position 5.
+
+        thiD residue_mutation mut=*5aA;*5bA
+        #insert two alanines in thiD after position 5.
+
+    The symbol for stop codons is $::
+
+        thiD residue_mutation mut=N5$
+        #substitue N with a stop codon at residue 5 in thiD.
+
     """
 
     default_options = {"mutation": (str, None)}
