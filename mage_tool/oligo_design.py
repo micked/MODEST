@@ -289,6 +289,8 @@ class Mutation:
             #If primers are identical, shift one nt.
             if not self._invalid_MASC_primers(ref_genome, mut_genome, fpwt[0], fpmut[0]):
                 break
+        else:
+            raise Exception('Algorithm failed. Possibly because of direct repeats.')
 
         wtpos = self.pos+len(self.before)
         primers = {"fpwt": fpwt, "fpmut": fpmut}
