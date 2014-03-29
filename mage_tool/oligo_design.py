@@ -272,32 +272,29 @@ class Mutation:
             raise Exception("Only strictly valid DNA (ATGC) can make MASC primers.")
         if self.before.upper() == self.after.upper():
             raise Exception('Mutation is not a mutation (identical before and after).')
-        fpwt = ""
-        fpmut = ""
-        fp_offset = 0
-        limit = max(25, len(self.before), len(self.after)) * 2
 
-        wtpos  = self.pos+len(self.before)
-        mutpos = self.pos+len(self.after)
+        #Maximum iterations
+        limit = max(25, len(self.before), len(self.after)) * 2
 
         #Reference and mutated genome
         ref_genome = str(ref_genome)
         mut_genome = self.get_mutated(ref_genome)
 
         #In loop to shift frame if forward primers are identical.
-        while not fpwt or self._invalid_MASC_primers(ref_genome, mut_genome, fpwt[0], fpmut[0]):
+        for offset in range(limit):
             #fpwt: forward primer(wt)
-            fpwt = make_primer(ref_genome, temp, wtpos-3+fp_offset, wtpos+fp_offset, salt_c, primer_c, 200)
+            fpwt = make_primer(ref_genome, temp, self.pos-3+offset, self.pos+offset, salt_c, primer_c, 200)
             #fpmut: forward primer(mut)
-            fpmut = make_primer(mut_genome, temp, mutpos-3+fp_offset, mutpos+fp_offset, salt_c, primer_c, 200)
+            fpmut = make_primer(mut_genome, temp, self.pos-3+offset, self.pos+offset, salt_c, primer_c, 200)
             #If primers are identical, shift one nt.
-            fp_offset += 1
-            #Timeout
-            if fp_offset > limit:
-                raise Exception('Unknown error or algorithm failure.')
+            if not self._invalid_MASC_primers(ref_genome, mut_genome, fpwt[0], fpmut[0]):
+                break
 
-        avg_fp_len = int(float(len(fpwt[0])+len(fpmut[0]))/2)
+        wtpos = self.pos+len(self.before)
         primers = {"fpwt": fpwt, "fpmut": fpmut}
+        #Average forward primer length
+        avg_fp_len = int(float(len(fpwt[0])+len(fpmut[0]))/2)
+        #Type lengths to a list
         lengths = [lengths] if type(lengths) is int else lengths
         for l in lengths:
             ref = extract_circular(ref_genome, wtpos-1-avg_fp_len, wtpos-1-avg_fp_len+l)
