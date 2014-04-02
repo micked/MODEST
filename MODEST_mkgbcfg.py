@@ -13,7 +13,6 @@ from urllib2 import HTTPError
 import yaml
 from Bio import Entrez
 from Bio import SeqIO
-#Entrez.email = 'sch@ntz.nu'
 
 from mage_tool.IO import make_genomeconfig
 from mage_tool.IO import load_config_file
@@ -29,6 +28,7 @@ def int_or_region(val):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument('email', help='Email for accessing nuccore')
     gb_group = parser.add_mutually_exclusive_group(required=True)
     gb_group.add_argument('--gb', help='GenBank genome file', type=argparse.FileType('U'))
     gb_group.add_argument('--nc', help='NCBI Genbank identifier to automatically fetch genome online.')
@@ -36,6 +36,8 @@ if __name__ == "__main__":
     parser.add_argument('-t', help='Termination of replication. Region or integer.', default=None, type=int_or_region)
     parser.add_argument('--output', help='Output dir or filename. Defaults to location of genome, current dir if genome is downloaded.', default=None)
     args = parser.parse_args()
+
+    Entrez.email = args.email
 
     #In current working directory
     if args.output is None:
