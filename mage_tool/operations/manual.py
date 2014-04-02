@@ -379,7 +379,8 @@ class ResidueMutation(BaseOperation):
     The symbol for stop codons is $::
 
         thiD residue_mutation mut=N5$
-        #substitue N with a stop codon at residue 5 in thiD.
+        #substitue N with a stop codon at
+        #residue 5 in thiD.
 
     """
 
