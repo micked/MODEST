@@ -357,25 +357,39 @@ class TestMageTool(unittest.TestCase):
     def test_MASC(self):
         mut1 = oligo_design.Mutation("TAG", "C", 200, self.genome.seq)
         prm = mut1.MASC_primers(self.genome.seq, lengths=[100,150,200], temp=30.0)
-        self.assertEqual(str(prm["fpwt"][0]), "GAAACGCATTAG")
+        self.assertEqual(str(prm["fpwt"][0]),  "TGAAACGCATT")
         self.assertEqual(str(prm["fpmut"][0]), "TGAAACGCATC")
         self.assertEqual(str(prm[100][0]), "TCAGGTGCGG")
         self.assertEqual(str(prm[150][0]), "CGCATGGTTG")
         self.assertEqual(str(prm[200][0]), "GCAGAAAACGT")
+
         mut2 = oligo_design.Mutation("TAG", "", 200, self.genome.seq)
         prm = mut2.MASC_primers(self.genome.seq, lengths=[100], temp=30.0)
-        self.assertEqual(str(prm["fpwt"][0]), "GAAACGCATTAG")
+        self.assertEqual(str(prm["fpwt"][0]),  "TGAAACGCATT")
         self.assertEqual(str(prm["fpmut"][0]), "TGAAACGCATC")
+
         mut3 = oligo_design.Mutation("T", "", 199, self.genome.seq)
         prm = mut3.MASC_primers(self.genome.seq, lengths=[100], temp=30.0)
-        self.assertEqual(str(prm["fpwt"][0]), "TGAAACGCATT")
+        self.assertEqual(str(prm["fpwt"][0]),   "TGAAACGCATT")
         self.assertEqual(str(prm["fpmut"][0]), "ATGAAACGCATA")
-        mut4 = oligo_design.Mutation("TAG", "TAGCCCCCC", 200, self.genome.seq)
-        prm = mut4.MASC_primers(self.genome.seq, lengths=[100, 150], temp=30.0)
-        self.assertEqual(str(prm["fpwt"][0]), "GAAACGCATTAG")
-        self.assertEqual(str(prm["fpmut"][0]), "TTAGCCCCCC")
-        self.assertEqual(str(prm[100][0]), "TCAGGTGCGG")
-        self.assertEqual(str(prm[150][0]), "CGCATGGTTG")
+
+        mut4 = oligo_design.Mutation("TAG", "TAGcccccc", 200, self.genome.seq)
+        prm = mut4.MASC_primers(self.genome.seq, lengths=[100, 150], temp=58.0)
+        self.assertEqual(str(prm["fpwt"][0]), "CACAACATCCATGAAACGCATTAGCA")
+        self.assertEqual(str(prm["fpmut"][0]), "ACAACATCCATGAAACGCATTAGCC")
+        self.assertEqual(str(prm[100][0]), "TTTTCTGTGTTTCCTGTACGCGTCA")
+        self.assertEqual(str(prm[150][0]), "CTCGTTACCTTTGGTCGAAAAAAAAAGCC")
+
+        mut5 = oligo_design.Mutation('', 'AAAAAA', 274, self.genome.seq)
+        prm = mut5.MASC_primers(self.genome.seq, lengths=[200], temp=58.0)
+        #print(prm['fpwt'][0], prm["fpmut"][0])
+        self.assertEqual(str(prm["fpwt"][0]),  "ACGCGTACAGGAAACACAGAAAAAAG")
+        self.assertEqual(str(prm["fpmut"][0]), "ACGCGTACAGGAAACACAGAAAAAAA")
+
+        #Long direct repeat
+        mut6 = oligo_design.Mutation('', 'ACGCGTACAGGAAACACAGAAAAAAGCCCGCACCTGACAGTGCG', 254, self.genome.seq)
+        with self.assertRaises(Exception):
+            prm = mut6.MASC_primers(self.genome.seq, lengths=[200], temp=58.0)
 
     def test_KO(self):
         mut1 = translation.translational_KO(self.genes["fakA"])

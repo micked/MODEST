@@ -270,33 +270,33 @@ class Mutation:
         """
         if self.after and not valid_dna(self.after):
             raise Exception("Only strictly valid DNA (ATGC) can make MASC primers.")
-        fpwt = ""
-        fpmut = ""
-        fp_offset = 0
+        if self.before.upper() == self.after.upper():
+            raise Exception('Mutation is not a mutation (identical before and after).')
 
-        wtpos = self.pos+len(self.before)
+        #Maximum iterations
+        limit = max(25, len(self.before), len(self.after)) * 2
+
+        #Reference and mutated genome
+        ref_genome = str(ref_genome)
+        mut_genome = self.get_mutated(ref_genome)
 
         #In loop to shift frame if forward primers are identical.
-        while str(fpwt) == str(fpmut):
+        for offset in range(limit):
             #fpwt: forward primer(wt)
-            fpwt = make_primer(ref_genome, temp, wtpos-3+fp_offset, wtpos+fp_offset, salt_c, primer_c, 200)
+            fpwt = make_primer(ref_genome, temp, self.pos-3+offset, self.pos+offset, salt_c, primer_c, 200)
             #fpmut: forward primer(mut)
-            if self.after:
-                if fp_offset > 0:
-                    fpmut_ref = extract_circular(ref_genome, self.pos-200, self.pos)+self.after.upper()+extract_circular(ref_genome, self.pos, self.pos+fp_offset)
-                else:
-                    fpmut_ref = extract_circular(ref_genome, self.pos-200, self.pos)+self.after.upper()
-                    #if len(self.after) > len(self.before):
-                    #    fpmut_ref = fpmut_ref + ref_genome[self.pos+len(self.before)]
-            else:
-                fpmut_ref = extract_circular(ref_genome, self.pos-200+fp_offset, self.pos+fp_offset)+ref_genome[self.pos+fp_offset+len(self.before)]
-
-            fpmut = make_primer(fpmut_ref, temp, len(fpmut_ref)-3, len(fpmut_ref), salt_c, primer_c, 200)
+            fpmut = make_primer(mut_genome, temp, self.pos-3+offset, self.pos+offset, salt_c, primer_c, 200)
             #If primers are identical, shift one nt.
-            fp_offset += 1
+            if not self._invalid_MASC_primers(ref_genome, mut_genome, fpwt[0], fpmut[0]):
+                break
+        else:
+            raise Exception('Algorithm failed. Possibly because of direct repeats.')
 
-        avg_fp_len = int(float(len(fpwt[0])+len(fpmut[0]))/2)
+        wtpos = self.pos+len(self.before)
         primers = {"fpwt": fpwt, "fpmut": fpmut}
+        #Average forward primer length
+        avg_fp_len = int(float(len(fpwt[0])+len(fpmut[0]))/2)
+        #Type lengths to a list
         lengths = [lengths] if type(lengths) is int else lengths
         for l in lengths:
             ref = extract_circular(ref_genome, wtpos-1-avg_fp_len, wtpos-1-avg_fp_len+l)
@@ -306,6 +306,58 @@ class Mutation:
             primers[l] = pr
 
         return primers
+
+    def _invalid_MASC_primers(self, ref_genome, mut_genome, wt_primer, mut_primer):
+        """Test whether the two primers can differentiate between mut and wt.
+
+            >>> seq = 'ATCGATCG'
+            >>> mut = Mutation('AT','TG', 4, seq)
+            >>> mutated = mut.get_mutated(seq)
+            >>> mut._invalid_MASC_primers(seq, mutated, 'TCGA', 'ATCG')
+            1
+            >>> mut._invalid_MASC_primers(seq, mutated, 'CGTG', 'XXXX')
+            2
+            >>> mut._invalid_MASC_primers(seq, mutated, 'GGGG', 'TCGC')
+            3
+            >>> mut._invalid_MASC_primers(seq, mutated, 'TCGA', 'GGGG')
+            4
+            >>> mut._invalid_MASC_primers(seq, mutated, 'TCGA', 'TCGT')
+            0
+
+        """
+        if mut_primer in ref_genome:
+            return 1
+            raise Exception('Located mut_primer on wt sequence')
+        if wt_primer in mut_genome:
+            return 2
+            raise Exception('Located wt_primer on mut sequence')
+        if wt_primer not in ref_genome:
+            return 3
+            raise Exception('Unable to locate wt_primer on wt sequence')
+        if mut_primer not in mut_genome:
+            return 4
+            raise Exception('Unable to locate mut_primer on mut sequence')
+        #Exit code OK
+        return 0
+
+    def get_mutated(self, ref_genome):
+        """Get the mutated sequence.
+
+        >>> seq = 'ATCGATCG'
+        >>> mut = Mutation('AT','TG', 4, seq)
+        >>> mut.get_mutated(seq)
+        'ATCGTGCG'
+        >>> mut = Mutation('AT','', 4, seq)
+        >>> mut.get_mutated(seq)
+        'ATCGCG'
+        >>> mut = Mutation('','TG', 4, seq)
+        >>> mut.get_mutated(seq)
+        'ATCGTGATCG'
+
+        """
+        mut_genome = bytearray(str(ref_genome))
+        mut_genome[self.pos:self.pos+len(self.before)] = bytearray(str(self.after.upper()))
+        return str(mut_genome)
 
     def __repr__(self):
         return "Mutation: [{}->{}] at pos {}".format(
