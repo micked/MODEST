@@ -185,7 +185,7 @@ class BaseOperation(object):
         for i, (mut, code, operation, values) in enumerate(muts, 1):
             number = "{:0>4}.{}".format(count, i)
             oligo = Oligo(mut, gene, project, number, oligo_len=rc.CONF["oligo_length"])
-            oligo.set_oligo(genome, optimise=True, threshold=-20.0)
+            oligo.set_oligo(genome, optimise=rc.CONF["opt_folding"], threshold=rc.CONF["opt_threshold"])
             oligo.target_lagging_strand(config["replication"]["ori"], config["replication"]["ter"])
 
             #Back tracing

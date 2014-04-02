@@ -13,6 +13,9 @@ CONF = {#Oligo options
         "oligo_length": 90,
         "min_homology": 15,
         "long_homology": 50,
+        #Enable folding optimization
+        "opt_folding": True,
+        "opt_threshold": -20.0, #KCal/mol
 
         #Program options
         "processes": None,
