@@ -14,8 +14,7 @@ import yaml
 from Bio import Entrez
 from Bio import SeqIO
 
-from mage_tool.IO import make_genomeconfig
-from mage_tool.IO import load_config_file
+import mage_tool.IO
 
 
 def int_or_region(val):
@@ -83,7 +82,8 @@ if __name__ == "__main__":
     print('Genome file:       ', gb_filename)
     print('Genome config file:', gbcfg_filename)
 
-    gbcfg = make_genomeconfig(args.o, args.t, genome)
+    gbcfg = mage_tool.IO.make_genomeconfig(args.o, args.t, genome)
+    gbcfg = mage_tool.IO.generate_codon_usage(genome, gbcfg)
 
     with open(gbcfg_filename, 'w') as f:
         f.write(yaml.dump(gbcfg))
