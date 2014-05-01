@@ -7,6 +7,23 @@ The first text field is used to specify the name of the project. This name will 
 used for the files generated as well as for naming the oligos designed with
 MODEST.
 
+Oligos created with MODEST is optimal for use with MAGE and recombineering methods
+where the methyl-directed mismatch repair (MMR) system is unfunctional e.g. by
+using a MutS mutant strain or a system where the MMR system can be temporarily
+knocked out. Please refer to the following articles for more information about
+strains, effeciency and the MMR system:
+
+    1. Wang, H. H., Isaacs, F. J., Carr, P. A., Sun, Z. Z., Xu, G., Forest, C. R.
+       and Church, G. M. (2009) *Programming cells by multiplex genome engineering
+       and accelerated evolution.* Nature, 460, 894–8.
+    2. Nyerges, A., Csörgo, B., Nagy, I., Latinovics, D., Szamecz, B., Pósfai, G.
+       and Pál, C. (2014) *Conditional DNA repair mutants enable highly precise
+       genome engineering.* Nucleic Acids Res., 10.1093/nar/gku105.
+    3. Sawitzke, J. A., Costantino, N., Li, X.-T., Thomason, L. C., Bubunenko, M.,
+       Court, C. and Court, D. L. (2011) *Probing cellular processes with
+       oligo-mediated recombination and using the knowledge gained to optimize
+       recombineering.* J. Mol. Biol., 407, 45–59.
+
 Selecting organism
 ------------------
 
