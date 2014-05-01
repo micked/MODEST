@@ -272,9 +272,12 @@ def residue_mutation(gene, mutations, codon_table=default_codon_table,
         >>> residue_mutation(gene, ["K5*"])
         Mutation: [AAA->] at pos 112
 
-    Insertions are denoted with a star and a lower letter index:
+    Insertions are denoted with a star or `@` and a lower letter index:
 
         >>> residue_mutation(gene, ["*1aA", "*2aK"])
+        Mutation: [GCA->gcgGCAaaa] at pos 103
+
+        >>> residue_mutation(gene, ["@1aA", "@2aK"])
         Mutation: [GCA->gcgGCAaaa] at pos 103
 
     Stop-codons are denoted by $:
@@ -289,7 +292,7 @@ def residue_mutation(gene, mutations, codon_table=default_codon_table,
 
     for mut in mutations:
         #Find desired residue substitution.
-        m = re.match("^([A-Z*$])(\d+)([a-z]?)([A-Z*$])$", mut)
+        m = re.match("^([A-Z*@$])(\d+)([a-z]?)([A-Z*$])$", mut)
 
         if not m:
             #log.debug("Invalid residue mutation: {}.".format(mut))
@@ -316,7 +319,7 @@ def residue_mutation(gene, mutations, codon_table=default_codon_table,
             new_codons = product(*[list(dgn_to_nts[nt]) for nt in new_dgn])
             new_codons = ["".join(cdn) for cdn in new_codons]
             #Insertion, choose codon with max usage
-            if old_AA == "*":
+            if old_AA in {'*', '@'}:
                 usage, new_codon = max([(usage_table[cdn][1], cdn) for cdn in new_codons])
             #Prioritise number of muts, then usage
             else:
@@ -334,12 +337,12 @@ def residue_mutation(gene, mutations, codon_table=default_codon_table,
 
             #Do mutation
             for i, nt in enumerate(new_codon):
-                if old_AA == "*":
+                if old_AA in {'*', '@'}:
                     seq.insert(nt, dna_pos + 3 + i, in_place=True)
                 else:
                     seq.mutate(nt, dna_pos + i, in_place=True)
 
-            if old_AA == "*": offset += 3
+            if old_AA in {'*', '@'}: offset += 3
 
     mutation = seq.get_mutation()
     if mutation:
@@ -367,13 +370,13 @@ class ResidueMutation(BaseOperation):
 
         thiD residue_mutation mut=N5*
 
-    Insertions are denoted as a star followed by an insertion number, lower-case
-    suffix letter and then the inserted amino acid::
+    Insertions are denoted as a an ``@`` followed by an insertion number,
+    lower-case suffix letter and then the inserted amino acid::
 
-        thiD residue_mutation mut=*5aA
+        thiD residue_mutation mut=@5aA
         #insert alanine in thiD after position 5.
 
-        thiD residue_mutation mut=*5aA;*5bA
+        thiD residue_mutation mut=@5aA;@5bA
         #insert two alanines in thiD after position 5.
 
     The symbol for stop codons is $::
