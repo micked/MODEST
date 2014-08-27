@@ -61,7 +61,8 @@ class Oligo:
     def make_oligo(self, genome, offset=0):
         """Make oligo from mutation"""
         #Make sure what is being mutated is actually being mutated
-        if str(genome[self.mut.pos:self.mut.pos+len(self.mut.before)]) != str(self.mut.before):
+        genome_before = str(genome[self.mut.pos:self.mut.pos+len(self.mut.before)])
+        if genome_before.upper() != str(self.mut.before).upper():
             found = genome[self.mut.pos:self.mut.pos+len(self.mut.before)]
             mutpos = self.mut.pos
             len_bef = len(self.mut.before)
@@ -244,7 +245,8 @@ class Mutation:
             raise ValueError("Invalid 'before' sequence: '{}'.".format(before))
         self.before = before.upper()
         if ref_seq:
-            if self.before != str(ref_seq[self.pos:self.pos+len(self.before)]):
+            ref_before = str(ref_seq[self.pos:self.pos+len(self.before)]).upper()
+            if self.before.upper() != ref_before:
                 raise ValueError("Trying to mutate '{}', but found '{}' in reference sequence."
                                  "".format(self.before, ref_seq[self.pos:self.pos+len(before)]))
 
