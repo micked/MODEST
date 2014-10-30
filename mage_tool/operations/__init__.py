@@ -147,6 +147,10 @@ class BaseOperation(object):
             else:
                 self.options[o] = self.default_options[o][1]
 
+        remaining = set(options) - set(self.options)
+        for o in remaining:
+            self.error('Unrecognized option: "{}"'.format(o))
+
     def create_opt_str(self):
         self.opt_str = ""
         for o, v in self.options.items():
