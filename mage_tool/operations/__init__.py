@@ -149,7 +149,8 @@ class BaseOperation(object):
 
         remaining = set(options) - set(self.options)
         for o in remaining:
-            self.error('Unrecognized option: "{}"'.format(o))
+            if o != 'barcodes':
+                self.error('Unrecognized option: "{}"'.format(o))
 
     def create_opt_str(self):
         self.opt_str = ""
