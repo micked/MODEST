@@ -98,6 +98,9 @@ def run_adjustments(oplist, genome, project, barcoding_lib, threaded=True):
             except KeyboardInterrupt:
                 log.error("Computation manually stopped")
                 break
+            except Exception as exc:
+                log.error('Something went wrong with {}. This is the program authors fault.'.format(op))
+                log.exception(exc)
 
     oligos = list()
     for r in results:

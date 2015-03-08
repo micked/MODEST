@@ -316,8 +316,10 @@ def residue_mutation(gene, mutations, codon_table=default_codon_table,
             #New degenerate codon
             new_dgn = dgn_table[new_AA]
             #All possible new codons
-            new_codons = product(*[list(dgn_to_nts[nt]) for nt in new_dgn])
-            new_codons = ["".join(cdn) for cdn in new_codons]
+            #new_codons = product(*[list(dgn_to_nts[nt]) for nt in new_dgn])
+            #new_codons = ["".join(cdn) for cdn in new_codons]
+            new_codons = [c for c, r in codon_table.items() if r==new_AA]
+
             #Insertion, choose codon with max usage
             if old_AA in {'*', '@'}:
                 usage, new_codon = max([(usage_table[cdn][1], cdn) for cdn in new_codons])
@@ -347,6 +349,8 @@ def residue_mutation(gene, mutations, codon_table=default_codon_table,
     mutation = seq.get_mutation()
     if mutation:
         return gene.do_mutation(mutation)
+
+    raise Exception('Unknown error occured.')
     return None
 
 
