@@ -421,6 +421,7 @@ def RBS_Monte_Carlo(gene, target, maxmuts=10, collect_library=False, **kwargs):
 
     #Initial leader
     best_leader = gene.leader.copy()
+    #print('## START:\ns=mage_tool.oligo_design.Sequence("{}")'.format(best_leader))
 
     #List leader sequences
     output = list()
@@ -449,7 +450,10 @@ def RBS_Monte_Carlo(gene, target, maxmuts=10, collect_library=False, **kwargs):
         #TODO: do ALL mutations
         for i in xrange(mut_period):
             #Create candidate
-            candidate = best_leader.random_mutation(max_mut=n)
+            try:
+                candidate = best_leader.random_mutation(max_mut=n)
+            except Exception:
+                continue
 
             #Calculate new total free energy
             new_dG = RBS_predict(candidate, gene.cds, RNAfold=RNAfold)
