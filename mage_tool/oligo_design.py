@@ -698,6 +698,7 @@ class Sequence:
             False
 
         """
+        #print('s = s.mutate({}, a={}, b={}, in_place={})'.format(nt,a,b,in_place))
         if nt not in ["A", "T", "G", "C"] or len(nt) != 1:
             raise MutationError("{} is not a single DNA nucleotide!".format(nt))
 
@@ -736,6 +737,7 @@ class Sequence:
         Behaves similarly to mutate()
 
         """
+        #print('s = s.delete(a={}, b={}, in_place={})'.format(a,b,in_place))
         if b is None:
             c = a
             a, b = self.seql[a]
@@ -813,6 +815,7 @@ class Sequence:
         Behaves similarly to mutate()
 
         """
+        #print('s = s.insert({}, a={}, b={}, in_place={})'.format(nt,a,b,in_place))
         if nt not in ["A", "T", "G", "C"] or len(nt) != 1:
             raise MutationError("{} is not a single DNA nucleotide!".format(nt))
 
@@ -833,7 +836,7 @@ class Sequence:
             raise NotImplementedError("Coordinates not possible for insertions.")
 
         #Inserting as very first codon
-        if c == 0 and self.seql[0] == (0, 0):
+        if c == 0 and (not self.seql or self.seql[0] == (0, 0)):
             return False
 
         #Inside wobble, abort
@@ -1037,12 +1040,14 @@ class Sequence:
             #print(pos, nt)
             new = self.insert(nt, pos, in_place=False)
             if max_mut:
-                muts = self.get_mutated_positions()
+                #new or self? XXXX
+                muts = new.get_mutated_positions()
                 #Remove a random mutation
                 while len(muts) > int(max_mut)-1:
                     r = random.choice(range(len(muts)))
                     new.revert_mutation(*muts[r], in_place=True)
-                    del(muts[r])
+                    #del(muts[r])
+                    muts = new.get_mutated_positions()
             return new
         #Deletion
         elif dim < thr:
@@ -1087,6 +1092,7 @@ class Sequence:
 
     def revert_mutation(self, a, b, in_place=True):
         """Revert a mutation."""
+        #print('s = s.revert_mutation(a={}, b={}, in_place={})'.format(a,b,in_place))
         new = self
         if not in_place:
             new = self.copy()
