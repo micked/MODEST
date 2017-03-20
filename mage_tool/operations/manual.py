@@ -361,31 +361,31 @@ class ResidueMutation(BaseOperation):
 
     Options:
 
-    - ``mut`` Amino acid substitions. Multiple substitions can be separated by a semicolon (;)
+    - ``mutation`` Amino acid substitions. Multiple substitions can be separated by a semicolon (;)
 
     Examples::
 
-        thiD residue_mutation mut=N5Q
+        thiD residue_mutation mutation=N5Q
         #substitue N with Q at residue 5 in thiD.
 
     Amino acid sequence before is MKRINALTIA, and after substitution it is MKRIQALTIA.
 
     Deletions are denoted with a ``*``::
 
-        thiD residue_mutation mut=N5*
+        thiD residue_mutation mutation=N5*
 
-    Insertions are denoted as a an ``@`` followed by an insertion number,
+    Insertions are denoted as a an ``*`` followed by an insertion number,
     lower-case suffix letter and then the inserted amino acid::
 
-        thiD residue_mutation mut=@5aA
+        thiD residue_mutation mutation=*5aA
         #insert alanine in thiD after position 5.
 
-        thiD residue_mutation mut=@5aA;@5bA
+        thiD residue_mutation mutation=*5aA;*5bA
         #insert two alanines in thiD after position 5.
 
     The symbol for stop codons is $::
 
-        thiD residue_mutation mut=N5$
+        thiD residue_mutation mutation=N5$
         #substitue N with a stop codon at
         #residue 5 in thiD.
 

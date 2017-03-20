@@ -18,7 +18,8 @@ from setuptools import setup
 version_py = os.path.join(os.path.dirname(__file__), 'mage_tool', 'version.py')
 
 try:
-    version_git = subprocess.check_output(["git", "describe", '--abbrev=3']).rstrip()
+    version_git = subprocess.check_output(["git", "describe", '--abbrev=3'],
+        universal_newlines=True).rstrip()
 except subprocess.CalledProcessError:
     with open(version_py, 'r') as fh:
         version_git = open(version_py).read().strip().split('=')[-1].replace('"','')
